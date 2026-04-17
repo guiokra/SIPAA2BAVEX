@@ -57,6 +57,19 @@
     "/relprevReports/{reportId}": {
       "schema": "RelprevReport",
       "description": "Relatos de prevenção"
+    },
+    "/config/abastecimento": {
+      "schema": {
+        "title": "AppConfig",
+        "description": "Configurações globais do aplicativo",
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "description": "URL do arquivo de abastecimento" },
+          "updatedAt": { "type": "string", "description": "Data da última atualização" },
+          "updatedBy": { "type": "string", "description": "Email do admin que atualizou" }
+        }
+      },
+      "description": "Documentos de configuração"
     }
   }
 }

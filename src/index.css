@@ -11,9 +11,22 @@
   --color-accent-gold: #c5a059;
   --color-accent-gold-dark: #8e6d2d;
   --color-accent-blue: #1e4b8a;
+  --color-military-gold: #c5a059;
+  --color-military-gold-dark: #8e6d2d;
+  --color-military-blue: #1e4b8a;
   --color-military-black: #05070a;
   --color-text-secondary: #8a94a6;
   --color-border-theme: rgba(197, 160, 89, 0.2);
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 @layer base {

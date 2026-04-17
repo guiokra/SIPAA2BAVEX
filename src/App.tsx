@@ -36,10 +36,11 @@ import {
   Download,
   Clock,
   Search,
-  Eye
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { auth, db } from './firebase';
+import { auth, db, storage } from './firebase';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
@@ -57,8 +58,11 @@ import {
   getDocFromServer, 
   doc,
   Timestamp,
-  deleteDoc
+  deleteDoc,
+  setDoc,
+  getDoc
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -169,6 +173,222 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
+
+// --- Admin Helpers ---
+const ABASTECIMENTO_DATA = [
+  { estado: 'ACRE', locais: [
+    { icao: 'SBCZ', local: 'Cruzeiro do sul', br: 'BR', contato: '(68) 3322-5615/(92) 99388-2821', horario: '6-18h' },
+    { icao: 'SBRB', local: 'Rio Branco', br: 'BR', contato: '(68) 3211-1095/(68) 99995-1511', horario: 'H24' }
+  ]},
+  { estado: 'ALAGOAS', locais: [
+    { icao: 'SBMO', local: 'Maceió (Zumbi dos Palmares)', br: 'BR', contato: '(82) 3332-6110/(82) 99991-8144', horario: 'H24' }
+  ]},
+  { estado: 'AMAPÁ', locais: [
+    { icao: 'SBMQ', local: 'Macapá', br: 'BR', contato: '(96) 3223-4493/(96) 98137- 6371', horario: 'H24' }
+  ]},
+  { estado: 'AMAZONAS', locais: [
+    { icao: 'SBUY', local: 'Coari (URUCU)', br: 'BR', contato: '(92) 3616-6546/(92) 99231-2803', horario: '6:30-18:30h' },
+    { icao: 'SBEG', local: 'Manaus (Eduardo Gomes)', br: 'BR', contato: '(92) 3652-1628/(92) 98143-1288', horario: 'H24' },
+    { icao: 'SBMN', local: 'Manaus (Ponta Pelada)', br: 'BR', contato: '(92) 3629-3074/(92)99116-1980', horario: 'H24' },
+    { icao: 'SWFN', local: 'Manaus (Flores)', br: 'BR', contato: '(92) 3653-0082/(92) 99401-2196', horario: '6-17:30h' },
+    { icao: 'SBUA', local: 'São Gabriel da Cachoeira', br: 'BR', contato: '(97) 99183-0766/(97) 3471-1343', horario: '8-19h' },
+    { icao: 'SBTT', local: 'Tabatinga', br: 'BR', contato: '(97) 3412-2372/(97) 98407 0983', horario: '7-17h' },
+    { icao: 'SBTF', local: 'Tefé', br: 'BR', contato: '(92) 99359-6132/(97) 3343-9501', horario: '6-18h' }
+  ]},
+  { estado: 'BAHIA', locais: [
+    { icao: 'SBIL', local: 'Ilhéus * (não pertence mais à VIBRA)', br: 'BR', contato: 'NOTAS ABAIXO', horario: 'COORD.' },
+    { icao: 'SBPS', local: 'Porto Seguro', br: 'BR', contato: '(73) 3288-2788 (73) 98203-7667', horario: 'H24' },
+    { icao: 'SBSV', local: 'Salvador', br: 'BR', contato: '(71) 98106-5216/(71) 3204-1135', horario: 'H24' },
+    { icao: 'SBTC', local: 'Una/Comandatuba', br: 'BR', contato: '(73) 3236-6017/(73) 99956-2040', horario: '9-17h' },
+    { icao: 'SBVC', local: 'Vitória da Conquista', br: 'BR', contato: '(77) 98125-3003/(77) 99193-4588', horario: 'H24' }
+  ]},
+  { estado: 'CEARÁ', locais: [
+    { icao: 'SBFZ', local: 'Fortaleza (Pinto Martins)', br: 'BR', contato: '(85) 99147-8620 (85) 98736-4150', horario: 'H24' },
+    { icao: 'SBJU', local: 'Juazeiro do Norte', br: 'BR', contato: '(88) 3511-5385/(85) 8813-7669', horario: 'H24' },
+    { icao: 'SBJE', local: 'Jericoacara (Ariston Pessoa)', br: 'BR', contato: '(82) 99961-4115 (88) 98141-1391', horario: '8-17' }
+  ]},
+  { estado: 'DISTRITO FEDERAL', locais: [
+    { icao: 'SBBR', local: 'Brasília', br: 'BR', contato: '(61) 3365-1290/(61) 99825-1411', horario: 'H24' }
+  ]},
+  { estado: 'ESPÍRITO SANTO', locais: [
+    { icao: 'SBVT', local: 'Vitória', br: 'BR', contato: '(27) 99892-3427 (27) 99941-4820', horario: 'H24' }
+  ]},
+  { estado: 'GOIÁS', locais: [
+    { icao: 'SBAN', local: 'Anápolis', br: 'BR', contato: '(62) 3329-7803/(62) 3329-7803', horario: 'H24' },
+    { icao: 'SBCN', local: 'Caldas Novas', br: 'BR', contato: '(64) 3453-2671/(62) 99370-6975', horario: '7-19h' },
+    { icao: 'SBGO', local: 'Goiânia (Santa Genoveva)', br: 'BR', contato: '(62) 3942-4004/(62) 99679-7718', horario: 'H24' }
+  ]},
+  { estado: 'MARANHÃO', locais: [
+    { icao: 'SBSL', local: 'São Luiz (Mal. Cunha Machado)', br: 'BR', contato: '(98) 3221-7366 (98) 98121-9724', horario: 'H24' }
+  ]},
+  { estado: 'MATO GROSSO', locais: [
+    { icao: 'SBAT', local: 'Alta Floresta', br: 'BR', contato: '(66) 3521-5556/(66) 98114-3004', horario: '6-180h' },
+    { icao: 'SBCY', local: 'Cuiabá (Mal. Rondon)', br: 'BR', contato: '(65) 3682-3445/(65) 99216-0442', horario: 'H24' },
+    { icao: 'SWSI', local: 'Sinop', br: 'BR', contato: '(66) 98114-3006 (66) 99657-5804', horario: '6-18h' }
+  ]},
+  { estado: 'MATO GROSSO DO SUL', locais: [
+    { icao: 'SBDB', local: 'Bonito', br: 'BR', contato: '(67) 3255-4303/(67) 99823-1977', horario: '07:30-17:30' },
+    { icao: 'SBCG', local: 'Campo Grande', br: 'BR', contato: '(67) 3363-6383/(67) 99958-6620', horario: 'H24' },
+    { icao: 'SBCR', local: 'Corumbá', br: 'BR', contato: '(67) 3232-5615/(67) 99612-0431', horario: '6-18h' },
+    { icao: 'SBDO', local: 'Dourados', br: 'JR', contato: '(67) 3427-1230/(67)99833-6325', horario: '24h' },
+    { icao: 'SBTG', local: 'Três Lagoas', br: 'BR', contato: '(67) 3522-3523/(67) 99823-9523', horario: '07:30-17:30' }
+  ]},
+  { estado: 'MINAS GERAIS', locais: [
+    { icao: 'SBBH', local: 'Belo Horizonte (Pampulha)', br: 'BR', contato: '(31) 3441-3477/(31) 99950-1783', horario: 'H24' },
+    { icao: 'SBCF', local: 'Confins', br: 'BR', contato: '(31) 3689-2111/(31)97322-0555', horario: 'H24' },
+    { icao: 'SBZM', local: 'Goianá (Zona da Mata)', br: 'BR', contato: '(32) 9921-2229/(32) 99918-5570', horario: '8-22' },
+    { icao: 'SBMK', local: 'Montes Claros', br: 'BR', contato: '(38) 3215-3062/(38) 99192-7208', horario: '5-22h' },
+    { icao: 'SBUR', local: 'Uberaba', br: 'BR', contato: '(34) 3336-1677/(34) 99971-1013', horario: '04-21' },
+    { icao: 'SBUL', local: 'Uberlândia', br: 'BR', contato: '(34) 3212-5064/(34) 99811-7655', horario: 'H24' }
+  ]},
+  { estado: 'PARÁ', locais: [
+    { icao: 'SBHT', local: 'Altamira', br: 'BR', contato: '(93) 99228-2900/(93) 99142-3791', horario: '06:45-18:45' },
+    { icao: 'SBBE', local: 'Belém (Val de Cans)', br: 'BR', contato: '(91) 99994-6967/(91) 98733-2544', horario: 'H24' },
+    { icao: 'SBIH', local: 'Itaituba', br: 'BR', contato: '(93) 99119-9327/(93) 98114-0579', horario: '6:30-18:30h' },
+    { icao: 'SBMA', local: 'Marabá', br: 'BR', contato: '(94) 3324-1349/(94) 99186-5602', horario: '3-19' },
+    { icao: 'SBCJ', local: 'Parauapebas (Carajás)', br: 'BR', contato: '(94) 3346-1480/(94) 98410-1000', horario: '8-18h' },
+    { icao: 'SBSN', local: 'Santarém', br: 'BR', contato: '(93) 3522-2033/(93) 99975-1347', horario: 'H24' }
+  ]},
+  { estado: 'PARANÁ', locais: [
+    { icao: 'SBMG', local: 'Maringá', br: 'BR', contato: '(44) 3024-5381/(44) 99739-0600', horario: '5-21:20' },
+    { icao: 'SBLO', local: 'Londrina', br: 'BR', contato: '(43) 3326-1334/(43) 99935-0366', horario: '4-22h' },
+    { icao: 'SBFI', local: 'Foz Iguaçu (Cataratas)', br: 'BR', contato: '(45)3523-7010/(45) 99148-8591', horario: '6-00:20' },
+    { icao: 'SBBI', local: 'Curitiba (Bacacheri)', br: 'BR', contato: '(41) 3357-9970/(41) 99768-4489', horario: '05-22h' },
+    { icao: 'SBPG', local: 'Ponta Grossa', br: 'BR', contato: '(41) 3381-1839/(41) 99965-1594', horario: '7-19h' },
+    { icao: 'SBCT', local: 'Curitiba (Afonso Pena)', br: 'BR', contato: '(41)3381-1838/(41) 3381-1839', horario: 'H24' }
+  ]},
+  { estado: 'PERNAMBUCO', locais: [
+    { icao: 'SBPL', local: 'Petrolina', br: 'BR', contato: '(87) 3863-5100/(87) 99922-2821', horario: 'H24' },
+    { icao: 'SBRF', local: 'Recife (Guararapes)', br: 'BR', contato: '(81) 3461-4545/(81) 99961-3041', horario: 'H24' }
+  ]},
+  { estado: 'RIO DE JANEIRO', locais: [
+    { icao: 'SBES', local: 'São Pedro d`Aldeia', br: 'Marinha', contato: '(22) 2621-4030', horario: '' },
+    { icao: 'SBME', local: 'Macaé', br: 'BR', contato: '(22) 2762-1602/(22) 99870-4031', horario: '6-22h' },
+    { icao: 'SBGL', local: 'Galeão', br: 'BR', contato: '(21) 3398-3570/(21) 3383-6868', horario: 'H24' },
+    { icao: 'SBRJ', local: 'Santos Dumont', br: 'BR', contato: '(21) 3814-7437/(21) 980315911', horario: 'H24' },
+    { icao: 'SBJR', local: 'Jacarepaguá', br: 'BR', contato: '(21) 99406-0235/(21) 97009-7311', horario: 'H24' },
+    { icao: 'SBSC', local: 'Santa Cruz', br: 'BR', contato: '(21) 3395 4178/(21) 3401-8196', horario: 'H24' }
+  ]},
+  { estado: 'RIO GRANDE DO NORTE', locais: [
+    { icao: 'SBSG', local: 'São Gonçalo do Amarante', br: 'BR', contato: '(84) 99641-7887/(84) 3343-6376', horario: 'H24' }
+  ]},
+  { estado: 'RIO GRANDE DO SUL', locais: [
+    { icao: 'SBCX', local: 'Caxias do Sul', br: 'BR', contato: '(54) 3213-5072/(54) 99683-3533', horario: '7-19h' },
+    { icao: 'SBCO', local: 'Base Aérea de Canoas', br: 'BR', contato: '(51)99196-0275', horario: 'H24' },
+    { icao: 'SBPK', local: 'Pelotas', br: 'BR', contato: '(53) 3011-7965/(53) 99128-6698', horario: '7-19h' },
+    { icao: 'SBPA', local: 'Porto Alegre', br: 'BR', contato: '(51) 3371-3131/(51) 3375-9101', horario: 'H24' },
+    { icao: 'SBSM', local: 'Santa Maria (Base Aérea)', br: 'BR', contato: 'NOTAS ABAIXO', horario: '06-22H' },
+    { icao: 'SBUG', local: 'Uruguaiana', br: 'BR', contato: '(55) 3413-4807/(55) 99999-0298', horario: '08-17' }
+  ]},
+  { estado: 'SANTA CATARINA', locais: [
+    { icao: 'SBFL', local: 'Florianópolis', br: 'BR', contato: '(48) 3236-1464/(48) 99959-4532', horario: 'H24' },
+    { icao: 'SBNF', local: 'Navegantes', br: 'BR', contato: '(47) 3342-3989/(47) 99925-9584', horario: '6-00h' },
+    { icao: 'SBCH', local: 'Chapecó (não pertence mais à VIBRA)', br: 'BR', contato: 'COORD. ANTECIPADA', horario: '' }
+  ]},
+  { estado: 'SÃO PAULO', locais: [
+    { icao: 'SBAU', local: 'Araçatuba', br: 'BR', contato: '(18) 3625-6606/ (18) 98170-0122', horario: '7:30-21:00' },
+    { icao: 'SBAE', local: 'Arealva (Bauru)', br: 'BR', contato: '(14) 3237-7003/(14) 97602-0081', horario: '8-18h' },
+    { icao: 'SBKP', local: 'Campinas (Viracopos)', br: 'BR', contato: '(19) 3765-9159/(19) 99920-1167', horario: 'H24' },
+    { icao: 'SBGW', local: 'Guaratinguetá', br: 'BR', contato: '(19) 97419-4380', horario: '8-18h' },
+    { icao: 'SBGR', local: 'Guarulhos', br: 'BR', contato: '(11) 2404-9815/(11) 96556-3580', horario: 'H24' },
+    { icao: 'SBRP', local: 'Ribeirão Preto', br: 'BR', contato: '(16) 3626-2041/(16) 99700-7176', horario: '6:30-19:30' },
+    { icao: 'SDSC', local: 'São Carlos', br: 'BR', contato: '(16) 3378-3300/(19) 999762-7089', horario: '8-20h' },
+    { icao: 'SBSR', local: 'São José do Rio Preto', br: 'BR', contato: '(17) 3222-2318/(17) 97400-1836', horario: '5:30-21h' },
+    { icao: 'SBSJ', local: 'São José dos Campos', br: 'BR', contato: '(12) 3947-3454', horario: '6-22h' },
+    { icao: 'SBSP', local: 'Congonhas', br: 'BR', contato: '(11) 3478-3150/(19) 94700-7244', horario: '5:15-23h' },
+    { icao: 'SBMT', local: 'Campo de Marte', br: 'BR', contato: '(11) 2221-5148/(11) 2221-7586', horario: '6-22h' },
+    { icao: 'SIMK', local: 'Franca', br: 'BR', contato: '(15) 99860-8984', horario: '8-18h' },
+    { icao: 'SBAQ', local: 'Araraquara', br: 'BR', contato: '(15) 99871-7129', horario: '8-18h' },
+    { icao: 'SBDN', local: 'Pres. Prudente', br: 'BR', contato: '(18) 3223-1300/(18) 98170-0093', horario: '4-18' },
+    { icao: 'SBTA', local: 'Taubaté', br: 'BR', contato: '(12) 2123-7400', horario: '6-18h' }
+  ]}
+];
+
+const generateAbastecimentoPDF = () => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // High fidelity style to match original document exactly
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Localidades ANO 2025', pageWidth / 2, 20, { align: 'center' });
+  
+  doc.setTextColor(255, 0, 0); // Red (ANO 2025)
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('(ANO 2025)', pageWidth / 2, 28, { align: 'center' });
+
+  let currentY = 35;
+  
+  ABASTECIMENTO_DATA.forEach((item) => {
+    // State Header
+    autoTable(doc, {
+      startY: currentY,
+      body: [[item.estado]],
+      theme: 'plain',
+      styles: { 
+        fontSize: 10, 
+        fontStyle: 'bold', 
+        halign: 'center',
+        cellPadding: 1,
+        textColor: [0, 0, 0],
+        fillColor: [230, 230, 230]
+      },
+      margin: { left: 15, right: 15 }
+    });
+    
+    currentY = (doc as any).lastAutoTable.finalY;
+
+    // Table
+    autoTable(doc, {
+      startY: currentY,
+      body: item.locais.map(l => [l.icao, l.local, l.br, l.contato, l.horario]),
+      theme: 'grid',
+      styles: { 
+        fontSize: 7,
+        cellPadding: 1.5,
+        textColor: [0, 0, 0],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1
+      },
+      columnStyles: {
+        0: { fillColor: [205, 230, 205], fontStyle: 'bold', cellWidth: 20 }, // Light Green ICAO
+        1: { cellWidth: 55 },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 55 },
+        4: { cellWidth: 25, halign: 'center' }
+      },
+      margin: { left: 15, right: 15 },
+      didDrawPage: (data) => {
+        // Handle side-notes specifically for SBIL, SBCH, SBSM if visible
+      }
+    });
+
+    // Special side-notes integration (emulating the yellow/green boxes)
+    const lastY = (doc as any).lastAutoTable.finalY;
+    
+    if (item.estado === 'BAHIA') {
+      doc.setFontSize(7);
+      doc.setFillColor(255, 255, 200); // Yellowish
+      doc.rect(172, lastY - 15, 25, 20, 'F');
+      doc.text(['SBIL *', 'Necessita de', 'coordenação', 'antecipada', 'junto ao', 'CavEx/CMAvEx'], 173, lastY - 12);
+    }
+    
+    currentY = lastY + 5;
+  });
+
+  // Footer pages
+  const totalPages = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(0);
+    doc.text(`Página ${i}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+  }
+
+  return doc;
+};
 
 // --- Admin Helpers ---
 function getRiskClass(r: number, tipoVoo: string = 'REGULAR') {
@@ -405,6 +625,17 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<SectionKey>('Inicio');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [abastecimentoConfig, setAbastecimentoConfig] = useState<any>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'config', 'abastecimento'), (snap) => {
+      if (snap.exists()) {
+        setAbastecimentoConfig(snap.data());
+      }
+    });
+    return () => unsub();
+  }, []);
+
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -490,6 +721,23 @@ export default function App() {
   ];
 
   const handleTabChange = (tab: any) => {
+    if (tab === 'Portal Notificação') {
+      window.open('https://santosdumont.anac.gov.br/menu/r/api/portal_unico_notificacao/selecao-do-tipo-de-evento?clear=103&session=111703245409353', '_blank');
+      return;
+    }
+    if (tab === 'Normas CAvEx') {
+      window.open('https://drive.google.com/drive/folders/1EDnPJbjEb4dWJYQ_BODhr_HGLUggwtRh', '_blank');
+      return;
+    }
+    if (tab === 'Abastecimento') {
+      if (abastecimentoConfig?.url) {
+        window.open(abastecimentoConfig.url, '_blank');
+      } else {
+        const docObj = generateAbastecimentoPDF();
+        window.open(docObj.output('bloburl'), '_blank');
+      }
+      return;
+    }
     if (tab === 'Admin' && !isAdminAuthenticated) {
       setIsAdminModalOpen(true);
       return;
@@ -692,7 +940,11 @@ export default function App() {
               transition={{ duration: 0.2 }}
               className="max-w-7xl mx-auto w-full pb-20"
             >
-              {React.createElement(sectionComponents[activeTab], { user, onTabChange: handleTabChange })}
+              {React.createElement(sectionComponents[activeTab], { 
+                user, 
+                onTabChange: handleTabChange,
+                abastecimentoConfig 
+              })}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -1977,70 +2229,47 @@ function PosAcidenteSection({ onTabChange }: { onTabChange: (tab: SectionKey) =>
   );
 }
 
-function AbastecimentoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
+function AbastecimentoSection({ onTabChange, abastecimentoConfig }: { onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any }) {
   return (
-    <div className="space-y-8">
-       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Segurança no Abastecimento</h2>
-            <p className="text-slate-400 italic">"Combustível é vida, mas vapor é perigo."</p>
-          </div>
-          <div className="flex gap-2">
-             <div className="px-3 py-1 bg-green-500/10 border border-green-500/30 rounded text-[10px] text-green-500 font-bold uppercase tracking-widest">Posto Ativo</div>
-          </div>
+    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="text-center space-y-3">
+        <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Guia de Abastecimento 2025</h2>
+        <p className="text-military-gold font-bold text-sm uppercase tracking-[0.3em]">Documento Oficial Carregado</p>
+      </div>
+
+      <div className="card-military p-12 max-w-xl w-full border-dashed flex flex-col items-center gap-8 bg-military-gold/5">
+        <div className="w-24 h-24 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold shadow-2xl shadow-military-gold/10">
+          <FileText size={48} />
+        </div>
+        
+        <div className="text-center space-y-4">
+          <p className="text-slate-300 text-sm leading-relaxed">
+            O arquivo original foi aberto em uma nova aba com todas as localidades, contatos e horários para 2025. Se houver algum bloqueio de popup, utilize o botão abaixo para visualizar.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-           <div className="lg:col-span-2 space-y-6">
-              <div className="card-military">
-                <h3 className="font-bold text-white mb-6 border-b border-slate-800 pb-2 uppercase text-xs tracking-widest">Protocolo de Segurança</h3>
-                <ul className="space-y-4">
-                  <CheckItem text="Verificar aterramento obrigatório da aeronave e do veículo de abastecimento" />
-                  <CheckItem text="Distância de segurança de 15m para qualquer fonte de calor ou ignição" />
-                  <CheckItem text="Verificar estanqueidade de todas as mangueiras e conexões de abastecimento" />
-                  <CheckItem text="Equipamento de combate a incêndio (Extintores) posicionado e tripulado" />
-                  <CheckItem text="Motores e aviônicos essenciais desligados durante a operação padrão" />
-                </ul>
-              </div>
+        <button 
+          onClick={() => {
+            if (abastecimentoConfig?.url) {
+              window.open(abastecimentoConfig.url, '_blank');
+            } else {
+              const doc = generateAbastecimentoPDF();
+              window.open(doc.output('bloburl'), '_blank');
+            }
+          }}
+          className="btn-military w-full py-5 text-sm uppercase font-black tracking-[0.2em] flex items-center justify-center gap-4 group"
+        >
+          <ExternalLink size={20} className="group-hover:scale-110 transition-transform" />
+          VISUALIZAR ARQUIVO ORIGINAL
+        </button>
+      </div>
 
-              <div className="card-military bg-red-950/20 border-red-500/30">
-                <h3 className="font-bold text-red-500 mb-4 flex items-center gap-2 uppercase text-xs tracking-widest">
-                   <AlertTriangle size={18} />
-                   Pontos de Atenção Crítica
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                   <div className="p-4 bg-military-black rounded border border-red-500/20 text-slate-300">
-                     <span className="font-bold text-red-400 block mb-2 uppercase text-[10px]">Descarga Estática</span>
-                     O fluxo de combustível gera eletricidade estática. O aterramento é a única barreira contra explosão.
-                   </div>
-                   <div className="p-4 bg-military-black rounded border border-red-500/20 text-slate-300">
-                     <span className="font-bold text-red-400 block mb-2 uppercase text-[10px]">Qualidade (Drenagem)</span>
-                     Drenar sempre antes do primeiro voo do dia para checar presença de água ou sedimentos.
-                   </div>
-                </div>
-              </div>
-           </div>
-
-           <div className="space-y-6">
-              <div className="card-military">
-                 <h3 className="font-bold text-military-gold mb-4 uppercase text-[10px] tracking-widest">Suporte e Material</h3>
-                 <div className="space-y-3">
-                    <button className="w-full btn-military text-xs py-3 font-bold uppercase tracking-wider">
-                      <FileText size={16} /> Checklist Completo
-                    </button>
-                    <button className="w-full px-4 py-3 border border-slate-700 bg-slate-800 text-slate-200 rounded text-xs font-bold uppercase tracking-wider hover:bg-slate-700 transition-colors">Solicitar Amostragem</button>
-                 </div>
-              </div>
-              
-              <div className="card-military border-military-blue/30 bg-military-blue/5">
-                 <h4 className="text-[10px] font-black text-military-blue-300 uppercase mb-2">Último Teste Lote</h4>
-                 <div className="flex justify-between items-center bg-military-black p-3 rounded">
-                    <span className="text-xs text-slate-300">Lote #JET-4589</span>
-                    <span className="text-green-500 font-bold text-xs uppercase">Conforme</span>
-                 </div>
-              </div>
-           </div>
-        </div>
+      <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-lg flex items-center gap-3 max-w-md">
+        <AlertCircle className="text-blue-400" size={18} />
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-tight">
+          Acesso restrito ao efetivo do 2º BAvEx. Verifique sempre o NOTAM para disponibilidade em tempo real.
+        </p>
+      </div>
     </div>
   );
 }
@@ -2251,13 +2480,14 @@ function PlanejamentoSection({ onTabChange }: { onTabChange: (tab: SectionKey) =
   );
 }
 
-function AdminSection({ user, onTabChange }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }) {
+function AdminSection({ user, onTabChange, abastecimentoConfig }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any }) {
   const [stats, setStats] = useState({ relprevs: 0, fgrs: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
   const [fgrs, setFgrs] = useState<any[]>([]);
-  const [selectedView, setSelectedView] = useState<'stats' | 'relprevs' | 'fgrs'>('stats');
+  const [selectedView, setSelectedView] = useState<'stats' | 'relprevs' | 'fgrs' | 'config'>('stats');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const qRelprev = query(collection(db, 'relprevReports'), orderBy('createdAt', 'desc'));
@@ -2299,6 +2529,31 @@ function AdminSection({ user, onTabChange }: { user: FirebaseUser | null, onTabC
     setDeleteColl(collectionName);
   };
 
+  const handleAbastecimentoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setIsUploading(true);
+    try {
+      const storageRef = ref(storage, `config/abastecimento_${Date.now()}.pdf`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
+      await setDoc(doc(db, 'config', 'abastecimento'), {
+        url,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.email || 'Admin'
+      });
+      
+      alert('Arquivo de abastecimento atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      alert('Falha ao enviar arquivo. Verifique se o arquivo é um PDF válido.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
        <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 md:pb-6 border-b border-slate-800 gap-4">
@@ -2329,6 +2584,12 @@ function AdminSection({ user, onTabChange }: { user: FirebaseUser | null, onTabC
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'fgrs' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
             >
               Missões FGR
+            </button>
+            <button 
+              onClick={() => setSelectedView('config')}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'config' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
+            >
+              Configurações
             </button>
           </div>
        </div>
@@ -2560,6 +2821,72 @@ function AdminSection({ user, onTabChange }: { user: FirebaseUser | null, onTabC
              <div className="card-military py-12 text-center opacity-40 italic text-sm">Nenhuma missão encontrada.</div>
            )}
          </div>
+       )}
+
+       {selectedView === 'config' && (
+          <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+             <div className="card-military p-6">
+                <div className="flex items-center gap-3 mb-6">
+                   <Settings className="text-military-gold" size={20} />
+                   <h3 className="font-black text-white uppercase text-[10px] tracking-widest">Configurações de Documentos</h3>
+                </div>
+                
+                <div className="space-y-4">
+                   <div className="p-4 bg-military-gold/5 border border-military-gold/20 rounded-lg">
+                      <h4 className="text-xs font-bold text-military-gold uppercase mb-2 tracking-tight">Guia de Abastecimento</h4>
+                      <p className="text-[10px] text-slate-400 mb-6 uppercase leading-relaxed">
+                         Substitua o arquivo PDF padrão. Quando um arquivo for enviado aqui, ele terá prioridade e será aberto automaticamente quando o usuário clicar em "Abastecimento".
+                      </p>
+                      
+                      <div className="flex flex-col sm:flex-row items-center gap-4">
+                         <input 
+                           type="file" 
+                           accept=".pdf"
+                           onChange={handleAbastecimentoUpload}
+                           className="hidden" 
+                           id="abastecimento-upload" 
+                           disabled={isUploading}
+                         />
+                         <label 
+                           htmlFor="abastecimento-upload"
+                           className={`btn-military py-3 px-8 text-[10px] cursor-pointer inline-flex items-center gap-3 transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+                         >
+                           {isUploading ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                           {isUploading ? 'PROCESSANDO UPLOAD...' : 'SELECIONAR E ENVIAR NOVO PDF'}
+                         </label>
+                         
+                         {abastecimentoConfig?.url && (
+                            <a 
+                              href={abastecimentoConfig.url} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-white hover:text-military-gold text-[10px] font-black uppercase tracking-widest flex items-center gap-2 px-4 py-2 bg-white/5 rounded-md transition-colors"
+                            >
+                               <Download size={14} /> Arquivo Atual
+                            </a>
+                         )}
+                      </div>
+                      
+                      {abastecimentoConfig?.updatedAt && (
+                         <div className="mt-6 pt-4 border-t border-military-gold/10">
+                            <p className="text-[9px] text-slate-500 uppercase tracking-widest">
+                               Última atualização: <span className="text-slate-300 font-bold">{new Date(abastecimentoConfig.updatedAt).toLocaleString()}</span> por <span className="text-military-gold font-bold">{abastecimentoConfig.updatedBy || 'Mestre/SIPAA'}</span>
+                            </p>
+                         </div>
+                      )}
+                   </div>
+                </div>
+             </div>
+
+             <div className="card-military p-6 border-blue-500/10 bg-blue-500/5">
+                <div className="flex items-start gap-3">
+                   <AlertCircle className="text-blue-400 shrink-0" size={18} />
+                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider leading-relaxed">
+                      Atenção: O upload de arquivos grandes pode levar alguns segundos dependendo da conexão. Certifique-se de que o arquivo está no formato PDF e não está corrompido antes do envio.
+                   </p>
+                </div>
+             </div>
+          </div>
        )}
 
        {/* Delete Confirmation Modal */}
@@ -2897,7 +3224,7 @@ function AdminStat({ label, value, trend }: any) {
   );
 }
 
-const sectionComponents: Record<string, FC<{ user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }>> = {
+const sectionComponents: Record<string, FC<{ user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any }>> = {
   Inicio: InicioSection,
   RELPREV: RelprevSection,
   FGR: FgrSection,

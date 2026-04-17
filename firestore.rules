@@ -50,6 +50,12 @@ service cloud.firestore {
       allow read, create, update, delete: if true;
     }
 
+    // Config
+    match /config/abastecimento {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Default Deny
     match /{document=**} {
       allow read, write: if false;
