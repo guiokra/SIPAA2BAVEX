@@ -724,17 +724,17 @@ function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
           </div>
           <div className="flex flex-wrap gap-4 mt-8">
             <button 
-              onClick={() => onTabChange('Ações Pós-Acidente')}
+              onClick={() => onTabChange('RELPREV')}
               className="btn-military shadow-lg shadow-accent-gold/10"
             >
-              <AlertTriangle size={18} />
-              Reportar Emergência
+              <FileSearch size={18} />
+              RELPREV
             </button>
             <button 
-              onClick={() => onTabChange('Portal Notificação')}
-              className="px-6 py-2 border border-border-theme rounded-sm text-text-secondary hover:text-white hover:bg-white/5 transition-all text-sm font-semibold"
+              onClick={() => onTabChange('FGR')}
+              className="px-6 py-2 border border-border-theme rounded-sm text-text-secondary hover:text-white hover:bg-white/5 transition-all text-sm font-semibold uppercase tracking-widest"
             >
-              Ver Notificações
+              FGR
             </button>
           </div>
         </div>
@@ -903,7 +903,6 @@ const GRAVIDADE_DATA = [
 
 function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }) {
   const [reports, setReports] = useState<any[]>([]);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [extraFiles, setExtraFiles] = useState<string[]>([]);
@@ -991,7 +990,6 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
       }
 
       alert(isDraft ? "Rascunho salvo com sucesso." : "Relato enviado com sucesso ao SIPAA.");
-      setIsFormOpen(false);
       
       // Reset
       setFormData({
@@ -1013,77 +1011,8 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
     }
   };
 
-  if (!isFormOpen) {
-    return (
-      <div className="space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">RELPREV</h2>
-            <p className="text-text-secondary text-sm">Relato de Prevenção - Contribua para a segurança de voo.</p>
-          </div>
-          <button 
-            onClick={() => setIsFormOpen(true)}
-            className="btn-military px-8 py-4 flex items-center gap-3 group"
-          >
-            <Plus size={18} className="group-hover:rotate-90 transition-transform" />
-            <span className="text-xs font-black uppercase tracking-widest">Novo Relato</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          <h3 className="text-[10px] font-black uppercase text-text-secondary tracking-[0.3em] mb-2 px-1">Meus Relatos</h3>
-          {reports.length === 0 ? (
-            <div className="card-military py-20 text-center text-sm italic opacity-40">
-               Nenhum relato encontrado.
-            </div>
-          ) : (
-            reports.map((report) => (
-              <div key={report.id} className="card-military p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-accent-gold/40 transition-all group">
-                 <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 rounded-lg bg-bg-panel border border-border-theme flex flex-col items-center justify-center shrink-0">
-                       <span className="text-[8px] font-black text-accent-gold leading-none mb-1">PROT</span>
-                       <span className="text-xs font-black text-white leading-none">{report.codigo?.split('-')[1] || '---'}</span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                         <span className="text-[10px] font-black text-accent-gold uppercase tracking-widest">{report.local}</span>
-                         <span className="w-1 h-1 rounded-full bg-border-theme" />
-                         <span className="text-[10px] font-mono text-text-secondary">{new Date(report.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <h4 className="text-sm font-bold text-white group-hover:text-accent-gold transition-colors line-clamp-1">{report.situacao}</h4>
-                    </div>
-                 </div>
-                 <div className="flex items-center gap-4">
-                    <div className={`px-3 py-1 rounded bg-bg-panel border border-border-theme text-[9px] font-black tracking-widest uppercase italic ${report.status === 'RASCUNHO' ? 'text-slate-500' : 'text-accent-gold'}`}>
-                      {report.status}
-                    </div>
-                    <button 
-                      onClick={() => {
-                        const doc = generateRelprevPDF(report);
-                        window.open(doc.output('bloburl'), '_blank');
-                      }}
-                      className="p-2 text-text-secondary hover:text-white transition-colors"
-                    >
-                       <FileText size={18} />
-                    </button>
-                 </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <button 
-        onClick={() => setIsFormOpen(false)}
-        className="text-text-secondary hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest mb-2"
-      >
-        <ChevronRight size={14} className="rotate-180" /> Voltar ao Histórico
-      </button>
-
       <div className="bg-white rounded-lg shadow-2xl overflow-hidden text-slate-800 border border-slate-200">
         <div className="p-10 text-center border-b border-slate-100">
           <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-1">Relato de Prevenção</h2>
