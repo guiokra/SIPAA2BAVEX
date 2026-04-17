@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-military-gold: #D4AF37;
+  --color-military-gold-dark: #B8860B;
+  --color-military-blue: #003366;
+  --color-military-blue-dark: #001F3F;
+  --color-military-black: #0B0E14;
+  --color-military-gray: #1E232E;
+}
+
+@layer base {
+  body {
+    @apply bg-military-black text-slate-200 font-sans antialiased;
+  }
+
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-800 rounded-full hover:bg-slate-700 transition-colors;
+  }
+}
+
+@layer components {
+  .btn-military {
+    @apply px-4 py-2 bg-military-gold hover:bg-military-gold-dark text-military-black font-semibold rounded transition-all duration-200 flex items-center justify-center gap-2;
+  }
+  
+  .card-military {
+    @apply border border-slate-800 bg-military-gray/50 backdrop-blur-sm rounded-lg p-4 shadow-xl;
+  }
+
+  .input-military {
+    @apply w-full bg-military-black border border-slate-700 rounded-md p-2.5 text-slate-200 focus:border-military-gold outline-none transition-colors;
+  }
+}
