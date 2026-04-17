@@ -5,23 +5,26 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-military-gold: #D4AF37;
-  --color-military-gold-dark: #B8860B;
-  --color-military-blue: #003366;
-  --color-military-blue-dark: #001F3F;
-  --color-military-black: #0B0E14;
-  --color-military-gray: #1E232E;
+  --color-bg-deep: #05070a;
+  --color-bg-panel: #0d121d;
+  --color-bg-sidebar: #090d16;
+  --color-accent-gold: #c5a059;
+  --color-accent-gold-dark: #8e6d2d;
+  --color-accent-blue: #1e4b8a;
+  --color-military-black: #05070a;
+  --color-text-secondary: #8a94a6;
+  --color-border-theme: rgba(197, 160, 89, 0.2);
 }
 
 @layer base {
   body {
-    @apply bg-military-black text-slate-200 font-sans antialiased;
+    @apply bg-bg-deep text-[#e6e9ef] font-sans antialiased;
   }
 
   /* Custom Scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
@@ -29,20 +32,24 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-slate-800 rounded-full hover:bg-slate-700 transition-colors;
+    @apply bg-border-theme rounded-full hover:bg-accent-gold/40 transition-colors;
   }
 }
 
 @layer components {
   .btn-military {
-    @apply px-4 py-2 bg-military-gold hover:bg-military-gold-dark text-military-black font-semibold rounded transition-all duration-200 flex items-center justify-center gap-2;
+    @apply px-4 py-2 bg-accent-gold hover:bg-accent-gold-dark text-bg-deep font-semibold rounded-sm transition-all duration-200 flex items-center justify-center gap-2;
   }
   
   .card-military {
-    @apply border border-slate-800 bg-military-gray/50 backdrop-blur-sm rounded-lg p-4 shadow-xl;
+    @apply border border-border-theme bg-bg-panel rounded-lg p-5 shadow-lg;
   }
 
   .input-military {
-    @apply w-full bg-military-black border border-slate-700 rounded-md p-2.5 text-slate-200 focus:border-military-gold outline-none transition-colors;
+    @apply w-full bg-bg-deep border border-border-theme rounded p-2.5 text-[#e6e9ef] focus:border-accent-gold outline-none transition-colors;
+  }
+
+  .logo-hex {
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   }
 }

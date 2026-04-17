@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "FgrMission": {
+      "title": "FgrMission",
+      "description": "Uma missão cadastrada no formulário FGR (Ficha de Gerenciamento de Risco)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID do usuário autor" },
+        "missao": { "type": "string", "description": "Nome da missão/OMO" },
+        "local": { "type": "string", "description": "Local da missão" },
+        "data": { "type": "string", "format": "date", "description": "Data da missão" },
+        "preenchidoPor": { "type": "string", "description": "Nome do responsável" },
+        "funcao": { "type": "string", "description": "Função (PI/PO/PB)" },
+        "tipoVoo": { "type": "string", "description": "Código do perfil de voo" },
+        "p3Selections": { "type": "object", "description": "Votos da Parte III" },
+        "p4Selections": { "type": "object", "description": "Votos da Parte IV" },
+        "gravidadeSelections": { "type": "object", "description": "Fatores de gravidade selecionados" },
+        "scores": {
+          "type": "object",
+          "properties": {
+            "tgMin": { "type": "number" },
+            "tgMax": { "type": "number" },
+            "gravTotal": { "type": "number" },
+            "riskMin": { "type": "number" },
+            "riskMax": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "missao", "data", "createdAt"]
+    },
+    "RelprevReport": {
+      "title": "RelprevReport",
+      "description": "Um relato de prevenção de acidente aeronáutico",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID do usuário autor" },
+        "codigo": { "type": "string", "description": "Código do relatório (ex: 2026-001)" },
+        "dataOcorrencia": { "type": "string", "format": "date" },
+        "identificacao": { "type": "string", "description": "Identidade do relator (opcional)" },
+        "local": { "type": "string" },
+        "assunto": { "type": "string" },
+        "relato": { "type": "string" },
+        "analise": { "type": "string" },
+        "medidas": { "type": "string" },
+        "status": { "type": "string", "enum": ["ENVIADO", "EM ANÁLISE", "FINALIZADO"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "codigo", "relato", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/fgrMissions/{missionId}": {
+      "schema": "FgrMission",
+      "description": "Histórico de missões FGR"
+    },
+    "/relprevReports/{reportId}": {
+      "schema": "RelprevReport",
+      "description": "Relatos de prevenção"
+    }
+  }
+}

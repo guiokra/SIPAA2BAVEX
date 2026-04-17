@@ -1,10 +1,11 @@
-import React, { FC, useState, useEffect } from 'react';
+import React, { FC, useState, useEffect, useRef } from 'react';
 import { 
   Home, 
   FileText, 
   Scale, 
   Map as MapIcon, 
   Bell, 
+  AlertCircle,
   AlertTriangle, 
   Zap, 
   CloudSun, 
@@ -26,9 +27,377 @@ import {
   Bird,
   Gavel,
   Compass,
-  Settings
+  Settings,
+  LogIn,
+  Loader2,
+  Unlock,
+  Plus,
+  Trash2,
+  Download,
+  Clock,
+  Search,
+  Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { auth, db } from './firebase';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut,
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  onSnapshot, 
+  orderBy, 
+  getDocFromServer, 
+  doc,
+  Timestamp,
+  deleteDoc
+} from 'firebase/firestore';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+// --- Utilities ---
+const compressImage = (base64Str: string, maxWidth = 800, maxHeight = 600): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width *= maxHeight / height;
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.onerror = () => resolve(base64Str);
+  });
+};
+
+const openBase64InNewTab = (base64Data: string) => {
+  try {
+    const parts = base64Data.split(',');
+    if (parts.length < 2) return;
+    const contentType = parts[0].split(':')[1].split(';')[0];
+    const byteCharacters = atob(parts[1]);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: contentType });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  } catch (e) {
+    console.error("Erro ao abrir anexo:", e);
+    // Fallback: tenta abrir diretamente se for seguro ou avisa
+    const win = window.open();
+    if (win) {
+      win.document.write(`<iframe src="${base64Data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+    }
+  }
+};
+
+// --- Error Handling ---
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+// --- Admin Helpers ---
+function getRiskClass(r: number, tipoVoo: string = 'REGULAR') {
+  const isP4 = tipoVoo !== 'REGULAR';
+  // Thresholds based on image:
+  // Regular: 0-44 (B), 45-89 (M), 90-119 (A), >=120 (MA) -> [45, 90, 120]
+  // Complex (P4): 0-49 (B), 50-94 (M), 95-124 (A), >=125 (MA) -> [50, 95, 125]
+  const thresholds = isP4 ? [50, 95, 125] : [45, 90, 120];
+
+  if (r < thresholds[0]) {
+    return { 
+      label: "Baixo", 
+      color: "text-green-500", 
+      bg: "bg-green-500/10", 
+      border: "border-green-500/30", 
+      hex: [34, 197, 94],
+      decisao: "Monitorar a variação do risco durante a missão",
+      responsavel: "Cmt Missão Aérea / PO/PI"
+    };
+  }
+  if (r < thresholds[1]) {
+    return { 
+      label: "Médio", 
+      color: "text-yellow-500", 
+      bg: "bg-yellow-500/10", 
+      border: "border-yellow-500/30", 
+      hex: [234, 179, 8],
+      decisao: "Ajustar p/ próxima missão e monitorar risco",
+      responsavel: "Cmt SU"
+    };
+  }
+  if (r < thresholds[2]) {
+    return { 
+      label: "Alto", 
+      color: "text-orange-500", 
+      bg: "bg-orange-500/10", 
+      border: "border-orange-500/30", 
+      hex: [249, 115, 22],
+      decisao: "Ajustar antes da missão (*)",
+      responsavel: "Cmt OM"
+    };
+  }
+  return { 
+    label: "Muito Alto", 
+    color: "text-red-500", 
+    bg: "bg-red-500/10", 
+    border: "border-red-500/30", 
+    hex: [239, 68, 68],
+    decisao: "Adiar e replanejar (*)",
+    responsavel: "Cmt OM"
+  };
+};
+const generateFgrPDF = (mission: any) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // Header
+  doc.setFillColor(26, 31, 37); // #1a1f25
+  doc.rect(0, 0, pageWidth, 40, 'F');
+  
+  doc.setTextColor(212, 175, 55); // #d4af37
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SIPAA 2º BAvEx', 20, 25);
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10);
+  doc.text('GERENCIAMENTO DE RISCO OPERACIONAL (FGR)', 20, 32);
+  
+  // Mission Info
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(14);
+  doc.text('I - Informações da Missão', 20, 55);
+  
+  autoTable(doc, {
+    startY: 60,
+    head: [['Campo', 'Informação']],
+    body: [
+      ['Modelo (Anv Líder)', mission.modeloAnv || 'N/A'],
+      ['Matrícula(s) Anv', mission.aeronave || 'N/A'],
+      ['Missão', mission.missao || 'N/A'],
+      ['Local', mission.local || 'N/A'],
+      ['Data', mission.data || 'N/A'],
+      ['Trigramas Tripulação', mission.trigramaTrip || 'N/A'],
+      ['Preenchido por', mission.preenchidoPor || 'N/A'],
+      ['Função', mission.funcao || 'N/A']
+    ],
+    theme: 'striped',
+    headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] }
+  });
+
+  // Parte II - Assertivas
+  const p2Y = (doc as any).lastAutoTable.finalY + 10;
+  doc.setFontSize(14);
+  doc.text('II - Condições Impeditivas', 20, p2Y);
+  
+  autoTable(doc, {
+    startY: p2Y + 5,
+    head: [['Assertiva', 'Resposta']],
+    body: PARTE_II_DATA.map(item => [
+      item.text,
+      mission.p2Selections[item.id] || 'N/A'
+    ]),
+    theme: 'grid',
+    styles: { fontSize: 8 },
+    columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 20, halign: 'center' } }
+  });
+  
+  // Risk Box (Destaque)
+  const riskY = (doc as any).lastAutoTable.finalY + 10;
+  const riskStatus = getRiskClass(mission.scores.riskMax, mission.tipoVoo);
+  
+  doc.setFillColor(riskStatus.hex[0], riskStatus.hex[1], riskStatus.hex[2]);
+  doc.rect(20, riskY, pageWidth - 40, 30, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('V - AVALIAÇÃO FINAL DE RISCO', pageWidth / 2, riskY + 8, { align: 'center' });
+  doc.setFontSize(18);
+  doc.text(`${riskStatus.label.toUpperCase()} (${mission.scores.riskMax} pts)`, pageWidth / 2, riskY + 18, { align: 'center' });
+  
+  // Ação e Responsabilidade no PDF
+  doc.setFontSize(7);
+  doc.text(`AÇÃO: ${riskStatus.decisao.toUpperCase()}`, pageWidth / 2, riskY + 24, { align: 'center' });
+  doc.text(`RESPONSABILIDADE: ${riskStatus.responsavel.toUpperCase()}`, pageWidth / 2, riskY + 28, { align: 'center' });
+
+  // Scores Table
+  const scoresY = riskY + 40;
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(14);
+  doc.text('Resumo dos Fatores (III & IV)', 20, scoresY);
+  
+  autoTable(doc, {
+    startY: scoresY + 5,
+    body: [
+      ['TG Mínimo', mission.scores.tgMin.toString()],
+      ['TG Máximo', mission.scores.tgMax.toString()],
+      ['Fator de Gravidade', mission.scores.gravTotal.toString()],
+      ['Risco Mínimo', mission.scores.riskMin.toString()],
+      ['Risco Máximo', mission.scores.riskMax.toString()]
+    ],
+    theme: 'grid',
+    styles: { fontSize: 9 }
+  });
+ 
+  // Mitigation
+  if (mission.mitigation) {
+    const mitigY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(14);
+    doc.text('Medidas Mitigadoras', 20, mitigY);
+    doc.setFontSize(10);
+    const splitText = doc.splitTextToSize(mission.mitigation, pageWidth - 40);
+    doc.text(splitText, 20, mitigY + 7);
+  }
+
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text(`Gerado em: ${new Date(mission.createdAt).toLocaleString('pt-BR')}`, pageWidth - 20, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+  
+  return doc;
+};
+
+const generateRelprevPDF = (report: any) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  // Clean Header
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, pageWidth, 40, 'F');
+  
+  doc.setTextColor(26, 31, 37);
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Relato de Prevenção', pageWidth / 2, 20, { align: 'center' });
+  
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Batalhão Guerreiro', pageWidth / 2, 30, { align: 'center' });
+  
+  doc.setDrawColor(200, 200, 200);
+  doc.line(20, 40, pageWidth - 20, 40);
+
+  // Content
+  let y = 55;
+  const addBlock = (label: string, value: string) => {
+    // Check if we need a new page
+    const splitText = doc.splitTextToSize(value || 'N/A', pageWidth - 40);
+    const blockSize = (splitText.length * 7) + 15;
+    
+    if (y + blockSize > pageHeight - 30) {
+      doc.addPage();
+      y = 30;
+    }
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(120, 120, 120);
+    doc.text(label.toUpperCase(), 20, y);
+    y += 7;
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    doc.text(splitText, 20, y);
+    y += (splitText.length * 7) + 10;
+  };
+
+  addBlock('Local', report.local);
+  addBlock('Data e Horário do Fato', `${report.dataFato} às ${report.horaFato}`);
+  addBlock('Pessoal envolvido e/ou aeronave', report.envolvidos);
+  addBlock('Situação', report.situacao);
+  
+  if (report.relatorPosto || report.relatorNome) {
+    addBlock('Identificação do Relator', `${report.relatorPosto || ''} ${report.relatorNome || ''}`.trim());
+  }
+  
+  if (report.email) {
+    addBlock('E-mail para retorno', report.email);
+  }
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(180, 180, 180);
+  doc.text(`Protocolo SIPAA: ${report.codigo} | Gerado em ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+  return doc;
+};
 
 type SectionKey = 'Inicio' | 'RELPREV' | 'FGR' | 'Mapa de Risco' | 'Portal Notificação' | 'Ações Pós-Acidente' | 'Abastecimento' | 'Memento Meteo' | 'Reporte Fauna' | 'Normas CAvEx' | 'Planeje seu Voo' | 'Admin';
 
@@ -36,6 +405,63 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<SectionKey>('Inicio');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [totalRelprev, setTotalRelprev] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setTotalRelprev(0);
+      return;
+    }
+    const q = query(collection(db, 'relprevReports'), where('uid', '==', user.uid));
+    const unsubscribe = onSnapshot(q, (snap) => setTotalRelprev(snap.size));
+    return () => unsubscribe();
+  }, [user]);
+
+  // Connection Test
+  useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+        }
+      }
+    }
+    testConnection();
+  }, []);
+
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      handleTabChange('Inicio');
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -64,22 +490,66 @@ export default function App() {
   ];
 
   const handleTabChange = (tab: any) => {
+    if (tab === 'Admin' && !isAdminAuthenticated) {
+      setIsAdminModalOpen(true);
+      return;
+    }
     setActiveTab(tab);
     if (isMobile) setIsSidebarOpen(false);
   };
 
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassword === 'sipaa2bavex') {
+      setIsAdminAuthenticated(true);
+      setIsAdminModalOpen(false);
+      setActiveTab('Admin');
+      setAdminPassword('');
+    } else {
+      alert('Senha incorreta');
+    }
+  };
+
   return (
     <div className="flex h-screen bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
-      {/* Mobile Overlay */}
+      
+      {/* Admin Password Modal */}
       <AnimatePresence>
-        {isMobile && isSidebarOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
-          />
+        {isAdminModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="card-military max-w-sm w-full p-8 space-y-6"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-military-gold font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                  <Lock size={14} />
+                  Acesso Administrativo
+                </h3>
+                <button onClick={() => setIsAdminModalOpen(false)} className="text-text-secondary hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+              <form onSubmit={handleAdminLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-text-secondary">Senha de Acesso</label>
+                  <input 
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    className="w-full bg-military-black border border-border-theme rounded p-3 text-white focus:border-military-gold outline-none transition-colors"
+                    placeholder="••••••••"
+                    autoFocus
+                  />
+                </div>
+                <button type="submit" className="btn-military w-full py-3 text-xs">
+                  AUTENTICAR
+                </button>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -87,31 +557,29 @@ export default function App() {
       <motion.aside 
         initial={false}
         animate={{ 
-          width: isSidebarOpen ? (isMobile ? '280px' : '300px') : '0px',
-          x: isSidebarOpen ? 0 : (isMobile ? -300 : -300)
+          width: isSidebarOpen ? (isMobile ? '280px' : '240px') : '0px',
+          x: isSidebarOpen ? 0 : (isMobile ? -300 : -240)
         }}
-        className={`fixed lg:relative z-50 bg-[#0d1117] border-r border-slate-800 flex flex-col h-full shadow-2xl transition-all duration-300 ease-in-out`}
+        className={`fixed lg:relative z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-full shadow-2xl transition-all duration-300 ease-in-out`}
       >
-        <div className="p-6 flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-military-gold rounded flex items-center justify-center shadow-lg shadow-military-gold/20">
-              <ShieldCheck className="text-military-black w-6 h-6" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-bold tracking-tight text-white leading-none">SIPAA</span>
-              <span className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-widest">2º BAvEx</span>
-            </div>
+        <div className="p-6 flex items-center gap-3 border-b border-border-theme">
+          <div className="logo-hex w-10 h-10 bg-gradient-to-br from-accent-gold to-accent-gold-dark flex items-center justify-center shadow-lg text-bg-deep font-bold text-[10px] text-center shrink-0">
+            SIPAA
+          </div>
+          <div className="flex flex-col">
+            <span className="text-lg font-bold tracking-widest text-accent-gold leading-none">2º BAvEx</span>
+            <span className="text-[10px] text-text-secondary font-medium mt-1 uppercase tracking-widest">Exército Brasileiro</span>
           </div>
           {isMobile && (
-            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+            <button onClick={() => setIsSidebarOpen(false)} className="ml-auto text-slate-400 hover:text-white transition-colors">
               <X size={24} />
             </button>
           )}
         </div>
 
         {/* Scrollable Menu Area */}
-        <div className="flex-1 overflow-y-auto px-3 py-6 custom-scrollbar">
-          <nav className="space-y-1.5">
+        <div className="flex-1 overflow-y-auto py-4 custom-scrollbar">
+          <nav className="space-y-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -119,86 +587,102 @@ export default function App() {
                 <button
                   key={item.id}
                   onClick={() => handleTabChange(item.id)}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all duration-200 group relative ${
+                  className={`w-full flex items-center gap-3 px-6 py-2.5 transition-all duration-200 group relative text-[13px] font-medium border-l-[3px] ${
                     isActive 
-                      ? 'bg-military-blue/30 text-military-gold border-l-2 border-military-gold' 
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                      ? 'bg-accent-gold/10 text-accent-gold border-l-accent-gold' 
+                      : 'text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent'
                   }`}
                 >
-                  <Icon size={20} className={isActive ? 'text-military-gold' : 'group-hover:text-slate-200'} />
-                  <span className="text-sm font-medium tracking-wide">{item.name}</span>
-                  {isActive && (
-                    <motion.div 
-                      layoutId="active-pill"
-                      className="absolute right-3 w-1.5 h-1.5 rounded-full bg-military-gold shadow-[0_0_8px_rgba(212,175,55,0.8)]"
-                    />
-                  )}
+                  <Icon size={16} className={isActive ? 'text-accent-gold' : 'text-text-secondary group-hover:text-white'} />
+                  <span>{item.name}</span>
                 </button>
               );
             })}
           </nav>
         </div>
 
-        {/* Admin Section at Bottom */}
-        <div className="p-4 bg-military-black/30 border-t border-slate-800">
-           <button
+        {/* User profile & Admin Section at Bottom */}
+        <div className="px-4 py-4 border-t border-border-theme space-y-4">
+          <div className="px-2 space-y-3">
+            {user && (
+              <div className="card-military p-3 bg-white/2 border-white/5">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[9px] uppercase font-bold text-slate-500">Relatos (Mês)</span>
+                  <span className="text-[10px] font-mono font-black text-accent-gold">{totalRelprev}</span>
+                </div>
+                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                   <div 
+                     className="bg-accent-gold h-full transition-all duration-500" 
+                     style={{ width: `${Math.min((totalRelprev / 10) * 100, 100)}%` }} 
+                   />
+                </div>
+              </div>
+            )}
+
+            {user && (
+              <div className="flex items-center gap-3 px-1 py-1">
+                <div className="w-8 h-8 rounded-full bg-accent-gold/20 flex items-center justify-center text-accent-gold overflow-hidden border border-accent-gold/30">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || ''} referrerPolicy="no-referrer" />
+                  ) : (
+                    <User size={16} />
+                  )}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[11px] font-bold text-white truncate">{user.displayName || 'Usuário'}</span>
+                  <button onClick={handleLogout} className="text-[9px] text-red-400 hover:text-red-300 transition-colors text-left flex items-center gap-1 mt-0.5 font-bold uppercase tracking-tighter">
+                    <LogOut size={10} /> Sair
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
             onClick={() => handleTabChange('Admin')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-all duration-200 ${
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest ${
               activeTab === 'Admin'
-                ? 'bg-military-gold text-military-black border-military-gold font-bold shadow-lg shadow-military-gold/10'
-                : 'border-slate-800 text-military-gold hover:bg-military-gold/10'
+                ? 'bg-accent-gold text-bg-deep shadow-lg shadow-accent-gold/10'
+                : 'text-accent-gold border border-accent-gold/20 hover:bg-accent-gold/10'
             }`}
           >
-            <Lock size={18} />
-            <span className="text-sm font-bold uppercase tracking-wider">Admin</span>
+            {isAdminAuthenticated ? <Unlock size={12} /> : <Lock size={12} />}
+            <span>Área Administrativa</span>
           </button>
         </div>
       </motion.aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full bg-military-black relative overflow-hidden">
+      <main className="flex-1 flex flex-col h-full bg-bg-deep relative overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b border-slate-800 bg-[#0d1117] flex items-center justify-between px-6 z-30 shadow-md">
+        <header className="h-[50px] md:h-[60px] border-b border-border-theme bg-bg-panel/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30 shadow-sm">
           <div className="flex items-center gap-4">
             {!isSidebarOpen && (
               <button 
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded transition-all"
               >
-                <Menu size={20} />
+                <Menu size={18} />
               </button>
             )}
-            <div className="flex flex-col">
-              <h1 className="text-sm font-bold text-slate-100 uppercase tracking-widest leading-none">
-                {activeTab === 'Inicio' ? 'Painel Operacional' : activeTab}
-              </h1>
-              <span className="text-[10px] text-military-gold/80 font-mono mt-0.5 tracking-tighter">
-                SISTEMA INTEGRADO DE PREVENÇÃO DE ACIDENTES AERONÁUTICOS
-              </span>
+            <div className="status-badge flex items-center gap-2 text-[12px] font-semibold text-[#27ae60] uppercase tracking-wider">
+               <div className="status-dot w-2 h-2 bg-[#27ae60] rounded-full shadow-[0_0_8px_#27ae60]" />
+               Operações: Normal (VMC)
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-slate-400">
-            <div className="flex flex-col items-end mr-2 hidden sm:flex">
-              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">Status do Dia</span>
-              <span className="text-xs text-green-500 flex items-center gap-1 font-bold">
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                OPERACIONAL
-              </span>
-            </div>
-            <div className="h-8 w-[1px] bg-slate-800 hidden sm:block" />
-            <div className="relative p-2 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer">
-              <Bell size={18} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0d1117]" />
-            </div>
-            <div className="p-2 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer">
-              <Settings size={18} />
+          <div className="flex items-center gap-6 text-[12px] text-text-secondary">
+            <span className="hidden md:block">Taubaté, SP | 24 OUT 2026 | 14:35 Z</span>
+            <div className="h-4 w-[1px] bg-border-theme hidden sm:block" />
+            <div className="relative p-1.5 hover:bg-white/5 rounded transition-colors cursor-pointer">
+              <Bell size={16} />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-bg-panel" />
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 relative custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -208,7 +692,7 @@ export default function App() {
               transition={{ duration: 0.2 }}
               className="max-w-7xl mx-auto w-full pb-20"
             >
-              {React.createElement(sectionComponents[activeTab])}
+              {React.createElement(sectionComponents[activeTab], { user, onTabChange: handleTabChange })}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -219,270 +703,1269 @@ export default function App() {
 
 // --- SECTIONS ---
 
-function InicioSection() {
+function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
       {/* Hero Welcome */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-military-blue to-military-black border border-slate-700 p-8 lg:p-12 shadow-2xl">
+      <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-[#101826] to-[#0d121d] border border-border-theme p-8 lg:p-10 shadow-2xl">
         <div className="relative z-10 max-w-2xl">
+          <p className="text-accent-gold text-xs font-bold uppercase tracking-[0.2em] mb-4">
+            Seção de Investigação e Prevenção de Acidentes Aeronáuticos
+          </p>
           <motion.h2 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="text-3xl lg:text-5xl font-extrabold text-white mb-4 tracking-tight"
+            className="text-[28px] font-light text-white mb-6"
           >
-            Segurança em Primeiro Lugar, <br/>
-            <span className="text-military-gold italic">Missão Cumprida.</span>
+            Bem-vindo ao Portal de Segurança de Voo
           </motion.h2>
-          <p className="text-slate-300 text-lg mb-8 leading-relaxed max-w-xl">
-            Bem-vindo ao Portal de Segurança de Voo do 2º BAvEx. Utilize as ferramentas abaixo para garantir uma operação segura e eficiente.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <button className="btn-military shadow-lg shadow-military-gold/20">
+          <div className="border-l-2 border-accent-gold pl-6 italic text-text-secondary text-sm max-w-xl leading-relaxed">
+            "A segurança de voo é uma responsabilidade de todos nós. Previna-se, reporte e garanta a integridade de nossa missão."
+          </div>
+          <div className="flex flex-wrap gap-4 mt-8">
+            <button 
+              onClick={() => onTabChange('Ações Pós-Acidente')}
+              className="btn-military shadow-lg shadow-accent-gold/10"
+            >
               <AlertTriangle size={18} />
               Reportar Emergência
             </button>
-            <button className="px-6 py-2 border border-slate-600 rounded text-slate-200 hover:bg-slate-800 hover:border-slate-500 transition-all font-semibold">
+            <button 
+              onClick={() => onTabChange('Portal Notificação')}
+              className="px-6 py-2 border border-border-theme rounded-sm text-text-secondary hover:text-white hover:bg-white/5 transition-all text-sm font-semibold"
+            >
               Ver Notificações
             </button>
           </div>
         </div>
         
         {/* Abstract Background Element */}
-        <div className="absolute top-0 right-0 h-full w-1/3 opacity-10 pointer-events-none">
-          <ShieldCheck className="w-full h-full text-military-gold" />
-        </div>
+        <div className="absolute -bottom-12 -right-12 h-64 w-64 bg-accent-gold/5 rounded-full blur-3xl" />
       </div>
 
       {/* Grid Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <QuickCard 
           icon={FileSearch} 
-          title="Novo RELPREV" 
-          desc="Registre um relato de prevenção agora mesmo." 
-          color="gold"
+          title="Reportar RELPREV" 
+          desc="Registro de relato preventivo." 
+          color="blue"
+          onClick={() => onTabChange('RELPREV')}
         />
         <QuickCard 
           icon={ShieldCheck} 
-          title="FGR" 
-          desc="Gerencie o risco da sua próxima missão." 
+          title="Novo FGR" 
+          desc="Gerenciamento de risco operacional." 
           color="blue"
+          onClick={() => onTabChange('FGR')}
+        />
+        <QuickCard 
+          icon={AlertTriangle} 
+          title="Checklist Emergência" 
+          desc="Protocolos de resposta rápida." 
+          color="blue"
+          onClick={() => onTabChange('Ações Pós-Acidente')}
         />
         <QuickCard 
           icon={Navigation} 
-          title="Planejamento" 
-          desc="Consulte áreas de atenção e meteorologia." 
-          color="slate"
+          title="METAR / TAF" 
+          desc="Consulte meteorologia atual." 
+          color="blue"
+          onClick={() => onTabChange('Memento Meteo')}
         />
       </div>
 
       {/* Info Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Avisos */}
-        <div className="card-military border-l-4 border-l-red-500">
-          <div className="flex items-center gap-2 mb-6">
-            <Bell className="text-red-500" size={20} />
-            <h3 className="text-lg font-bold uppercase tracking-wider text-white">Avisos Críticos</h3>
-          </div>
-          <div className="space-y-4">
-            <AvisoItem 
-              type="danger" 
-              title="Restrição de Voo - Área Delta" 
-              time="2h atrás" 
-              text="Atividades de tiro real no polígono sul. Voo proibido abaixo de 5000ft."
-            />
-            <AvisoItem 
-              type="warning" 
-              title="Manutenção de Pista" 
-              time="5h atrás" 
-              text="Pista 18/36 com obras de sinalização no período noturno de 20 a 22 de Abril."
-            />
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="card-military flex flex-col items-start h-full">
+          <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">RELPREV Ativos</span>
+          <div className="text-[32px] font-bold text-white mb-1">14</div>
+          <span className="text-[10px] text-text-secondary tracking-tight">+2 nas últimas 24 horas</span>
         </div>
-
-        {/* Notícias / Operacional */}
-        <div className="card-military">
-          <div className="flex items-center gap-2 mb-6 text-military-gold">
-            <Zap size={20} />
-            <h3 className="text-lg font-bold uppercase tracking-wider text-white">Atualizações Operacionais</h3>
+        <div className="card-military flex flex-col items-start h-full">
+          <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">FGR Gerados</span>
+          <div className="text-[32px] font-bold text-white mb-1">08</div>
+          <span className="text-[10px] text-text-secondary tracking-tight">Missões planejadas p/ hoje</span>
+        </div>
+        <div className="card-military flex flex-col items-start h-full bg-green-500/5 border-green-500/20">
+          <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">Risco Operacional Atual</span>
+          <div className="w-full flex items-center justify-center p-2 rounded bg-green-500/20 text-green-500 font-bold uppercase text-xs border border-green-500/30 mb-4">
+            Baixo
           </div>
-          <div className="space-y-4">
-            <NewsItem 
-              title="Simulado de Emergência" 
-              date="14 Out" 
-              text="Realizado com sucesso o treinamento de evacuação e resgate no setor Bravo." 
-            />
-            <NewsItem 
-              title="Novas Normas CAvEx" 
-              date="12 Out" 
-              text="Publicada a nova diretriz para operações com visão noturna (NVG)." 
-            />
-          </div>
+          <p className="text-[11px] text-text-secondary leading-tight">
+            Condições meteorológicas favoráveis. Manutenções preventivas em dia. Nível de fadiga controlado.
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-function RelprevSection() {
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-1">RELPREV</h2>
-          <p className="text-slate-400">Relato de Prevenção - Contribua para a segurança de voo.</p>
-        </div>
-        <button className="btn-military whitespace-nowrap">
-          <FileSearch size={18} />
-          Novo RELPREV
-        </button>
-      </div>
+// --- RISK DATA CONSTANTS ---
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* List */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold uppercase text-slate-500 tracking-widest">Registros Recentes</h3>
-            <div className="flex gap-2">
-              <input type="text" placeholder="Filtrar..." className="bg-military-gray border border-slate-700 rounded px-3 py-1 text-xs outline-none focus:border-military-gold" />
+const PARTE_II_DATA = [
+  { id: "p2_1", text: "A tripulação está habilitada para a realização do voo (verificar o SisAvEx e a pasta dos tripulantes)." },
+  { id: "p2_2", text: "A aeronave está liberada para o voo (Esqd He e/ou EMS)." },
+  { id: "p2_3", text: "Aeronave sem nenhuma restrição que comprometa a execução da missão." },
+  { id: "p2_4", text: "Teste de combustível foi realizado com resultado satisfatório." },
+  { id: "p2_5", text: "Todos os materiais previstos no Manual de Manobras para o cumprimento da missão/voo estão em condições de uso." },
+  { id: "p2_6", text: "As N Op estão sendo cumpridas." },
+  { id: "p2_7", text: "Todos os tripulantes em condições físicas de cumprir a missão." },
+  { id: "p2_8", text: "Toda a tripulação/envolvidos participam de um briefing." },
+  { id: "p2_9", text: "O Cartão de saúde de todos envolvidos no voo está válido." },
+  { id: "p2_10", text: "Ausência de CB na rota na execução do voo IFR." },
+];
+
+const PARTE_III_DATA = {
+  RH: [
+    { id: "p3_rh_1", text: "Um dos pilotos realizou pelo menos um voo em menos de 30 dias.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p3_rh_2", text: "O 1P/PO possui MENOS de 50 HV no modelo na função de 1P.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p3_rh_3", text: "O PA/PB possui MENOS de 50 HV no modelo na função de 2P.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p3_rh_4", text: "OM/OV/MV possui MENOS de 50 HV no modelo na função de MV/OM/VL.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p3_rh_5", text: "MVA/MVB possui MENOS de 50 HV no modelo na função de MVA/MVB.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p3_rh_6", text: "A tripulação participou do CRM nos últimos 24 meses.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p3_rh_7", text: "Briefing da missão realizado de forma completa e detalhada.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p3_rh_8", text: "Houve briefing de segurança para todos os envolvidos na missão, SFC.", w: { S: 0, N: 3, D: 3 } },
+  ],
+  METEO: [
+    { id: "p3_me_1", text: "O local de pouso/decolagem foi reconhecido (locais não homologados).", w: { S: 0, N: 2, D: 2 } },
+    { id: "p3_me_2", text: "Existe aglomeração de pássaros na região de voo.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p3_me_3", text: "As informações necessárias ao voo estão disponíveis (NOTAM, Meteorologia, etc).", w: { S: 0, N: 2, D: 2 } },
+    { id: "p3_me_4", text: "As publicações técnicas necessárias ao voo estão atualizadas e disponíveis.", w: { S: 0, N: 1, D: 1 } },
+    { id: "p3_me_5", text: "Existe previsão de tempo significativo em rota (CB, frente fria, instabilidade, etc).", w: { S: 3, N: 0, D: 3 } },
+    { id: "p3_me_6", text: "Infraestrutura necessária ao voo em condições de prestar apoio.", w: { S: 0, N: 1, D: 1 } },
+  ],
+  MATERIAL: [
+    { id: "p3_ma_1", text: "A aeronave se encontra com MENOS de 10 HV após inspeção A/TC.", w: { S: 3, N: 0, D: 3 } },
+    { id: "p3_ma_2", text: "A aeronave RFD executar o voo pairado fora do efeito solo no local de pouso.", w: { S: 0, N: 3, D: 3 } },
+    { id: "p3_ma_3", text: "A aeronave já foi pré-voada.", w: { S: 0, N: 1, D: 1 } },
+  ],
+  MISSAO: [
+    { id: "p3_mi_1", text: "Adequado tempo para planejamento e preparação.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p3_mi_2", text: "Voo com duração superior a 3 (três) HV contínuas.", w: { S: 1, N: 0, D: 1 } },
+    { id: "p3_mi_3", text: "Operações com duração superior a 5 dias.", w: { S: 1, N: 0, D: 1 } },
+    { id: "p3_mi_4", text: "Mais de 05 repetições da mesma manobra.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p3_mi_5", text: "Voo com autoridade de bordo.", w: { S: 3, N: 0, D: 3 } },
+    { id: "p3_mi_6", text: "Há tempo suficiente para o cumprimento da missão, mesmo havendo imprevistos.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p3_mi_7", text: "O MV estará embarcado no voo.", w: { S: 0, N: 2, D: 2 } },
+  ],
+  ORG: [
+    { id: "p3_or_1", text: "Existem pressões externas para execução dessa missão.", w: { S: 3, N: 0, D: 3 } },
+    { id: "p3_or_2", text: "A tripulação participou da padronização de manobras e procedimentos da U.A.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p3_or_3", text: "A tripulação participa regularmente das reuniões de Seg Voo da OM.", w: { S: 0, N: 1, D: 1 } },
+    { id: "p3_or_4", text: "A tripulação e/ou Fração de Helicópteros é toda da mesma U.A.", w: { S: 0, N: 2, D: 2 } },
+  ],
+};
+
+const PARTE_IV_DATA = {
+  INSTRUCAO: [
+    { id: "p4_in_1", text: "Haverá hot-seat.", w: { S: 1, N: 0, D: 1 } },
+    { id: "p4_in_2", text: "O voo será realizado com piloto aluno e/ou com piloto em formação IFR ou OVN.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p4_in_3", text: "É voo de emergência, IFR ou OVN.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p4_in_4", text: "É o primeiro voo de Habilitação Técnica de algum tripulante no modelo de aeronave.", w: { S: 2, N: 0, D: 2 } },
+  ],
+  IFR: [
+    { id: "p4_if_1", text: "O voo será ACIMA de 10.000 ft (hipóxia).", w: { S: 1, N: 0, D: 1 } },
+    { id: "p4_if_2", text: "O nivelamento manter-se-á acima dos obstáculos previstos na rota.", w: { S: 0, N: 3, D: 3 } },
+    { id: "p4_if_3", text: "O Briefing meteorológico foi realizado por especialista.", w: { S: 0, N: 1, D: 1 } },
+    { id: "p4_if_4", text: "Um dos pilotos realizou voo IFR em um período inferior a 30 dias.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p4_if_5", text: "ADEP foi realizada a partir de um aeródromo homologado EPC.", w: { S: 0, N: 2, D: 2 } },
+  ],
+  OVN: [
+    { id: "p4_ov_1", text: "Será realizado voo na noite de nível 4 ou 5.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p4_ov_2", text: "Será realizado voo em área urbana.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p4_ov_3", text: "Foi realizado reconhecimento fora das áreas de instrução da Av Ex.", w: { S: 0, N: 3, D: 3 } },
+    { id: "p4_ov_4", text: "Dispositivo de iluminação individual compatível com o voo OVN.", w: { S: 0, N: 1, D: 1 } },
+    { id: "p4_ov_5", text: "Presença de neblina e/ou precipitação.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p4_ov_6", text: "Mais de 30 dias sem voar OVN.", w: { S: 2, N: 0, D: 2 } },
+  ],
+  TECNICO: [
+    { id: "p4_te_1", text: "É o primeiro giro e/ou voo após inspeção.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p4_te_2", text: "É o primeiro voo após troca de componentes vitais.", w: { S: 3, N: 0, D: 3 } },
+    { id: "p4_te_3", text: "A aeronave está abastecida com a autonomia mínima de 40 minutos.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p4_te_4", text: "Foi verificada e fechada todas as OS afetas às intervenções.", w: { S: 0, N: 2, D: 2 } },
+    { id: "p4_te_5", text: "Houve quebra na sequência de realização dos serviços de manutenção.", w: { S: 2, N: 0, D: 2 } },
+  ]
+};
+
+const GRAVIDADE_DATA = [
+  { id: "g0", text: "Valor Básico Inicial", pts: 1, fixed: true },
+  { id: "g1", text: "Voo Tático", pts: 2 },
+  { id: "g2", text: "Voo de Instrução", pts: 2, autoByTipo: "INSTRUCAO" },
+  { id: "g3", text: "Voo de Instrução simultâneo", pts: 1 },
+  { id: "g4", text: "Voo OVN", pts: 2, autoByTipo: "OVN" },
+  { id: "g5", text: "Voo de demonstração", pts: 3 },
+  { id: "g6", text: "Voo de formação", pts: 2 },
+  { id: "g7", text: "Voo Solo", pts: 1 },
+  { id: "g8", text: "Ambiente hostil real", pts: 3 },
+  { id: "g9", text: "Voo Técnico (Mnt)", pts: 1, autoByTipo: "TECNICO" }
+];
+
+function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }) {
+  const [reports, setReports] = useState<any[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [images, setImages] = useState<string[]>([]);
+  const [extraFiles, setExtraFiles] = useState<string[]>([]);
+  
+  const [formData, setFormData] = useState({
+    local: '',
+    dataFato: '',
+    horaFato: '',
+    envolvidos: '',
+    situacao: '',
+    relatorPosto: '',
+    relatorNome: '',
+    email: ''
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'relprevReports'),
+      where('uid', '==', user.uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'relprevReports');
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    for (const file of Array.from(files) as File[]) {
+      // Limit file size to 2MB before processing (browser safety)
+      if (file.size > 2 * 1024 * 1024 && type === 'file') {
+        alert(`Arquivo ${file.name} muito grande. Máximo 2MB.`);
+        continue;
+      }
+
+      const reader = new FileReader();
+      const promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string);
+      });
+      reader.readAsDataURL(file);
+      
+      let base64String = await promise;
+
+      if (type === 'image') {
+        const compressed = await compressImage(base64String);
+        setImages(prev => [...prev, compressed]);
+      } else {
+        setExtraFiles(prev => [...prev, base64String]);
+      }
+    }
+  };
+
+  const handleSubmit = async (isDraft: boolean = false) => {
+    if (!isDraft && (!formData.local || !formData.dataFato || !formData.situacao)) {
+      alert("Por favor, preencha os campos obrigatórios (*).");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const codigo = `${new Date().getFullYear()}-${String(reports.length + 1).padStart(3, '0')}`;
+      const payload = {
+        ...formData,
+        codigo,
+        images,
+        extraFiles,
+        status: isDraft ? 'RASCUNHO' : 'ENVIADO',
+        uid: user?.uid || 'guest',
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'relprevReports'), payload);
+
+      if (!isDraft) {
+        const doc = generateRelprevPDF(payload);
+        window.open(doc.output('bloburl'), '_blank');
+      }
+
+      alert(isDraft ? "Rascunho salvo com sucesso." : "Relato enviado com sucesso ao SIPAA.");
+      setIsFormOpen(false);
+      
+      // Reset
+      setFormData({
+        local: '',
+        dataFato: '',
+        horaFato: '',
+        envolvidos: '',
+        situacao: '',
+        relatorPosto: '',
+        relatorNome: '',
+        email: ''
+      });
+      setImages([]);
+      setExtraFiles([]);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'relprevReports');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!isFormOpen) {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">RELPREV</h2>
+            <p className="text-text-secondary text-sm">Relato de Prevenção - Contribua para a segurança de voo.</p>
+          </div>
+          <button 
+            onClick={() => setIsFormOpen(true)}
+            className="btn-military px-8 py-4 flex items-center gap-3 group"
+          >
+            <Plus size={18} className="group-hover:rotate-90 transition-transform" />
+            <span className="text-xs font-black uppercase tracking-widest">Novo Relato</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          <h3 className="text-[10px] font-black uppercase text-text-secondary tracking-[0.3em] mb-2 px-1">Meus Relatos</h3>
+          {reports.length === 0 ? (
+            <div className="card-military py-20 text-center text-sm italic opacity-40">
+               Nenhum relato encontrado.
+            </div>
+          ) : (
+            reports.map((report) => (
+              <div key={report.id} className="card-military p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-accent-gold/40 transition-all group">
+                 <div className="flex items-center gap-5">
+                    <div className="w-12 h-12 rounded-lg bg-bg-panel border border-border-theme flex flex-col items-center justify-center shrink-0">
+                       <span className="text-[8px] font-black text-accent-gold leading-none mb-1">PROT</span>
+                       <span className="text-xs font-black text-white leading-none">{report.codigo?.split('-')[1] || '---'}</span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                         <span className="text-[10px] font-black text-accent-gold uppercase tracking-widest">{report.local}</span>
+                         <span className="w-1 h-1 rounded-full bg-border-theme" />
+                         <span className="text-[10px] font-mono text-text-secondary">{new Date(report.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <h4 className="text-sm font-bold text-white group-hover:text-accent-gold transition-colors line-clamp-1">{report.situacao}</h4>
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-4">
+                    <div className={`px-3 py-1 rounded bg-bg-panel border border-border-theme text-[9px] font-black tracking-widest uppercase italic ${report.status === 'RASCUNHO' ? 'text-slate-500' : 'text-accent-gold'}`}>
+                      {report.status}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const doc = generateRelprevPDF(report);
+                        window.open(doc.output('bloburl'), '_blank');
+                      }}
+                      className="p-2 text-text-secondary hover:text-white transition-colors"
+                    >
+                       <FileText size={18} />
+                    </button>
+                 </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <button 
+        onClick={() => setIsFormOpen(false)}
+        className="text-text-secondary hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest mb-2"
+      >
+        <ChevronRight size={14} className="rotate-180" /> Voltar ao Histórico
+      </button>
+
+      <div className="bg-white rounded-lg shadow-2xl overflow-hidden text-slate-800 border border-slate-200">
+        <div className="p-10 text-center border-b border-slate-100">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-1">Relato de Prevenção</h2>
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Batalhão Guerreiro</p>
+        </div>
+
+        <div className="p-8 md:p-12 space-y-10">
+          {/* Local */}
+          <div className="space-y-2">
+            <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Local: <span className="text-red-500">*</span></label>
+            <input 
+              type="text"
+              className="w-full px-5 py-4 rounded border-2 border-slate-100 focus:border-military-gold outline-none transition-all text-sm font-medium bg-slate-50/50"
+              value={formData.local}
+              onChange={e => setFormData({...formData, local: e.target.value})}
+            />
+          </div>
+
+          {/* Data e Hora */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Data e Horário do Fato <span className="text-red-500">*</span></label>
+              <div className="flex gap-4">
+                <input 
+                  type="date"
+                  className="flex-1 px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 outline-none text-sm font-medium"
+                  value={formData.dataFato}
+                  onChange={e => setFormData({...formData, dataFato: e.target.value})}
+                />
+                <input 
+                  type="time"
+                  className="w-32 px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 outline-none text-sm font-medium"
+                  value={formData.horaFato}
+                  onChange={e => setFormData({...formData, horaFato: e.target.value})}
+                />
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Hora Minutos</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Pessoal envolvido e/ou aeronave <span className="text-red-500">*</span></label>
+              <input 
+                type="text"
+                className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 outline-none text-sm font-medium"
+                value={formData.envolvidos}
+                onChange={e => setFormData({...formData, envolvidos: e.target.value})}
+              />
             </div>
           </div>
-          
-          <div className="space-y-3">
-             {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="card-military hover:border-military-gold/50 cursor-pointer transition-colors group">
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-military-gold uppercase tracking-tighter">RELPREV #2026-00{i}</span>
-                      <h4 className="font-bold text-slate-100 group-hover:text-military-gold transition-colors">Observação de falha técnica em motor de partida</h4>
-                      <p className="text-xs text-slate-400 line-clamp-1 mt-1">Identificado durante checklist de pré-voo na aeronave HM-1 Pantera...</p>
+
+          {/* Situação */}
+          <div className="space-y-2">
+            <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Situação: <span className="text-red-500">*</span></label>
+            <textarea 
+              className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 h-48 outline-none text-sm font-medium resize-none leading-relaxed"
+              placeholder="Digite aqui..."
+              value={formData.situacao}
+              onChange={e => setFormData({...formData, situacao: e.target.value})}
+            />
+          </div>
+
+          {/* Image Upload Area */}
+          <div className="space-y-4">
+            <label className="block w-full cursor-pointer group">
+              <input type="file" className="hidden" accept="image/*" multiple onChange={e => handleFileChange(e, 'image')} />
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 flex flex-col items-center justify-center bg-slate-50/50 group-hover:bg-slate-100/80 transition-all gap-4">
+                <div className="w-16 h-16 rounded-full bg-white shadow-md flex items-center justify-center text-slate-400 group-hover:text-military-gold transition-colors">
+                  <FileSearch size={28} />
+                </div>
+                <div className="text-center">
+                  <span className="block font-black text-slate-700 text-sm uppercase tracking-widest mb-1">Selecionar Imagem</span>
+                  <span className="text-[11px] text-slate-400 font-medium">Drag and drop your image here</span>
+                </div>
+              </div>
+            </label>
+            
+            {images.length > 0 && (
+              <div className="flex gap-4 overflow-x-auto pb-4 pt-2 px-2 scroll-mt-4">
+                {images.map((img, i) => (
+                  <div key={i} className="relative shrink-0 group">
+                    <img src={img} className="w-24 h-24 object-cover rounded-lg border-2 border-slate-100 shadow-sm" alt="Preview" />
+                    <button 
+                      onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* File Upload Area */}
+          <div className="space-y-4">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-tighter">Caso precise anexar mais fotos ou arquivos, utilize o espaço abaixo</p>
+            <label className="block w-full cursor-pointer group">
+              <input type="file" className="hidden" multiple onChange={e => handleFileChange(e, 'file')} />
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-10 flex flex-col items-center justify-center bg-slate-50/50 group-hover:bg-slate-100/80 transition-all gap-3 text-center">
+                <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-military-gold transition-colors">
+                  <Download size={22} />
+                </div>
+                <div>
+                  <span className="block font-black text-slate-700 text-sm uppercase tracking-widest mb-1">Pesquisar Arquivos</span>
+                  <span className="text-[11px] text-slate-400 font-medium">Arraste e solte seus arquivos aqui</span>
+                </div>
+              </div>
+            </label>
+            {extraFiles.length > 0 && (
+              <div className="text-[11px] text-slate-500 font-bold bg-slate-50 p-3 rounded border border-slate-100 flex items-center gap-2">
+                <CheckSquare size={14} className="text-green-500" />
+                {extraFiles.length} arquivos adicionais anexados para análise.
+              </div>
+            )}
+          </div>
+
+          {/* Relator */}
+          <div className="space-y-4 pt-4">
+            <label className="text-xs font-black text-slate-700 uppercase tracking-widest block">Identificação do Relator (opcional)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <input 
+                  type="text"
+                  placeholder="Posto / Graduação"
+                  className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 text-sm font-medium outline-none focus:border-slate-300"
+                  value={formData.relatorPosto}
+                  onChange={e => setFormData({...formData, relatorPosto: e.target.value})}
+                />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter px-1">Posto / Graduação</span>
+              </div>
+              <div className="space-y-2">
+                <input 
+                  type="text"
+                  placeholder="Nome de Guerra"
+                  className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 text-sm font-medium outline-none focus:border-slate-300"
+                  value={formData.relatorNome}
+                  onChange={e => setFormData({...formData, relatorNome: e.target.value})}
+                />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter px-1">Nome de Guerra</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Email */}
+          <div className="space-y-2 pt-2">
+            <label className="text-xs font-black text-slate-700 uppercase tracking-widest block">E-mail para retorno (opcional)</label>
+            <input 
+              type="email"
+              placeholder="exemplo@exemplo.com"
+              className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 text-sm font-medium outline-none focus:border-slate-300"
+              value={formData.email}
+              onChange={e => setFormData({...formData, email: e.target.value})}
+            />
+            <p className="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-tighter italic">exemplo@exemplo.com</p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 pt-10">
+            <button 
+              onClick={() => handleSubmit(true)}
+              disabled={isSaving}
+              className="flex-1 py-5 border-2 border-slate-200 rounded-lg text-slate-600 font-black uppercase text-xs tracking-[0.2em] hover:bg-slate-50 hover:border-slate-300 transition-all"
+            >
+              Salvar Rascunho
+            </button>
+            <button 
+              onClick={() => handleSubmit(false)}
+              disabled={isSaving}
+              className="flex-1 py-5 bg-[#5eb968] hover:bg-[#4ea858] text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] transition-all shadow-xl shadow-green-500/10 flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {isSaving ? <Loader2 className="animate-spin" size={18} /> : (
+                <>
+                  <FileSearch size={18} />
+                  Enviar Relato
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-center text-[10px] text-text-secondary font-bold uppercase tracking-widest opacity-40 py-8">
+        Sistema de Investigação e Prevenção de Acidentes Aeronáuticos — SIPAA
+      </div>
+    </div>
+  );
+}
+
+function FgrSection({ user, onTabChange }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }) {
+  const [stamp, setStamp] = useState<string>(new Date().toLocaleString("pt-BR"));
+  const [tipoVoo, setTipoVoo] = useState<string>("REGULAR");
+  const [isSaving, setIsSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [missionData, setMissionData] = useState({
+    modeloAnv: "",
+    aeronave: "",
+    missao: "",
+    local: "",
+    data: new Date().toISOString().split('T')[0],
+    trigramaTrip: "",
+    preenchidoPor: user?.displayName || "",
+    funcao: ""
+  });
+  const [p2Selections, setP2Selections] = useState<Record<string, 'SIM' | 'NÃO' | 'NA'>>({});
+  const [p3Selections, setP3Selections] = useState<Record<string, 'S' | 'N' | 'D'>>({});
+  const [p4Selections, setP4Selections] = useState<Record<string, 'S' | 'N' | 'D'>>({});
+  const [gravidadeSelections, setGravidadeSelections] = useState<Record<string, boolean>>({});
+  const [mitigation, setMitigation] = useState("");
+
+  const updateStamp = () => setStamp(new Date().toLocaleString("pt-BR"));
+
+  const handleP2 = (id: string, val: 'SIM' | 'NÃO' | 'NA') => {
+    setP2Selections(prev => ({ ...prev, [id]: val }));
+    updateStamp();
+  };
+
+  const handleP3 = (id: string, val: 'S' | 'N' | 'D') => {
+    setP3Selections(prev => {
+      if (prev[id] === val) {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+      return { ...prev, [id]: val };
+    });
+    updateStamp();
+  };
+
+  const handleP4 = (id: string, val: 'S' | 'N' | 'D') => {
+    setP4Selections(prev => {
+      if (prev[id] === val) {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+      return { ...prev, [id]: val };
+    });
+    updateStamp();
+  };
+
+  const handleGrav = (id: string) => {
+    setGravidadeSelections(prev => ({ ...prev, [id]: !prev[id] }));
+    updateStamp();
+  };
+
+  const resetAll = () => {
+    setTipoVoo("REGULAR");
+    setMissionData({
+      modeloAnv: "",
+      aeronave: "",
+      missao: "",
+      local: "",
+      data: new Date().toISOString().split('T')[0],
+      trigramaTrip: "",
+      preenchidoPor: user?.displayName || "",
+      funcao: ""
+    });
+    setP2Selections({});
+    setP3Selections({});
+    setP4Selections({});
+    setGravidadeSelections({});
+    setMitigation("");
+    updateStamp();
+  };
+
+  // Calculations
+  const calcSection = (data: any[], selections: Record<string, 'S' | 'N' | 'D'>) => {
+    let min = 0;
+    let max = 0;
+    data.forEach(item => {
+      const sel = selections[item.id];
+      if (sel === 'S') {
+        min += item.w.S;
+        max += item.w.S;
+      } else if (sel === 'N') {
+        min += item.w.N;
+        max += item.w.N;
+      } else if (sel === 'D') {
+        min += 0;
+        max += item.w.D;
+      }
+    });
+    return { min, max };
+  };
+
+  const p3Categories = Object.keys(PARTE_III_DATA).map(cat => ({
+    name: cat,
+    title: cat === 'RH' ? 'Recursos Humanos' : 
+           cat === 'METEO' ? 'Meteorologia' : 
+           cat === 'MATERIAL' ? 'Material' : 
+           cat === 'MISSAO' ? 'Missão' : 'Organização',
+    questions: (PARTE_III_DATA as any)[cat],
+    scores: calcSection((PARTE_III_DATA as any)[cat], p3Selections)
+  }));
+
+  const p3TotalMin = p3Categories.reduce((acc, c) => acc + c.scores.min, 0);
+  const p3TotalMax = p3Categories.reduce((acc, c) => acc + c.scores.max, 0);
+
+  const p4Questions = tipoVoo === 'REGULAR' ? [] : (PARTE_IV_DATA as any)[tipoVoo] || [];
+  const p4Scores = calcSection(p4Questions, p4Selections);
+
+  const tgMin = p3TotalMin + p4Scores.min;
+  const tgMax = p3TotalMax + p4Scores.max;
+
+  const gravTotal = GRAVIDADE_DATA.reduce((acc, g) => {
+    if (g.fixed) return acc + g.pts;
+    const isRestricted = tipoVoo === "REGULAR" && 
+      (g.id === "g2" || g.id === "g3" || g.id === "g4" || g.id === "g9");
+    if (isRestricted) return acc;
+    const isAuto = g.autoByTipo && g.autoByTipo === tipoVoo;
+    if (isAuto || gravidadeSelections[g.id]) return acc + g.pts;
+    return acc;
+  }, 0);
+
+  const riskMin = tgMin * gravTotal;
+  const riskMax = tgMax * gravTotal;
+
+  const riskMaxStatus = getRiskClass(riskMax, tipoVoo);
+
+  const hasImpediment = Object.values(p2Selections).some(v => v === 'NÃO');
+
+  const handleSave = async (force: boolean = false) => {
+    if (!force) {
+      const errors: string[] = [];
+      
+      // Validação Parte I
+      if (!missionData.modeloAnv) errors.push("Parte I: Selecione o Modelo da Aeronave.");
+      if (!missionData.aeronave.trim()) errors.push("Parte I: Informe a Matrícula da Aeronave.");
+      if (!missionData.missao.trim()) errors.push("Parte I: Descrição da Missão é obrigatória.");
+      if (!missionData.local.trim()) errors.push("Parte I: Informe o Local da operação.");
+      if (!missionData.trigramaTrip.trim()) errors.push("Parte I: Trigramas da Tripulação (Líder) são obrigatórios.");
+      if (!missionData.preenchidoPor.trim()) errors.push("Parte I: Informe quem está preenchendo o formulário.");
+      if (!missionData.funcao) errors.push("Parte I: Selecione a sua Função na missão.");
+
+      // Validação Parte II
+      if (Object.keys(p2Selections).length < PARTE_II_DATA.length) {
+        errors.push("Parte II: Responda todas as assertivas das Condições Impeditivas.");
+      }
+
+      // Validação Parte III
+      const totalP3Questions = Object.values(PARTE_III_DATA).flat().length;
+      if (Object.keys(p3Selections).length < totalP3Questions) {
+        errors.push("Parte III: Responda todas as assertivas dos Fatores de Gestão.");
+      }
+
+      // Validação Parte IV
+      if (tipoVoo !== 'REGULAR') {
+        const p4Questions = (PARTE_IV_DATA as any)[tipoVoo] || [];
+        if (Object.keys(p4Selections).length < p4Questions.length) {
+          errors.push(`Parte IV: Responda todas as assertivas específicas para voo ${tipoVoo}.`);
+        }
+      }
+
+      if (errors.length > 0) {
+        setValidationErrors(errors);
+        // Rolar para o primeiro erro ou apenas alertar visualmente
+        const element = document.getElementById('validation-errors-anchor');
+        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+
+    setValidationErrors([]);
+
+    if (hasImpediment) {
+       alert("MISSÃO IMPEDIDA: Qualquer resposta 'NÃO' na Parte II exige autorização expressa do Cmt U Ae para execução do voo.");
+       return;
+    }
+    setIsSaving(true);
+    try {
+      const scores = {
+        tgMin,
+        tgMax,
+        gravTotal,
+        riskMin,
+        riskMax
+      };
+
+      const missionPayload = {
+        ...missionData,
+        tipoVoo,
+        p2Selections,
+        p3Selections,
+        p4Selections,
+        gravidadeSelections,
+        mitigation,
+        scores,
+        uid: user?.uid || 'guest',
+        relatorName: user?.displayName || 'Convidado',
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'fgrMissions'), missionPayload);
+
+      // Generate and Open PDF
+      const doc = generateFgrPDF(missionPayload);
+      window.open(doc.output('bloburl'), '_blank');
+      
+      resetAll();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'fgrMissions');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-left">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">FGR — Gerenciamento de Risco</h2>
+          <p className="text-text-secondary text-sm">Gerenciamento completo estruturado no banco de dados SIPAA.</p>
+        </div>
+        <div className="flex gap-3">
+          <div className="bg-bg-sidebar border border-border-theme px-4 py-2 rounded flex items-center gap-3">
+            <span className="text-[10px] text-text-secondary font-bold uppercase tracking-widest">Sincronizado:</span>
+            <span className="text-[10px] text-accent-gold font-mono">{stamp}</span>
+          </div>
+        </div>
+      </div>
+
+      <>
+          {/* Form Content - (Parte I) */}
+          <div className="card-military p-0 overflow-hidden text-left">
+            <div className="bg-white/5 px-6 py-3 border-b border-border-theme flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-accent-gold tracking-[0.2em]">FORMULÁRIO DE GERENCIAMENTO DE RISCOS Processo de Apoio à Decisão PARTE I</span>
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+              {/* Modelo and Matrícula */}
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest flex items-center">
+                  Modelo (Anv Líder) <span className="text-red-500 ml-1">*</span>
+                </label>
+                <div className="flex flex-col gap-3">
+                  {['HA-1A', 'HM-1A', 'HM-2A', 'HM-3', 'HM-4'].map(m => (
+                    <label key={m} className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative flex items-center justify-center">
+                        <input 
+                          type="radio" 
+                          name="modeloAnv" 
+                          className="peer sr-only"
+                          checked={missionData.modeloAnv === m}
+                          onChange={() => { setMissionData({...missionData, modeloAnv: m}); updateStamp(); }}
+                        />
+                        <div className="w-4 h-4 rounded-full border border-border-theme bg-bg-deep peer-checked:border-accent-gold transition-all"></div>
+                        <div className="absolute w-2 h-2 rounded-full bg-accent-gold opacity-0 peer-checked:opacity-100 transition-all"></div>
+                      </div>
+                      <span className={`text-xs font-bold ${missionData.modeloAnv === m ? 'text-white' : 'text-text-secondary'} group-hover:text-white transition-colors`}>{m}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
+                  Matrícula da(s) Aeronave(s) <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  className="input-military w-full"
+                  value={missionData.aeronave}
+                  onChange={(e) => { setMissionData({...missionData, aeronave: e.target.value}); updateStamp(); }}
+                  placeholder="Ex: EB-20xx" 
+                />
+              </div>
+
+              {/* Missão and Local */}
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
+                  Missão (Lç PDV e/ou OMA/OM) <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  className="input-military w-full"
+                  value={missionData.missao}
+                  onChange={(e) => { setMissionData({...missionData, missao: e.target.value}); updateStamp(); }}
+                  placeholder="Descrição da missão" 
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
+                  Local <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  className="input-military w-full"
+                  value={missionData.local}
+                  onChange={(e) => { setMissionData({...missionData, local: e.target.value}); updateStamp(); }}
+                  placeholder="Base / Área de Operação" 
+                />
+              </div>
+
+              {/* Data and Trigramas */}
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
+                  Data <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input 
+                  type="date" 
+                  className="input-military w-full"
+                  value={missionData.data}
+                  onChange={(e) => { setMissionData({...missionData, data: e.target.value}); updateStamp(); }}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
+                  Trigramas da Tripulação (Anv Líder) <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  className="input-military w-full"
+                  value={missionData.trigramaTrip}
+                  onChange={(e) => { setMissionData({...missionData, trigramaTrip: e.target.value}); updateStamp(); }}
+                  placeholder="Ex: ABC/DEF/GHI" 
+                />
+              </div>
+
+              {/* Preenchido por and Função */}
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
+                  Preenchido por <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  className="input-military w-full"
+                  value={missionData.preenchidoPor}
+                  onChange={(e) => { setMissionData({...missionData, preenchidoPor: e.target.value}); updateStamp(); }}
+                  placeholder="Trigrama" 
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
+                  Função <span className="text-red-500 ml-1">*</span>
+                </label>
+                <div className="flex flex-col gap-3">
+                  {['Cmt Missão', 'PI', 'PO', 'PB'].map(f => (
+                    <label key={f} className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative flex items-center justify-center">
+                        <input 
+                          type="radio" 
+                          name="funcao" 
+                          className="peer sr-only"
+                          checked={missionData.funcao === f}
+                          onChange={() => { setMissionData({...missionData, funcao: f}); updateStamp(); }}
+                        />
+                        <div className="w-4 h-4 rounded-full border border-border-theme bg-bg-deep peer-checked:border-accent-gold transition-all"></div>
+                        <div className="absolute w-2 h-2 rounded-full bg-accent-gold opacity-0 peer-checked:opacity-100 transition-all"></div>
+                      </div>
+                      <span className={`text-xs font-bold ${missionData.funcao === f ? 'text-white' : 'text-text-secondary'} group-hover:text-white transition-colors`}>{f}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Content - (Parte II) */}
+          <div className="card-military p-0 overflow-hidden text-left shadow-xl shadow-black/40">
+            <div className="bg-bg-sidebar px-6 py-3 border-b border-border-theme flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-accent-gold tracking-[0.2em]">
+                Parte II — Condições Impeditivas
+              </span>
+              <span className="text-[9px] font-mono text-text-secondary italic">Qualquer "NÃO" impede o voo</span>
+            </div>
+            <div className="p-0">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-border-theme/30 bg-white/2">
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-white tracking-widest">Assertivas <span className="text-red-500 ml-1 font-bold">*</span></th>
+                    <th className="px-2 py-4 text-center w-14 text-[9px] uppercase font-black text-text-secondary tracking-widest">S</th>
+                    <th className="px-2 py-4 text-center w-14 text-[9px] uppercase font-black text-text-secondary tracking-widest">N</th>
+                    <th className="px-2 py-4 text-center w-14 text-[9px] uppercase font-black text-text-secondary tracking-widest">NA</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-theme/10">
+                  {PARTE_II_DATA.map((item) => (
+                    <tr key={item.id} className="hover:bg-white/2 transition-colors group">
+                      <td className="px-6 py-3.5 text-[11px] font-medium text-text-primary leading-tight opacity-90 group-hover:opacity-100 transition-opacity">
+                        {item.text}
+                      </td>
+                      {['SIM', 'NÃO', 'NA'].map((val) => (
+                        <td key={val} className="px-2 py-3.5 text-center">
+                          <button 
+                            type="button"
+                            onClick={() => handleP2(item.id, val as any)}
+                            className={`w-7 h-7 rounded border transition-all text-[9px] font-black flex items-center justify-center mx-auto ${
+                              p2Selections[item.id] === val 
+                                ? 'bg-accent-gold text-bg-deep border-accent-gold shadow-[0_0_8px_rgba(212,175,55,0.3)]' 
+                                : 'border-border-theme text-text-secondary hover:border-white/20'
+                            }`}
+                          >
+                            {val === 'SIM' ? 'S' : val === 'NÃO' ? 'N' : 'NA'}
+                          </button>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {hasImpediment && (
+              <div className="bg-red-950/20 border-t border-red-500/20 p-6 space-y-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <AlertCircle className="text-red-500" size={20} />
+                  <span className="text-red-500 text-xs font-black uppercase tracking-[0.2em]">Condição Impeditiva Detectada</span>
+                </div>
+                
+                <div className="space-y-4 text-left border-l-2 border-red-500/30 pl-4">
+                  <h4 className="text-[10px] font-black uppercase text-text-secondary tracking-widest mb-1">Observações:</h4>
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <span className="text-[10px] font-mono text-red-500 font-bold">1.</span>
+                      <p className="text-[10px] text-text-primary leading-relaxed">Qualquer número de resposta <b className="text-red-400 font-black">“NÃO”</b> impede a realização do voo, sem a autorização do Cmt da U Ae ou do Cmt Av Ex.</p>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold">EM ANÁLISE</span>
-                      <span className="text-[10px] text-slate-500 font-mono">16/04/2026</span>
+                    <div className="flex gap-3">
+                      <span className="text-[10px] font-mono text-red-500 font-bold">2.</span>
+                      <p className="text-[10px] text-text-primary leading-relaxed">Apenas o Cmt da U Ae ou Cmt da Av Ex podem dar autorização para que a missão prossiga, independente do número de respostas <b className="text-red-400 font-black">“NÃO”</b>. Os comandantes deverão levar em consideração o custo-benefício que essa decisão trará para a organização.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="text-[10px] font-mono text-red-500 font-bold">3.</span>
+                      <p className="text-[10px] text-text-primary leading-relaxed"><b className="text-white">N A</b> – não aplicável, ou seja, não tem nada a ver com a missão a ser realizada. Exemplo: - No caso de voo de instrução, no item <i className="text-white">“A tripulação está habilitada para a realização do voo”</i>, dever-se-á marcar NA.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="text-[10px] font-mono text-red-500 font-bold">4.</span>
+                      <p className="text-[10px] text-text-primary leading-relaxed">Caso seja levantado algum potencial de risco que comprometa a execução da missão/voo, o militar que preenche o FGR deverá lançar esse potencial de risco no espaço destinado e fazer a análise, marcando <b className="text-white">“SIM”</b> ou <b className="text-white">“NÃO”</b> ou <b className="text-white">“NA”</b>. Quando marcar <b className="text-red-400">“NÃO”</b> deverá proceder como prescreve nos itens 1 e 2 descritos acima.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="text-[10px] font-mono text-red-500 font-bold">5.</span>
+                      <p className="text-[10px] text-text-primary leading-relaxed">Caso no item: <i className="text-white">“Toda tripulação/envolvidos participam de um briefing”</i> seja marcado <b className="text-red-400 font-black">“NÃO”</b>, quem não participou não poderá realizar a missão até que passe pelo briefing.</p>
                     </div>
                   </div>
                 </div>
-             ))}
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Sidebar/Form Info */}
-        <div className="space-y-6">
-          <div className="card-military bg-military-gold/5 border-military-gold/20">
-            <h3 className="font-bold text-military-gold mb-3 flex items-center gap-2">
-              <AlertTriangle size={16} />
-              Importante
-            </h3>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              O RELPREV é uma ferramenta preventiva. O foco é identificar riscos antes que ocorram acidentes. Sua identidade pode ser preservada.
-            </p>
-          </div>
-          
-          <div className="card-military">
-            <h3 className="text-sm font-bold uppercase text-white mb-4">Estatísticas Mês</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400">Total de Relatos</span>
-                <span className="text-white font-bold">12</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-left">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-2">
+                 <h3 className="text-sm font-black uppercase text-white tracking-widest">Parte III — Fatores de Gestão</h3>
               </div>
-              <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                <div className="bg-military-gold h-full" style={{ width: '65%' }} />
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400">Finalizados</span>
-                <span className="text-green-500 font-bold">8</span>
+              <div className="space-y-4">
+                {p3Categories.map(cat => (
+                  <div key={cat.name} className="card-military p-0 overflow-hidden border-border-theme/40">
+                    <div className="bg-bg-sidebar px-4 py-2 border-b border-border-theme flex justify-between items-center">
+                      <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest">{cat.title}</span>
+                      <span className="text-[10px] font-mono text-accent-gold">mín: {cat.scores.min} / máx: {cat.scores.max}</span>
+                    </div>
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-border-theme/30 bg-white/2">
+                          <th className="px-4 py-2 text-[9px] uppercase font-black text-text-secondary tracking-tighter">Critério</th>
+                          <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">S</th>
+                          <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">N</th>
+                          <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">D</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cat.questions.map((q: any) => (
+                          <tr key={q.id} className="border-b border-border-theme/10 hover:bg-white/2">
+                            <td className="px-4 py-2.5 text-xs text-text-primary leading-tight">{q.text}</td>
+                            {['S', 'N', 'D'].map(val => (
+                              <td key={val} className="px-2 py-2.5 text-center">
+                                <button 
+                                  onClick={() => handleP3(q.id, val as any)}
+                                  className={`w-7 h-7 rounded border transition-all text-[9px] font-black ${p3Selections[q.id] === val ? 'bg-accent-gold text-bg-deep border-accent-gold' : 'border-border-theme text-text-secondary'}`}
+                                >
+                                  {(q.w as any)[val]}
+                                </button>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
             </div>
+
+            <div className="space-y-8">
+              <div className="space-y-4">
+                 <h3 className="text-sm font-black uppercase text-white tracking-widest px-2">Parte IV — Tipo de Voo</h3>
+                 <div className="card-military p-4 flex gap-4 items-center bg-bg-sidebar">
+                    <div className="flex-1">
+                       <label className="text-[9px] uppercase font-black text-accent-gold tracking-[0.2em] mb-2 block">Perfil de Voo</label>
+                       <select 
+                         className="input-military w-full text-sm font-bold bg-bg-deep"
+                         value={tipoVoo}
+                         onChange={(e) => { setTipoVoo(e.target.value); updateStamp(); setP4Selections({}); }}
+                       >
+                         <option value="REGULAR">Voo Regular</option>
+                         <option value="INSTRUCAO">Voo de Instrução</option>
+                         <option value="IFR">Voo IFR</option>
+                         <option value="OVN">Voo OVN</option>
+                         <option value="TECNICO">Voo Técnico (Mnt/Ens)</option>
+                       </select>
+                    </div>
+                    <div className="bg-bg-deep border border-border-theme px-4 py-2 rounded text-center">
+                       <span className="text-[8px] font-black text-text-secondary uppercase block mb-1">Total (III+IV)</span>
+                       <span className="text-lg font-mono text-white font-black">{tgMax}</span>
+                    </div>
+                 </div>
+
+                 {tipoVoo !== 'REGULAR' && p4Questions.length > 0 && (
+                   <div className="card-military p-0 overflow-hidden border-border-theme/40 mt-4">
+                     <div className="bg-bg-sidebar px-4 py-2 border-b border-border-theme flex justify-between items-center">
+                       <span className="text-[10px] font-bold uppercase text-accent-gold tracking-widest">Critérios Específicos — {tipoVoo}</span>
+                     </div>
+                     <table className="w-full text-left border-collapse">
+                       <thead>
+                         <tr className="border-b border-border-theme/30 bg-white/2">
+                           <th className="px-4 py-2 text-[9px] uppercase font-black text-text-secondary tracking-tighter">Critério</th>
+                           <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">S</th>
+                           <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">N</th>
+                           <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">D</th>
+                         </tr>
+                       </thead>
+                       <tbody>
+                         {p4Questions.map((q: any) => (
+                           <tr key={q.id} className="border-b border-border-theme/10 hover:bg-white/2">
+                             <td className="px-4 py-2.5 text-xs text-text-primary leading-tight">{q.text}</td>
+                             {['S', 'N', 'D'].map(val => (
+                               <td key={val} className="px-2 py-2.5 text-center">
+                                 <button 
+                                   onClick={() => handleP4(q.id, val as any)}
+                                   className={`w-7 h-7 rounded border transition-all text-[9px] font-black ${p4Selections[q.id] === val ? 'bg-accent-gold text-bg-deep border-accent-gold' : 'border-border-theme text-text-secondary'}`}
+                                 >
+                                   {(q.w as any)[val]}
+                                 </button>
+                               </td>
+                             ))}
+                           </tr>
+                         ))}
+                       </tbody>
+                     </table>
+                   </div>
+                 )}
+              </div>
+
+                  <div className="card-military p-0 overflow-hidden text-left border-border-theme/40">
+                     <div className="bg-bg-sidebar/50 px-6 py-4 border-b border-border-theme/30 flex justify-between items-center">
+                        <span className="text-[11px] font-black uppercase text-accent-gold tracking-[0.2em]">Parte V — Avaliação de Gravidade</span>
+                     </div>
+                     <div className="p-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {GRAVIDADE_DATA.filter(g => !g.fixed).map(g => {
+                            const isAuto = g.autoByTipo && g.autoByTipo === tipoVoo;
+                            const isRestricted = tipoVoo === "REGULAR" && 
+                               (g.id === "g2" || g.id === "g3" || g.id === "g4" || g.id === "g9");
+                            
+                            if (isRestricted) return null;
+
+                            return (
+                              <button
+                                key={g.id}
+                                disabled={isAuto}
+                                onClick={() => handleGrav(g.id)}
+                                className={`flex items-center justify-between p-3 rounded border text-left transition-all ${
+                                  (isAuto || gravidadeSelections[g.id]) 
+                                    ? 'bg-accent-gold/20 border-accent-gold text-white' 
+                                    : 'bg-white/2 border-white/5 text-text-secondary hover:border-white/20'
+                                }`}
+                              >
+                                <span className="text-[11px] font-bold uppercase tracking-tight">{g.text}</span>
+                                <span className={`text-[10px] font-mono ${isAuto || gravidadeSelections[g.id] ? 'text-accent-gold' : 'text-slate-500'}`}>+{g.pts}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="card-military p-0 overflow-hidden text-left bg-gradient-to-br from-bg-sidebar to-bg-deep border-border-theme/40">
+                     <div className="bg-bg-sidebar/50 px-6 py-4 border-b border-border-theme/30 flex justify-between items-center">
+                        <span className="text-[11px] font-black uppercase text-accent-gold tracking-[0.2em]">Resultado da Matriz de Risco</span>
+                     </div>
+                     <div className="p-8 space-y-8">
+                        <div className={`p-6 rounded border-2 shadow-2xl transition-all duration-700 ${riskMaxStatus.border} ${riskMaxStatus.bg} flex flex-col items-center gap-3`}>
+                           <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-50 mb-1">Classificação Final</span>
+                           <div className={`text-4xl md:text-5xl font-black italic tracking-tighter text-center ${riskMaxStatus.color}`}>
+                              {riskMaxStatus.label.toUpperCase()}
+                           </div>
+                           
+                           <div className="flex gap-8 items-center mt-2 py-4 border-y border-white/5 w-full justify-center">
+                              <div className="flex flex-col items-center">
+                                 <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1">Score Mínimo</span>
+                                 <span className="text-xl font-mono text-white font-black">{riskMin}</span>
+                              </div>
+                              <div className="w-px h-10 bg-white/10" />
+                              <div className="flex flex-col items-center">
+                                 <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mb-1">Score Máximo</span>
+                                 <span className="text-xl font-mono text-white font-black">{riskMax}</span>
+                              </div>
+                           </div>
+
+                           <div className="w-full space-y-6 pt-4">
+                              <div className="text-center">
+                                 <span className="text-[9px] font-black text-text-secondary/60 uppercase block mb-2 tracking-[0.2em]">Ação Recomendada</span>
+                                 <p className="text-[11px] font-bold text-white leading-relaxed max-w-[320px] mx-auto bg-black/20 p-3 rounded-sm border border-white/5 shadow-inner">
+                                    {riskMaxStatus.decisao}
+                                 </p>
+                              </div>
+                              <div className="text-center bg-bg-deep/40 p-4 rounded-sm border border-border-theme/30">
+                                 <span className="text-[9px] font-black text-text-secondary/60 uppercase block mb-1 tracking-[0.2em]">Responsabilidade</span>
+                                 <p className="text-[13px] font-black text-accent-gold uppercase tracking-tight">
+                                    {riskMaxStatus.responsavel}
+                                 </p>
+                              </div>
+                           </div>
+
+                           <div className="text-[9px] font-bold text-text-secondary/40 uppercase mt-4 italic">
+                             Fator TG ({tgMax}) × Gravidade ({gravTotal})
+                           </div>
+                        </div>
+
+                        <div className="space-y-4">
+                           <div>
+                              <label className="text-[10px] font-black uppercase text-text-secondary tracking-widest mb-2 block">Medidas de Mitigação Exigidas</label>
+                              <textarea 
+                                className="input-military w-full h-32 text-sm leading-relaxed p-4"
+                                placeholder="Descreva as ações para reduzir os riscos identificados..."
+                                value={mitigation}
+                                onChange={(e) => setMitigation(e.target.value)}
+                              />
+                           </div>
+
+                           <div id="validation-errors-anchor" className="scroll-mt-20">
+                             <AnimatePresence>
+                               {validationErrors.length > 0 && (
+                                 <motion.div 
+                                   initial={{ opacity: 0, y: 10 }}
+                                   animate={{ opacity: 1, y: 0 }}
+                                   exit={{ opacity: 0, y: -10 }}
+                                   className="bg-red-500/10 border border-red-500/30 rounded-sm p-4 mb-4"
+                                 >
+                                   <div className="flex items-center gap-2 mb-3">
+                                     <AlertTriangle className="text-red-500" size={16} />
+                                     <span className="text-[10px] font-black uppercase text-red-500 tracking-[0.2em]">Erros de Validação</span>
+                                   </div>
+                                   <ul className="space-y-1 mb-4">
+                                     {validationErrors.map((err, idx) => (
+                                       <li key={idx} className="text-[10px] text-text-primary flex items-start gap-2">
+                                         <span className="text-red-500 font-bold">•</span>
+                                         {err}
+                                       </li>
+                                     ))}
+                                   </ul>
+                                   <button 
+                                     onClick={() => handleSave(true)}
+                                     className="w-full py-2 bg-red-500/20 border border-red-500/40 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/30 transition-all"
+                                   >
+                                     Enviar mesmo assim
+                                   </button>
+                                 </motion.div>
+                               )}
+                             </AnimatePresence>
+                           </div>
+
+                           <button 
+                             disabled={isSaving}
+                             onClick={handleSave}
+                             className="btn-military w-full h-14 text-sm uppercase font-black tracking-[0.2em] gap-3 flex items-center justify-center shadow-lg hover:shadow-accent-gold/20 transition-all group"
+                           >
+                             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} className="group-hover:scale-110 transition-transform" />}
+                             {isSaving ? 'Processando...' : 'ENVIAR RELATÓRIO SIPAA'}
+                           </button>
+                           <button onClick={resetAll} className="w-full py-4 text-[10px] uppercase font-bold text-text-secondary hover:text-red-400 transition-colors tracking-widest">Descartar e Limpar Formulário</button>
+                        </div>
+                     </div>
+                  </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
     </div>
   );
 }
 
-function FgrSection() {
-  return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-1">FGR</h2>
-          <p className="text-slate-400">Gerenciamento de Risco Operacional</p>
-        </div>
-        <div className="flex gap-3">
-           <button className="px-4 py-2 border border-slate-700 bg-slate-800 text-white rounded hover:bg-slate-700 font-semibold text-sm">
-             Carregar Modelo
-           </button>
-           <button className="btn-military whitespace-nowrap text-sm">
-            <CheckSquare size={16} />
-            Finalizar FGR
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Header Form */}
-        <div className="lg:col-span-4 card-military grid grid-cols-1 md:grid-cols-4 gap-4">
-          <FgrField label="Missão" placeholder="Treinamento Tático" />
-          <FgrField label="Aeronave" placeholder="HA-1 Fennec" />
-          <FgrField label="Local" placeholder="Taubaté - SP" />
-          <FgrField label="Data" type="date" defaultValue="2026-04-16" />
-        </div>
-
-        {/* Risk Categories */}
-        <div className="lg:col-span-3 space-y-4">
-          <h3 className="text-sm font-bold border-l-2 border-military-gold pl-3 uppercase tracking-widest text-slate-400">Fatores de Risco</h3>
-          
-          <FgrRow title="Experiência da Tripulação" items={[
-            { label: "Instrutor qualificado", value: 1 },
-            { label: "Piloto em formação", value: 3 },
-            { label: "Tripulação reduzida", value: 5 },
-          ]} />
-          
-          <FgrRow title="Condições Meteorológicas" items={[
-            { label: "VMC Ceu claro", value: 1 },
-            { label: "VMC com restrições", value: 3 },
-            { label: "Próximo a mínimos", value: 6 },
-          ]} />
-
-          <FgrRow title="Terreno e Objetivo" items={[
-            { label: "Área conhecida", value: 1 },
-            { label: "Área restrita/Selva", value: 4 },
-            { label: "Área hostil/Novo", value: 7 },
-          ]} />
-        </div>
-
-        {/* Score Board */}
-        <div className="space-y-6">
-          <div className="card-military flex flex-col items-center justify-center p-8 text-center bg-military-blue/20 border-military-blue border-2">
-            <span className="text-sm text-slate-400 uppercase font-bold mb-2">Índice Total</span>
-            <span className="text-6xl font-black text-white">12</span>
-            <span className="mt-4 px-4 py-1 rounded bg-green-500 text-black text-xs font-bold uppercase">Risco Baixo</span>
-          </div>
-
-          <div className="card-military">
-            <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 tracking-tighter">Classificação</h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-2 rounded bg-green-500/10 border border-green-500/20 text-[10px] text-green-500 font-bold">
-                <span>0 - 15</span>
-                <span>BAIXO</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-yellow-500/10 border border-yellow-500/20 text-[10px] text-yellow-500 font-bold">
-                <span>16 - 25</span>
-                <span>MÉDIO</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-red-500/10 border border-red-500/20 text-[10px] text-red-500 font-bold">
-                <span>26+</span>
-                <span>ELEVADO</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MapaRiscoSection() {
+function MapaRiscoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
        <div>
@@ -500,7 +1983,7 @@ function MapaRiscoSection() {
   );
 }
 
-function NotificacaoSection() {
+function NotificacaoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
        <div className="flex items-center justify-between">
@@ -535,7 +2018,7 @@ function NotificacaoSection() {
   );
 }
 
-function PosAcidenteSection() {
+function PosAcidenteSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   const [simplifiedMode, setSimplifiedMode] = useState(false);
   
   return (
@@ -543,7 +2026,7 @@ function PosAcidenteSection() {
        <div className="flex items-center justify-between bg-red-600/10 p-4 border border-red-600/20 rounded-lg">
           <div>
             <h2 className="text-2xl font-extrabold text-red-500 mb-1 leading-none uppercase tracking-tighter">Plano de Emergência</h2>
-            <p className="text-slate-400 text-sm">Protocolos imediatos para resposta a acidentes.</p>
+            <p className="text-text-secondary text-sm">Protocolos imediatos para resposta a acidentes.</p>
           </div>
           <button 
             onClick={() => setSimplifiedMode(!simplifiedMode)}
@@ -565,7 +2048,7 @@ function PosAcidenteSection() {
   );
 }
 
-function AbastecimentoSection() {
+function AbastecimentoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -633,7 +2116,7 @@ function AbastecimentoSection() {
   );
 }
 
-function MeteoSection() {
+function MeteoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
        <div className="flex items-center justify-between">
@@ -686,7 +2169,7 @@ function MeteoSection() {
   );
 }
 
-function FaunaSection() {
+function FaunaSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
        <div>
@@ -753,7 +2236,7 @@ function FaunaSection() {
   );
 }
 
-function NormasSection() {
+function NormasSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-slate-800">
@@ -779,7 +2262,7 @@ function NormasSection() {
   );
 }
 
-function PlanejamentoSection() {
+function PlanejamentoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
        <div>
@@ -839,113 +2322,464 @@ function PlanejamentoSection() {
   );
 }
 
-function AdminSection() {
-  const [isLogged, setIsLogged] = useState(false);
-  
-  if (!isLogged) {
-    return (
-      <div className="max-w-md mx-auto pt-24">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="card-military p-10 text-center space-y-8 border-military-gold/20 shadow-2xl relative overflow-hidden"
-        >
-           {/* Abstract Keyhole */}
-           <div className="absolute -top-10 -right-10 opacity-5 pointer-events-none">
-             <Lock size={150} />
-           </div>
+function AdminSection({ user, onTabChange }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }) {
+  const [stats, setStats] = useState({ relprevs: 0, fgrs: 0 });
+  const [relprevs, setRelprevs] = useState<any[]>([]);
+  const [fgrs, setFgrs] = useState<any[]>([]);
+  const [selectedView, setSelectedView] = useState<'stats' | 'relprevs' | 'fgrs'>('stats');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteColl, setDeleteColl] = useState<string | null>(null);
 
-           <div className="mx-auto w-20 h-20 bg-military-gold rounded-2xl flex items-center justify-center mb-4 rotate-3 shadow-xl">
-             <Lock className="text-military-black" size={40} />
-           </div>
-           <div>
-              <h2 className="text-2xl font-black text-white italic tracking-tighter">ACESSO SIPAA</h2>
-              <p className="text-slate-400 text-sm mt-1 uppercase font-bold tracking-widest border-t border-slate-800 pt-2 inline-block">Área Restrita 2º BAvEx</p>
-           </div>
-           <div className="space-y-4">
-              <input className="input-military py-3.5" type="text" placeholder="Identidade Militar" />
-              <input className="input-military py-3.5" type="password" placeholder="Senha Operacional" />
-              <button onClick={() => setIsLogged(true)} className="btn-military w-full py-4 uppercase font-black tracking-widest shadow-lg shadow-military-gold/10 mt-4">AUTENTICAR</button>
-           </div>
-           <p className="text-[10px] text-slate-600 font-mono">Toda atividade neste painel é monitorada e registrada.</p>
-        </motion.div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const qRelprev = query(collection(db, 'relprevReports'), orderBy('createdAt', 'desc'));
+    const qFgr = query(collection(db, 'fgrMissions'), orderBy('createdAt', 'desc'));
+
+    const unsubRelprev = onSnapshot(qRelprev, (snap) => {
+      setStats(prev => ({ ...prev, relprevs: snap.size }));
+      setRelprevs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const unsubFgr = onSnapshot(qFgr, (snap) => {
+      setStats(prev => ({ ...prev, fgrs: snap.size }));
+      setFgrs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubRelprev();
+      unsubFgr();
+    };
+  }, []);
+
+  const [selectedRelprev, setSelectedRelprev] = useState<any>(null);
+  const [showAnexos, setShowAnexos] = useState(false);
+
+  const handleDelete = async () => {
+    if (!deleteId || !deleteColl) return;
+    try {
+      await deleteDoc(doc(db, deleteColl, deleteId));
+      setDeleteId(null);
+      setDeleteColl(null);
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      alert('Erro ao excluir registro. Verifique a conexão.');
+    }
+  };
+
+  const confirmDelete = (collectionName: string, id: string) => {
+    setDeleteId(id);
+    setDeleteColl(collectionName);
+  };
 
   return (
-    <div className="space-y-8">
-       <div className="flex items-center justify-between pb-6 border-b border-slate-800">
-          <div className="flex items-center gap-4">
-             <div className="w-12 h-12 rounded-full bg-military-gold/20 border border-military-gold flex items-center justify-center">
-                <User size={24} className="text-military-gold" />
+    <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
+       <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 md:pb-6 border-b border-slate-800 gap-4">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-military-gold/20 border border-military-gold flex items-center justify-center text-military-gold shrink-0">
+                <ShieldCheck size={20} className="md:w-6 md:h-6" />
              </div>
              <div>
-               <h2 className="text-2xl font-black text-white leading-none">Painel Administrativo</h2>
-               <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Bem-vindo, Maj Cavalcanti (SIPAA)</p>
+               <h2 className="text-xl md:text-2xl font-black text-white leading-tight">Painel Administrativo</h2>
+               <p className="text-military-gold text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] mt-0.5">SIPAA 2º BAvEx — Gestão Centralizada</p>
              </div>
           </div>
-          <button onClick={() => setIsLogged(false)} className="px-6 py-2 border border-red-500/30 text-red-500 hover:bg-red-500/10 rounded-lg text-xs font-black uppercase tracking-widest transition-all">
-            <LogOut size={16} className="inline mr-2" /> Encerrar Sessão
-          </button>
+          <div className="flex gap-1 bg-military-black/50 p-1 rounded-lg border border-white/5 overflow-x-auto no-scrollbar">
+            <button 
+              onClick={() => setSelectedView('stats')}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'stats' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
+            >
+              Dashboard
+            </button>
+            <button 
+              onClick={() => setSelectedView('relprevs')}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'relprevs' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
+            >
+              Relatos
+            </button>
+            <button 
+              onClick={() => setSelectedView('fgrs')}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'fgrs' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
+            >
+              Missões FGR
+            </button>
+          </div>
        </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <AdminStat label="Relatos Pendentes" value="03" trend="MÉDIA BAIXA" />
-          <AdminStat label="Última Inspeção" value="ONTEM" trend="SEM NÃO CONFORMIDADES" />
-          <AdminStat label="Mapa de Riscos" value="ATIVO" trend="ATUALIZADO ÀS 07:00" />
-          <AdminStat label="Alertas de Fauna" value="15" trend="+2 NAS ÚLTIMAS 24H" />
-       </div>
+       {selectedView === 'stats' && (
+         <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+              <AdminStat label="Relatos" value={stats.relprevs.toString()} trend="TOTAL" />
+              <AdminStat label="FGR" value={stats.fgrs.toString()} trend="TOTAL" />
+              <AdminStat label="Mapa" value="ATIVO" trend="ATUALIZADO" />
+              <AdminStat label="Fauna" value="15" trend="ALERTAS" />
+          </div>
 
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-         <div className="lg:col-span-2 card-military">
-            <div className="flex items-center justify-between mb-8 border-b border-slate-800 pb-4">
-               <h3 className="font-black text-white uppercase text-[10px] tracking-widest">Controle de Módulos Operacionais</h3>
-               <button className="text-[10px] text-military-gold font-bold hover:underline">Ver Todos</button>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
+            <div className="lg:col-span-2 card-military p-4 md:p-6">
+                <div className="flex items-center justify-between mb-4 md:mb-8 border-b border-slate-800 pb-4">
+                  <h3 className="font-black text-white uppercase text-[10px] tracking-widest">Ações Rápidas</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                  <AdminAction title="Relatórios de Frota" onClick={() => setSelectedView('relprevs')} desc="Visão geral de incidentes por modelo." icon={ShieldCheck} />
+                  <AdminAction title="Missões FGR" onClick={() => setSelectedView('fgrs')} desc="Auditoria de gerenciamento de risco." icon={FileText} />
+                </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <AdminAction title="Gestão de Normatização" desc="Publicar ou remover itens da biblioteca CAvEx." icon={BookOpen} />
-               <AdminAction title="Editores do Mapa" desc="Incluir ameaças e perigos temporários no setor." icon={MapIcon} />
-               <AdminAction title="Relatórios de Frota" desc="Visão geral de incidentes por modelo de aeronave." icon={ShieldCheck} />
-               <AdminAction title="Configuração Geral" desc="Limites de acesso e permissões de usuários." icon={Settings} />
+            
+            <div className="card-military bg-military-blue/10 border-military-blue/20 p-4 md:p-6">
+                <h3 className="text-[10px] font-black text-white uppercase tracking-widest mb-4">Log de Atividades</h3>
+                <div className="space-y-3 md:space-y-4">
+                  <ActivityItem time="Agora" user="Admin" action="Acesso ao Painel SIPAA" />
+                  <ActivityItem time="Recente" user="Sistema" action="Dados sincronizados" />
+                </div>
             </div>
+          </div>
          </div>
-         
-         <div className="card-military bg-military-blue/10 border-military-blue/20">
-            <h3 className="text-[10px] font-black text-white uppercase tracking-widest mb-4">Log de Atividades</h3>
-            <div className="space-y-4">
-               <ActivityItem time="12:45" user="Maj Silva" action="Aprovou RELPREV #89" />
-               <ActivityItem time="10:20" user="Sgt Rocha" action="Atualizou Mapa de Risco" />
-               <ActivityItem time="09:15" user="Cap Menezes" action="Nova Notificação Crítica" />
-               <ActivityItem time="08:00" user="SYSTEM" action="Backup Diário Concluído" />
+       )}
+
+        {selectedView === 'relprevs' && (
+          <div className="space-y-4">
+            {/* Desktop Table - Only on large screens */}
+            <div className="hidden xl:block card-military overflow-hidden">
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-border-theme text-[10px] uppercase text-text-secondary font-black">
+                      <th className="px-4 py-3">Data</th>
+                      <th className="px-4 py-3">Código</th>
+                      <th className="px-4 py-3">Situação</th>
+                      <th className="px-4 py-3">Relator</th>
+                      <th className="px-4 py-3 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-theme/30 text-[11px]">
+                    {relprevs.map(r => (
+                      <tr key={r.id} className="hover:bg-white/2 transition-colors">
+                        <td className="px-4 py-3 font-mono">{new Date(r.createdAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-military-gold font-bold">{r.codigo}</td>
+                        <td className="px-4 py-3 text-white truncate max-w-[200px]">{r.situacao}</td>
+                        <td className="px-4 py-3 text-text-secondary">{r.relatorNome || 'Anônimo'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <button 
+                              onClick={() => {
+                                const doc = generateRelprevPDF(r);
+                                window.open(doc.output('bloburl'), '_blank');
+                              }}
+                              className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
+                            >
+                              <FileText size={14} />
+                              <span className="text-[10px] font-black uppercase tracking-widest">PDF</span>
+                            </button>
+                            <button 
+                              onClick={() => { setSelectedRelprev(r); setShowAnexos(true); }} 
+                              className="text-slate-400 hover:text-white flex items-center gap-1.5 p-1"
+                            >
+                              <Eye size={14} />
+                              <span className="text-[10px] uppercase font-black">Anexos</span>
+                            </button>
+                            <button onClick={() => confirmDelete('relprevReports', r.id)} className="text-red-400 hover:text-red-300 p-1">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* Mobile/Tablet List - Show on anything smaller than XL */}
+            <div className="xl:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {relprevs.map(r => (
+                <div key={r.id} className="card-military p-4 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-military-gold font-mono font-black text-xs leading-none">{r.codigo}</span>
+                      <span className="text-[9px] text-text-secondary">{new Date(r.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <h4 className="text-white font-bold text-sm leading-tight mb-2 line-clamp-2">{r.situacao}</h4>
+                    <div className="text-[9px] text-text-secondary uppercase font-bold tracking-widest truncate">
+                      Rel: <span className="text-slate-300">{r.relatorNome || 'Anônimo'}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                    <button 
+                     onClick={() => {
+                        const doc = generateRelprevPDF(r);
+                        window.open(doc.output('bloburl'), '_blank');
+                     }} 
+                     className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
+                    >
+                      <FileText size={14} /> PDF
+                    </button>
+                    <button 
+                     onClick={() => { setSelectedRelprev(r); setShowAnexos(true); }} 
+                     className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider border border-white/5"
+                    >
+                      <Eye size={14} /> Anexos
+                    </button>
+                    <button 
+                     onClick={() => confirmDelete('relprevReports', r.id)} 
+                     className="w-10 h-9 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {relprevs.length === 0 && (
+              <div className="card-military py-12 text-center opacity-40 italic text-sm">Nenhum relato encontrado.</div>
+            )}
+          </div>
+        )}
+
+       {selectedView === 'fgrs' && (
+         <div className="space-y-4">
+           {/* Desktop Table - Only on large screens */}
+           <div className="hidden xl:block card-military overflow-hidden">
+             <div className="overflow-x-auto no-scrollbar">
+               <table className="w-full text-left">
+                 <thead>
+                   <tr className="border-b border-border-theme text-[10px] uppercase text-text-secondary font-black">
+                     <th className="px-4 py-3">Data</th>
+                     <th className="px-4 py-3">Missão</th>
+                     <th className="px-4 py-3">Aeronave</th>
+                     <th className="px-4 py-3">Risco</th>
+                     <th className="px-4 py-3 text-right font-black tracking-widest text-military-gold">PDF / AÇÕES</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-border-theme/30 text-[11px]">
+                   {fgrs.map(f => (
+                     <tr key={f.id} className="hover:bg-white/2 transition-colors">
+                       <td className="px-4 py-3 font-mono">{new Date(f.createdAt).toLocaleDateString()}</td>
+                       <td className="px-4 py-3 text-white font-bold">{f.missao}</td>
+                       <td className="px-4 py-3 text-text-secondary uppercase">{f.aeronave} | {f.relatorName || 'Conv.'}</td>
+                       <td className="px-4 py-3">
+                         <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest ${
+                           f.scores.riskMax > 100 ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'
+                         }`}>
+                           {f.scores.riskMax} pts
+                         </span>
+                       </td>
+                       <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                          <button 
+                            onClick={() => {
+                              const doc = generateFgrPDF(f);
+                              window.open(doc.output('bloburl'), '_blank');
+                            }}
+                            className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
+                          >
+                            <FileText size={14} />
+                            <span className="text-[10px] uppercase font-black">Ver PDF</span>
+                          </button>
+                          <button onClick={() => confirmDelete('fgrMissions', f.id)} className="text-red-400 hover:text-red-300 p-1">
+                            <Trash2 size={14} />
+                          </button>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+           </div>
+
+           {/* Mobile/Tablet List - Show on anything smaller than XL */}
+           <div className="xl:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+             {fgrs.map(f => (
+               <div key={f.id} className="card-military p-4 space-y-3 flex flex-col justify-between">
+                 <div>
+                   <div className="flex justify-between items-start mb-2">
+                     <span className="text-white font-black text-xs uppercase tracking-tight truncate">{f.missao}</span>
+                     <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${
+                       f.scores.riskMax > 100 ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'
+                     }`}>
+                       {f.scores.riskMax} PTS
+                     </span>
+                   </div>
+                   <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
+                     <div className="truncate">Av: <span className="text-slate-300">{f.aeronave}</span></div>
+                     <div className="text-right">{new Date(f.createdAt).toLocaleDateString()}</div>
+                   </div>
+                   <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight truncate">
+                     Rel: <span className="text-slate-300">{f.relatorName || 'Conv.'}</span>
+                   </div>
+                 </div>
+                 <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                   <button 
+                     onClick={() => {
+                       const doc = generateFgrPDF(f);
+                       window.open(doc.output('bloburl'), '_blank');
+                     }}
+                     className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
+                   >
+                     <FileText size={14} /> PDF
+                   </button>
+                   <button 
+                    onClick={() => confirmDelete('fgrMissions', f.id)} 
+                    className="w-10 h-9 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20"
+                   >
+                     <Trash2 size={16} />
+                   </button>
+                 </div>
+               </div>
+             ))}
+           </div>
+
+           {fgrs.length === 0 && (
+             <div className="card-military py-12 text-center opacity-40 italic text-sm">Nenhuma missão encontrada.</div>
+           )}
          </div>
-       </div>
+       )}
+
+       {/* Delete Confirmation Modal */}
+       <AnimatePresence>
+         {deleteId && (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="card-military max-w-sm w-full p-6 text-center space-y-6"
+              >
+                <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-500 mx-auto flex items-center justify-center">
+                  <Trash2 size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-black text-white uppercase tracking-tight">Confirmar Exclusão</h3>
+                  <p className="text-xs text-text-secondary">Deseja realmente apagar este registro? Esta ação não pode ser desfeita.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => { setDeleteId(null); setDeleteColl(null); }}
+                    className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={handleDelete}
+                    className="flex-1 px-4 py-3 rounded bg-red-500 text-white font-bold text-[10px] uppercase hover:bg-red-600 transition-colors"
+                  >
+                    Sim, Excluir
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+         )}
+       </AnimatePresence>
+
+       {/* Relprev Multi-line Details Modal */}
+       <AnimatePresence>
+         {selectedRelprev && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-md">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="card-military max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 space-y-6"
+              >
+                <div className="flex justify-between items-start border-b border-border-theme pb-4">
+                  <div>
+                    <span className="text-[10px] font-mono text-military-gold uppercase tracking-[0.2em]">RELPREV #{selectedRelprev.codigo}</span>
+                    <h3 className="text-xl font-black text-white">Anexos do Relato</h3>
+                  </div>
+                  <button onClick={() => { setSelectedRelprev(null); setShowAnexos(false); }} className="text-text-secondary hover:text-white border border-white/10 rounded p-1">
+                    <X size={20} />
+                  </button>
+                </div>
+                
+                <div className="space-y-6">
+                  {((selectedRelprev.images && selectedRelprev.images.length > 0) || (selectedRelprev.extraFiles && selectedRelprev.extraFiles.length > 0)) ? (
+                    <div className="space-y-6">
+                      {selectedRelprev.images && selectedRelprev.images.length > 0 && (
+                        <div className="space-y-3">
+                          <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">Fotos Anexadas</span>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {selectedRelprev.images.map((img: string, i: number) => (
+                              <button 
+                                key={i} 
+                                onClick={() => openBase64InNewTab(img)} 
+                                className="block group relative overflow-hidden rounded border border-white/10 hover:border-accent-gold transition-colors aspect-square"
+                              >
+                                <img src={img} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="Anexo" />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Search size={18} className="text-white" />
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedRelprev.extraFiles && selectedRelprev.extraFiles.length > 0 && (
+                        <div className="space-y-3">
+                          <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">Documentos Extras</span>
+                          <div className="space-y-2">
+                            {selectedRelprev.extraFiles.map((file: string, i: number) => (
+                              <button 
+                                key={i} 
+                                onClick={() => openBase64InNewTab(file)}
+                                className="w-full flex items-center gap-3 p-4 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-[10px] text-white font-bold uppercase text-left"
+                              >
+                                <FileText size={18} className="text-military-gold" />
+                                <span>Download Arquivo Anexo {i + 1}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="py-20 text-center text-text-secondary italic text-sm border border-dashed border-white/10 rounded">
+                      Este relato não possui anexos.
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-6 border-t border-white/5">
+                   <button 
+                    onClick={() => {
+                      const doc = generateRelprevPDF(selectedRelprev);
+                      window.open(doc.output('bloburl'), '_blank');
+                    }}
+                    className="flex-1 btn-military py-4 flex items-center justify-center gap-2"
+                   >
+                     <FileText size={16} /> VER DADOS COMPLETOS (PDF)
+                   </button>
+                   <button 
+                    onClick={() => { setSelectedRelprev(null); setShowAnexos(false); }}
+                    className="px-8 py-4 rounded border border-border-theme text-white font-bold text-xs hover:bg-white/5 transition-all uppercase"
+                   >
+                    Voltar
+                   </button>
+                </div>
+              </motion.div>
+            </div>
+         )}
+       </AnimatePresence>
     </div>
   );
 }
 
 // --- SUB-HELPER COMPONENTS ---
 
-function QuickCard({ icon: Icon, title, desc, color }: any) {
+function QuickCard({ icon: Icon, title, desc, color, onClick }: any) {
   const colorMap: any = {
-    gold: 'bg-military-gold/10 border-military-gold/30 text-military-gold',
-    blue: 'bg-military-blue/10 border-military-blue/30 text-blue-400',
-    slate: 'bg-slate-800/50 border-slate-700 text-slate-300'
+    gold: 'bg-accent-gold/10 border-accent-gold/30 text-accent-gold',
+    blue: 'bg-accent-blue/10 border-accent-blue/30 text-white',
+    slate: 'bg-slate-800/50 border-border-theme text-text-secondary'
   };
   
   return (
     <motion.div 
-      whileHover={{ y: -5 }}
-      className={`card-military p-6 cursor-pointer group transition-all ${colorMap[color]}`}
+      whileHover={{ y: -2 }}
+      onClick={onClick}
+      className={`card-military p-5 cursor-pointer group transition-all text-center ${colorMap[color]}`}
     >
-      <div className="flex items-center gap-3 mb-4">
-        <div className={`p-3 rounded-lg ${color === 'gold' ? 'bg-military-gold text-military-black' : 'bg-slate-800 text-white'}`}>
-          <Icon size={24} />
-        </div>
-        <h3 className="font-bold text-lg group-hover:scale-105 transition-transform">{title}</h3>
+      <div className="flex flex-col items-center gap-3">
+        {Icon && <Icon size={20} className="text-accent-gold" />}
+        <h3 className="font-bold text-sm tracking-wide">{title}</h3>
+        <p className="text-[11px] text-text-secondary leading-tight">{desc}</p>
       </div>
-      <p className="text-sm opacity-70 leading-relaxed font-medium">{desc}</p>
     </motion.div>
   );
 }
@@ -1106,9 +2940,12 @@ function ActivityItem({ time, user, action }: any) {
   );
 }
 
-function AdminAction({ title, desc, icon: Icon }: any) {
+function AdminAction({ title, desc, icon: Icon, onClick }: any) {
   return (
-    <div className="p-5 rounded-xl bg-military-black border border-slate-800 hover:border-military-gold cursor-pointer transition-all group flex gap-4">
+    <div 
+      onClick={onClick}
+      className="p-5 rounded-xl bg-military-black border border-slate-800 hover:border-military-gold cursor-pointer transition-all group flex gap-4"
+    >
        <div className="p-3 rounded-lg bg-slate-800 text-military-gold group-hover:bg-military-gold group-hover:text-military-black transition-all shrink-0 h-fit">
          <Icon size={20} />
        </div>
@@ -1131,7 +2968,7 @@ function AdminStat({ label, value, trend }: any) {
   );
 }
 
-const sectionComponents: Record<string, FC> = {
+const sectionComponents: Record<string, FC<{ user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }>> = {
   Inicio: InicioSection,
   RELPREV: RelprevSection,
   FGR: FgrSection,
