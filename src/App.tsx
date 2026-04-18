@@ -709,6 +709,8 @@ export default function App() {
         }
       } else if (error.code === 'auth/cancelled-popup-request') {
         // Ignorar
+      } else if (error.code === 'auth/unauthorized-domain') {
+        alert('ERRO DE SEGURANÇA: Este domínio (' + window.location.hostname + ') não está autorizado no Firebase Authentication. \n\nPor favor, adicione este domínio no Console do Firebase em: Authentication > Settings > Authorized Domains.');
       } else {
         alert('Erro ao fazer login: ' + (error.message || 'Erro desconhecido.'));
       }
@@ -2645,68 +2647,49 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
       }
 
       // 1. Upload to Storage
-      const path = `config/abastecimento/guia_${Date.now()}_${fileToUpload.name.replace(/\s+/g, '_').replace(/[^\w.-]/g, '')}`;
-      console.log('Iniciando upload para Storage no caminho:', path);
-      const storageRef = ref(storage, path);
+      const path = `config/abastecimento/guia_${Date.now()}_${fileToUpload.name.replace(/\D/g, '')}.pdf`;
+      console.log('--- INICIANDO PROCESSO DE UPLOAD ---');
+      console.log('Arquivo:', fileToUpload.name, 'Tamanho:', fileToUpload.size);
+      console.log('User:', auth.currentUser?.email);
+      console.log('Caminho no Storage:', path);
       
+      const storageRef = ref(storage, path);
       let url = '';
+
       try {
-        const metadata = { contentType: 'application/pdf' };
-        console.log('Criando tarefa de upload...');
-        const uploadTask = uploadBytesResumable(storageRef, fileToUpload, metadata);
-
-        url = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            uploadTask.cancel();
-            reject(new Error('Tempo limite de upload excedido (120 segundos). Verifique sua conexão ou se há bloqueios de rede. Se o erro persistir, tente abrir o site em uma nova aba fora do editor.'));
-          }, 120000); // 120 segundos
-
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
-              console.log('Upload is ' + progress + '% done');
-            }, 
-            (error) => {
-              clearTimeout(timeout);
-              console.error('UploadTask Error:', error);
-              reject(error);
-            }, 
-            async () => {
-              clearTimeout(timeout);
-              try {
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve(downloadURL);
-              } catch (e) {
-                reject(e);
-              }
-            }
-          );
+        console.log('Passo 1: Chamando uploadBytes...');
+        // O uploadBytes simples é mais estável em ambientes de iframe/proxy
+        const snapshot = await uploadBytes(storageRef, fileToUpload, {
+          contentType: 'application/pdf'
         });
-        console.log('URL obtida:', url);
+        console.log('Passo 1 Concluído: Snapshot recebido', snapshot.metadata.fullPath);
+        
+        console.log('Passo 2: Obtendo URL de download...');
+        url = await getDownloadURL(snapshot.ref);
+        console.log('Passo 2 Concluído: URL obtida', url);
       } catch (err: any) {
-        console.error('Storage Error Detail:', err);
-        throw new Error(`Falha no armazenamento (Storage): ${err.code || err.message}`);
+        console.error('ERRO NO STORAGE:', err);
+        throw new Error(`Erro ao enviar arquivo para o Google Storage: ${err.message || err.code}`);
       }
       
       // 2. Update Config
       try {
-        console.log('Atualizando documento de configuração no Firestore...');
+        console.log('Passo 3: Salvando configuração no Firestore...');
         await setDoc(doc(db, 'config', 'abastecimento'), {
           url,
           updatedAt: new Date().toISOString(),
           updatedBy: auth.currentUser.email || auth.currentUser.uid || 'Admin',
           fileName: fileToUpload.name
         });
-        console.log('Configuração atualizada.');
+        console.log('Passo 3 Concluído.');
       } catch (err: any) {
-        console.error('Firestore Config Error Detail:', err);
-        throw new Error(`Falha ao atualizar configuração (Firestore): ${err.code || err.message}`);
+        console.error('ERRO NO FIRESTORE (Config):', err);
+        throw new Error(`Erro ao atualizar banco de dados (Config): ${err.message}`);
       }
 
       // 3. Add to Collection
       try {
-        console.log('Adicionando registro ao acervo no Firestore...');
+        console.log('Passo 4: Adicionando ao acervo de arquivos...');
         await addDoc(collection(db, 'abastecimento_files'), {
           name: fileToUpload.name,
           url,
@@ -2714,10 +2697,10 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
           createdAt: new Date().toISOString(),
           createdBy: auth.currentUser.email || auth.currentUser.uid || 'Admin'
         });
-        console.log('Registro no acervo concluído.');
+        console.log('Passo 4 Concluído. Upload finalizado com sucesso!');
       } catch (err: any) {
-        console.error('Firestore Collection Error Detail:', err);
-        throw new Error(`Falha ao salvar no acervo: ${err.code || err.message}`);
+        console.error('ERRO NO FIRESTORE (Coleção):', err);
+        throw new Error(`Erro ao salvar no histórico do acervo: ${err.message}`);
       }
       
       alert('Arquivo enviado com sucesso!');

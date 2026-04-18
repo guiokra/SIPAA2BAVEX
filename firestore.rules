@@ -21,8 +21,7 @@ service cloud.firestore {
 
     // Check if user is the admin (Simplified to any authenticated user as requested)
     function isAdmin() {
-      return isAuthenticated() && 
-        request.auth.token.email_verified == true;
+      return isAuthenticated();
     }
 
     // Validation Helpers
