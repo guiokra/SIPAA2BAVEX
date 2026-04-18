@@ -19,10 +19,9 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == request.resource.data.uid;
     }
 
-    // Check if user is the admin
+    // Check if user is the admin (Simplified to any authenticated user as requested)
     function isAdmin() {
       return isAuthenticated() && 
-        request.auth.token.email == "guicromeu@gmail.com" && 
         request.auth.token.email_verified == true;
     }
 

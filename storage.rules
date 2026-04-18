@@ -4,9 +4,8 @@ service firebase.storage {
     match /config/abastecimento/{allPaths=**} {
       // Permite que qualquer usuário autenticado ou não leia o guia
       allow read: if true;
-      // Restringe a escrita apenas ao administrador do 2º BAvEx
+      // Permite escrita para qualquer usuário autenticado (conforme solicitado pelo usuário)
       allow write: if request.auth != null && 
-                    request.auth.token.email == "guicromeu@gmail.com" && 
                     request.auth.token.email_verified == true;
     }
     

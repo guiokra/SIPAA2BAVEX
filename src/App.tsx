@@ -45,6 +45,7 @@ import { auth, db, storage } from './firebase';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
+  signInWithRedirect,
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser 
@@ -63,7 +64,7 @@ import {
   setDoc,
   getDoc
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -689,10 +690,28 @@ export default function App() {
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
+    // Recomendar o uso de popup, mas estar preparado para o bloqueio
     try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login failed:", error);
+      console.log('Iniciando login com popup...');
+      const result = await signInWithPopup(auth, provider);
+      console.log('Login bem-sucedido via popup:', result.user.email);
+    } catch (error: any) {
+      console.error("Login popup failed:", error);
+      if (error.code === 'auth/popup-blocked') {
+        const confirmRedirect = confirm('O pop-up de login foi bloqueado. Deseja ser redirecionado para a página de login do Google? (A página irá recarregar)');
+        if (confirmRedirect) {
+          try {
+            await signInWithRedirect(auth, provider);
+          } catch (err: any) {
+            console.error('Redirect login failed:', err);
+            alert('Não foi possível realizar o login. Tente abrir o site diretamente em uma nova aba do navegador.');
+          }
+        }
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // Ignorar
+      } else {
+        alert('Erro ao fazer login: ' + (error.message || 'Erro desconhecido.'));
+      }
     }
   };
 
@@ -2547,6 +2566,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     const qRelprev = query(collection(db, 'relprevReports'), orderBy('createdAt', 'desc'));
@@ -2611,44 +2631,102 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   };
 
   const handleAbastecimentoUpload = async (fileToUpload: File) => {
+    if (isUploading) return;
     setIsUploading(true);
+    
     try {
       if (!auth.currentUser) {
         setIsUploading(false);
-        const shouldLogin = confirm('Você precisa estar autenticado com uma conta Google (@eb.mil.br ou @gmail.com) para realizar o upload. Deseja fazer login agora?');
+        const shouldLogin = confirm('Você precisa estar autenticado com uma conta Google para realizar o upload. Deseja fazer login agora?');
         if (shouldLogin) {
           await onLogin();
         }
         return;
       }
 
-      const storageRef = ref(storage, `config/abastecimento/guia_${Date.now()}_${fileToUpload.name}`);
-      const snapshot = await uploadBytes(storageRef, fileToUpload);
-      const url = await getDownloadURL(storageRef);
+      // 1. Upload to Storage
+      const path = `config/abastecimento/guia_${Date.now()}_${fileToUpload.name.replace(/\s+/g, '_').replace(/[^\w.-]/g, '')}`;
+      console.log('Iniciando upload para Storage no caminho:', path);
+      const storageRef = ref(storage, path);
       
-      // Salva como "Mais Recente"
-      await setDoc(doc(db, 'config', 'abastecimento'), {
-        url,
-        updatedAt: new Date().toISOString(),
-        updatedBy: auth.currentUser.email || 'Admin',
-        fileName: fileToUpload.name
-      });
+      let url = '';
+      try {
+        const metadata = { contentType: 'application/pdf' };
+        console.log('Criando tarefa de upload...');
+        const uploadTask = uploadBytesResumable(storageRef, fileToUpload, metadata);
 
-      // Adiciona ao Acervo (Lista completa)
-      await addDoc(collection(db, 'abastecimento_files'), {
-        name: fileToUpload.name,
-        url,
-        size: fileToUpload.size,
-        createdAt: new Date().toISOString(),
-        createdBy: auth.currentUser.email || 'Admin'
-      });
+        url = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            uploadTask.cancel();
+            reject(new Error('Tempo limite de upload excedido (120 segundos). Verifique sua conexão ou se há bloqueios de rede. Se o erro persistir, tente abrir o site em uma nova aba fora do editor.'));
+          }, 120000); // 120 segundos
+
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(progress);
+              console.log('Upload is ' + progress + '% done');
+            }, 
+            (error) => {
+              clearTimeout(timeout);
+              console.error('UploadTask Error:', error);
+              reject(error);
+            }, 
+            async () => {
+              clearTimeout(timeout);
+              try {
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                resolve(downloadURL);
+              } catch (e) {
+                reject(e);
+              }
+            }
+          );
+        });
+        console.log('URL obtida:', url);
+      } catch (err: any) {
+        console.error('Storage Error Detail:', err);
+        throw new Error(`Falha no armazenamento (Storage): ${err.code || err.message}`);
+      }
       
-      alert('Arquivo de abastecimento enviado com sucesso e adicionado ao acervo.');
+      // 2. Update Config
+      try {
+        console.log('Atualizando documento de configuração no Firestore...');
+        await setDoc(doc(db, 'config', 'abastecimento'), {
+          url,
+          updatedAt: new Date().toISOString(),
+          updatedBy: auth.currentUser.email || auth.currentUser.uid || 'Admin',
+          fileName: fileToUpload.name
+        });
+        console.log('Configuração atualizada.');
+      } catch (err: any) {
+        console.error('Firestore Config Error Detail:', err);
+        throw new Error(`Falha ao atualizar configuração (Firestore): ${err.code || err.message}`);
+      }
+
+      // 3. Add to Collection
+      try {
+        console.log('Adicionando registro ao acervo no Firestore...');
+        await addDoc(collection(db, 'abastecimento_files'), {
+          name: fileToUpload.name,
+          url,
+          size: fileToUpload.size,
+          createdAt: new Date().toISOString(),
+          createdBy: auth.currentUser.email || auth.currentUser.uid || 'Admin'
+        });
+        console.log('Registro no acervo concluído.');
+      } catch (err: any) {
+        console.error('Firestore Collection Error Detail:', err);
+        throw new Error(`Falha ao salvar no acervo: ${err.code || err.message}`);
+      }
+      
+      alert('Arquivo enviado com sucesso!');
     } catch (error: any) {
-      console.error('Erro no upload:', error);
-      alert('Falha ao enviar arquivo: ' + (error.message || 'Erro desconhecido.'));
+      console.error('Erro total:', error);
+      alert(error.message || 'Erro desconhecido durante o processo.');
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -2660,7 +2738,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                <AlertTriangle className="text-red-500 shrink-0" size={20} />
                <div>
                   <p className="text-xs font-bold text-white uppercase tracking-tight">Autenticação do Sistema Necessária</p>
-                  <p className="text-[10px] text-slate-400 uppercase leading-tight">Para gerenciar documentos e relatórios, você deve estar autenticado com sua conta Google (@eb.mil.br ou @gmail.com).</p>
+                  <p className="text-[10px] text-slate-400 uppercase leading-tight">Para gerenciar documentos e relatórios, você deve estar autenticado com sua conta Google.</p>
                </div>
             </div>
             <button 
