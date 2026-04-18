@@ -34,6 +34,7 @@ import {
   Plus,
   Trash2,
   Download,
+  Upload,
   Clock,
   Search,
   Eye,
@@ -626,12 +627,22 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [abastecimentoConfig, setAbastecimentoConfig] = useState<any>(null);
+  const [abastecimentoFiles, setAbastecimentoFiles] = useState<any[]>([]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'config', 'abastecimento'), (snap) => {
       if (snap.exists()) {
         setAbastecimentoConfig(snap.data());
       }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'abastecimento_files'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snap) => {
+      const files = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAbastecimentoFiles(files);
     });
     return () => unsub();
   }, []);
@@ -727,15 +738,6 @@ export default function App() {
     }
     if (tab === 'Normas CAvEx') {
       window.open('https://drive.google.com/drive/folders/1EDnPJbjEb4dWJYQ_BODhr_HGLUggwtRh', '_blank');
-      return;
-    }
-    if (tab === 'Abastecimento') {
-      if (abastecimentoConfig?.url) {
-        window.open(abastecimentoConfig.url, '_blank');
-      } else {
-        const docObj = generateAbastecimentoPDF();
-        window.open(docObj.output('bloburl'), '_blank');
-      }
       return;
     }
     if (tab === 'Admin' && !isAdminAuthenticated) {
@@ -867,7 +869,7 @@ export default function App() {
               </div>
             )}
 
-            {user && (
+            {user ? (
               <div className="flex items-center gap-3 px-1 py-1">
                 <div className="w-8 h-8 rounded-full bg-accent-gold/20 flex items-center justify-center text-accent-gold overflow-hidden border border-accent-gold/30">
                   {user.photoURL ? (
@@ -883,6 +885,14 @@ export default function App() {
                   </button>
                 </div>
               </div>
+            ) : (
+              <button 
+                onClick={handleLogin}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded bg-military-gold/5 border border-military-gold/20 text-[10px] font-bold text-military-gold hover:bg-military-gold/10 transition-all uppercase tracking-widest"
+              >
+                <LogIn size={14} />
+                Acessar com Google
+              </button>
             )}
           </div>
 
@@ -943,7 +953,9 @@ export default function App() {
               {React.createElement(sectionComponents[activeTab], { 
                 user, 
                 onTabChange: handleTabChange,
-                abastecimentoConfig 
+                abastecimentoConfig,
+                abastecimentoFiles,
+                onLogin: handleLogin
               })}
             </motion.div>
           </AnimatePresence>
@@ -2229,45 +2241,92 @@ function PosAcidenteSection({ onTabChange }: { onTabChange: (tab: SectionKey) =>
   );
 }
 
-function AbastecimentoSection({ onTabChange, abastecimentoConfig }: { onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any }) {
+function AbastecimentoSection({ onTabChange, abastecimentoFiles }: { onTabChange: (tab: SectionKey) => void, abastecimentoFiles: any[] }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center space-y-3">
-        <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Guia de Abastecimento 2025</h2>
-        <p className="text-military-gold font-bold text-sm uppercase tracking-[0.3em]">Documento Oficial Carregado</p>
-      </div>
-
-      <div className="card-military p-12 max-w-xl w-full border-dashed flex flex-col items-center gap-8 bg-military-gold/5">
-        <div className="w-24 h-24 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold shadow-2xl shadow-military-gold/10">
-          <FileText size={48} />
-        </div>
-        
-        <div className="text-center space-y-4">
-          <p className="text-slate-300 text-sm leading-relaxed">
-            O arquivo original foi aberto em uma nova aba com todas as localidades, contatos e horários para 2025. Se houver algum bloqueio de popup, utilize o botão abaixo para visualizar.
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Acervo de Abastecimento</h2>
+          <p className="text-military-gold font-bold text-xs uppercase tracking-[0.2em] mt-1">
+            Repositório de Documentos Oficiais 2º BAvEx
           </p>
         </div>
-
+        
         <button 
           onClick={() => {
-            if (abastecimentoConfig?.url) {
-              window.open(abastecimentoConfig.url, '_blank');
-            } else {
-              const doc = generateAbastecimentoPDF();
-              window.open(doc.output('bloburl'), '_blank');
-            }
+            const doc = generateAbastecimentoPDF();
+            window.open(doc.output('bloburl'), '_blank');
           }}
-          className="btn-military w-full py-5 text-sm uppercase font-black tracking-[0.2em] flex items-center justify-center gap-4 group"
+          className="btn-military px-6 py-3 text-[10px] uppercase font-black tracking-widest flex items-center gap-2"
         >
-          <ExternalLink size={20} className="group-hover:scale-110 transition-transform" />
-          VISUALIZAR ARQUIVO ORIGINAL
+          <BookOpen size={16} />
+          Gerar Guia Padrão (Contingência)
         </button>
       </div>
 
-      <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-lg flex items-center gap-3 max-w-md">
-        <AlertCircle className="text-blue-400" size={18} />
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-tight">
-          Acesso restrito ao efetivo do 2º BAvEx. Verifique sempre o NOTAM para disponibilidade em tempo real.
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {abastecimentoFiles.length === 0 ? (
+          <div className="col-span-full card-military p-12 flex flex-col items-center justify-center text-center space-y-4 border-dashed border-white/10">
+            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-slate-500">
+              <FileSearch size={32} />
+            </div>
+            <p className="text-slate-400 text-xs uppercase font-bold tracking-widest">Nenhum documento dinâmico disponível no momento.</p>
+          </div>
+        ) : (
+          abastecimentoFiles.map((file) => (
+            <motion.div 
+              key={file.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card-military flex flex-col group hover:border-military-gold transition-all"
+            >
+              <div className="p-5 flex-1 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="p-3 rounded-lg bg-military-gold/10 text-military-gold group-hover:bg-military-gold group-hover:text-military-black transition-all">
+                    <FileText size={24} />
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-tighter">
+                    {new Date(file.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-black text-white group-hover:text-military-gold transition-colors line-clamp-2 uppercase tracking-tight leading-tight">
+                    {file.name}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-2">
+                     <span className="text-[8px] font-black text-military-gold bg-military-gold/10 px-2 py-0.5 rounded uppercase tracking-widest">PDF</span>
+                     <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-white/5 border-t border-white/5 flex gap-2">
+                <button 
+                  onClick={() => window.open(file.url, '_blank')}
+                  className="flex-1 px-4 py-2.5 bg-military-gold text-military-black font-black text-[9px] uppercase tracking-widest rounded hover:bg-military-gold-dark transition-all flex items-center justify-center gap-2"
+                >
+                  <Eye size={14} /> Visualizar
+                </button>
+                <a 
+                  href={file.url}
+                  download={file.name}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 px-4 py-2.5 bg-white/10 text-white font-black text-[9px] uppercase tracking-widest rounded hover:bg-white/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Download size={14} /> Baixar
+                </a>
+              </div>
+            </motion.div>
+          ))
+        )}
+      </div>
+
+      <div className="card-military p-4 border-blue-500/10 bg-blue-500/5 flex items-center gap-3">
+        <AlertCircle className="text-blue-400 shrink-0" size={16} />
+        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-tight">
+          Atenção: Os documentos listados nesta seção são de caráter oficial e para uso exclusivo da aviação do exército.
         </p>
       </div>
     </div>
@@ -2480,7 +2539,7 @@ function PlanejamentoSection({ onTabChange }: { onTabChange: (tab: SectionKey) =
   );
 }
 
-function AdminSection({ user, onTabChange, abastecimentoConfig }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any }) {
+function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFiles, onLogin }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any, abastecimentoFiles: any[], onLogin: () => void }) {
   const [stats, setStats] = useState({ relprevs: 0, fgrs: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
   const [fgrs, setFgrs] = useState<any[]>([]);
@@ -2514,6 +2573,15 @@ function AdminSection({ user, onTabChange, abastecimentoConfig }: { user: Fireba
 
   const handleDelete = async () => {
     if (!deleteId || !deleteColl) return;
+    
+    if (!auth.currentUser) {
+      const shouldLogin = confirm('Você precisa estar autenticado com uma conta Google para excluir registros. Deseja fazer login agora?');
+      if (shouldLogin) await onLogin();
+      setDeleteId(null);
+      setDeleteColl(null);
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, deleteColl, deleteId));
       setDeleteId(null);
@@ -2529,26 +2597,56 @@ function AdminSection({ user, onTabChange, abastecimentoConfig }: { user: Fireba
     setDeleteColl(collectionName);
   };
 
-  const handleAbastecimentoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        alert('Por favor, selecione apenas arquivos PDF.');
+        return;
+      }
+      await handleAbastecimentoUpload(file);
+      // Reset input to allow re-selection of the same file
+      e.target.value = '';
+    }
+  };
+
+  const handleAbastecimentoUpload = async (fileToUpload: File) => {
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `config/abastecimento_${Date.now()}.pdf`);
-      await uploadBytes(storageRef, file);
+      if (!auth.currentUser) {
+        setIsUploading(false);
+        const shouldLogin = confirm('Você precisa estar autenticado com uma conta Google (@eb.mil.br ou @gmail.com) para realizar o upload. Deseja fazer login agora?');
+        if (shouldLogin) {
+          await onLogin();
+        }
+        return;
+      }
+
+      const storageRef = ref(storage, `config/abastecimento/guia_${Date.now()}_${fileToUpload.name}`);
+      const snapshot = await uploadBytes(storageRef, fileToUpload);
       const url = await getDownloadURL(storageRef);
       
+      // Salva como "Mais Recente"
       await setDoc(doc(db, 'config', 'abastecimento'), {
         url,
         updatedAt: new Date().toISOString(),
-        updatedBy: user?.email || 'Admin'
+        updatedBy: auth.currentUser.email || 'Admin',
+        fileName: fileToUpload.name
+      });
+
+      // Adiciona ao Acervo (Lista completa)
+      await addDoc(collection(db, 'abastecimento_files'), {
+        name: fileToUpload.name,
+        url,
+        size: fileToUpload.size,
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser.email || 'Admin'
       });
       
-      alert('Arquivo de abastecimento atualizado com sucesso!');
-    } catch (error) {
+      alert('Arquivo de abastecimento enviado com sucesso e adicionado ao acervo.');
+    } catch (error: any) {
       console.error('Erro no upload:', error);
-      alert('Falha ao enviar arquivo. Verifique se o arquivo é um PDF válido.');
+      alert('Falha ao enviar arquivo: ' + (error.message || 'Erro desconhecido.'));
     } finally {
       setIsUploading(false);
     }
@@ -2556,6 +2654,24 @@ function AdminSection({ user, onTabChange, abastecimentoConfig }: { user: Fireba
 
   return (
     <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
+       {!user && (
+         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex items-center gap-3">
+               <AlertTriangle className="text-red-500 shrink-0" size={20} />
+               <div>
+                  <p className="text-xs font-bold text-white uppercase tracking-tight">Autenticação do Sistema Necessária</p>
+                  <p className="text-[10px] text-slate-400 uppercase leading-tight">Para gerenciar documentos e relatórios, você deve estar autenticado com sua conta Google (@eb.mil.br ou @gmail.com).</p>
+               </div>
+            </div>
+            <button 
+              onClick={onLogin}
+              className="px-6 py-2 bg-red-500 text-white rounded text-[10px] font-black uppercase tracking-widest hover:bg-red-400 transition-colors flex items-center gap-2 w-full md:w-auto justify-center shadow-lg shadow-red-500/20"
+            >
+               <LogIn size={14} /> Fazer Login agora
+            </button>
+         </div>
+       )}
+
        <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 md:pb-6 border-b border-slate-800 gap-4">
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-military-gold/20 border border-military-gold flex items-center justify-center text-military-gold shrink-0">
@@ -2842,7 +2958,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig }: { user: Fireba
                          <input 
                            type="file" 
                            accept=".pdf"
-                           onChange={handleAbastecimentoUpload}
+                           onChange={handleFileSelect}
                            className="hidden" 
                            id="abastecimento-upload" 
                            disabled={isUploading}
@@ -2851,29 +2967,71 @@ function AdminSection({ user, onTabChange, abastecimentoConfig }: { user: Fireba
                            htmlFor="abastecimento-upload"
                            className={`btn-military py-3 px-8 text-[10px] cursor-pointer inline-flex items-center gap-3 transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
                          >
-                           {isUploading ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-                           {isUploading ? 'PROCESSANDO UPLOAD...' : 'SELECIONAR E ENVIAR NOVO PDF'}
-                         </label>
-                         
-                         {abastecimentoConfig?.url && (
-                            <a 
-                              href={abastecimentoConfig.url} 
-                              target="_blank" 
-                              rel="noreferrer"
-                              className="text-white hover:text-military-gold text-[10px] font-black uppercase tracking-widest flex items-center gap-2 px-4 py-2 bg-white/5 rounded-md transition-colors"
-                            >
-                               <Download size={14} /> Arquivo Atual
-                            </a>
-                         )}
+                           {isUploading ? (
+                            <>
+                              <Loader2 size={16} className="text-military-gold animate-spin" />
+                              <span className="animate-pulse">PROCESSANDO...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus size={16} className="text-military-gold" />
+                              Escolher e Enviar PDF
+                            </>
+                          )}
+                        </label>
                       </div>
                       
                       {abastecimentoConfig?.updatedAt && (
                          <div className="mt-6 pt-4 border-t border-military-gold/10">
                             <p className="text-[9px] text-slate-500 uppercase tracking-widest">
-                               Última atualização: <span className="text-slate-300 font-bold">{new Date(abastecimentoConfig.updatedAt).toLocaleString()}</span> por <span className="text-military-gold font-bold">{abastecimentoConfig.updatedBy || 'Mestre/SIPAA'}</span>
+                               Última atualização: <span className="text-slate-300 font-bold">{new Date(abastecimentoConfig.updatedAt).toLocaleString()}</span> {abastecimentoConfig.fileName && <>• <span className="text-white font-mono">{abastecimentoConfig.fileName}</span></>} por <span className="text-military-gold font-bold">{abastecimentoConfig.updatedBy || 'Mestre/SIPAA'}</span>
                             </p>
                          </div>
                       )}
+                   </div>
+
+                   {/* Acervo Management List */}
+                   <div className="p-4 bg-white/5 border border-white/10 rounded-lg mt-4">
+                      <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
+                         <Droplets size={14} className="text-military-gold" />
+                         Arquivos no Acervo ({abastecimentoFiles.length})
+                      </h4>
+                      
+                      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                         {abastecimentoFiles.length === 0 ? (
+                            <p className="text-[10px] text-slate-500 italic uppercase py-4">Nenhum arquivo no acervo.</p>
+                         ) : (
+                            abastecimentoFiles.map((file) => (
+                               <div key={file.id} className="flex items-center justify-between p-3 bg-military-black/30 border border-white/5 rounded hover:border-military-gold/30 transition-all group">
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                     <FileText size={16} className="text-military-gold shrink-0" />
+                                     <div className="flex flex-col min-w-0">
+                                        <span className="text-[10px] text-white font-bold truncate uppercase">{file.name}</span>
+                                        <span className="text-[8px] text-slate-500 uppercase">
+                                           {new Date(file.createdAt).toLocaleDateString()} • {(file.size / 1024 / 1024).toFixed(2)} MB
+                                        </span>
+                                     </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                     <button 
+                                        onClick={() => window.open(file.url, '_blank')}
+                                        className="p-1.5 text-slate-400 hover:text-military-gold transition-colors"
+                                        title="Visualizar"
+                                     >
+                                        <Eye size={14} />
+                                     </button>
+                                     <button 
+                                        onClick={() => confirmDelete('abastecimento_files', file.id)}
+                                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                                        title="Excluir"
+                                     >
+                                        <Trash2 size={14} />
+                                     </button>
+                                  </div>
+                               </div>
+                            ))
+                         )}
+                      </div>
                    </div>
                 </div>
              </div>
@@ -2882,7 +3040,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig }: { user: Fireba
                 <div className="flex items-start gap-3">
                    <AlertCircle className="text-blue-400 shrink-0" size={18} />
                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider leading-relaxed">
-                      Atenção: O upload de arquivos grandes pode levar alguns segundos dependendo da conexão. Certifique-se de que o arquivo está no formato PDF e não está corrompido antes do envio.
+                      Aviso: Certifique-se de que o arquivo está no formato PDF e não está corrompido antes do envio. O upload de arquivos grandes pode levar alguns segundos dependendo da conexão.
                    </p>
                 </div>
              </div>
@@ -3224,7 +3382,7 @@ function AdminStat({ label, value, trend }: any) {
   );
 }
 
-const sectionComponents: Record<string, FC<{ user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any }>> = {
+const sectionComponents: Record<string, FC<{ user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any, abastecimentoFiles?: any[], onLogin?: any }>> = {
   Inicio: InicioSection,
   RELPREV: RelprevSection,
   FGR: FgrSection,

@@ -56,6 +56,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    function isValidAbastecimentoFile(data) {
+      return data.name is string && data.name.size() < 255 &&
+             data.url is string && data.url.size() < 1000 &&
+             data.createdAt is string;
+    }
+
+    // Abastecimento Files
+    match /abastecimento_files/{fileId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidAbastecimentoFile(request.resource.data);
+    }
+
     // Default Deny
     match /{document=**} {
       allow read, write: if false;

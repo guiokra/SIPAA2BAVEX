@@ -70,6 +70,21 @@
         }
       },
       "description": "Documentos de configuração"
+    },
+    "/abastecimento_files/{fileId}": {
+      "schema": {
+        "title": "AbastecimentoFile",
+        "description": "A PDF file for fueling guidance",
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "url": { "type": "string" },
+          "size": { "type": "number" },
+          "createdAt": { "type": "string" },
+          "createdBy": { "type": "string" }
+        }
+      },
+      "description": "Collection of all uploaded PDFs for fueling"
     }
   }
 }
