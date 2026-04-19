@@ -777,36 +777,51 @@ export default function App() {
 
   // Auth Listener
   useEffect(() => {
+    console.log('Configurando listener de autenticação...');
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log('Estado de autenticação alterado:', currentUser ? currentUser.email : 'Nenhum usuário');
       setUser(currentUser);
+      setIsAuthLoading(false);
+    }, (error) => {
+      console.error('Erro no onAuthStateChanged:', error);
       setIsAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
   const handleLogin = async () => {
+    alert('Iniciando autenticação Google... Por favor, verifique se uma janela pop-up apareceu.');
+    console.log('handleLogin disparado');
     const provider = new GoogleAuthProvider();
-    // Recomendar o uso de popup, mas estar preparado para o bloqueio
+    // Forçar seleção de conta para testes
+    provider.setCustomParameters({ prompt: 'select_account' });
+    
     try {
       console.log('Iniciando login com popup...');
       const result = await signInWithPopup(auth, provider);
       console.log('Login bem-sucedido via popup:', result.user.email);
+      alert('Login realizado com sucesso!');
     } catch (error: any) {
       console.error("Login popup failed:", error);
+      
+      // Detalhes extras para depuração
+      if (error.code) console.log('Erro code:', error.code);
+      if (error.message) console.log('Erro message:', error.message);
+
       if (error.code === 'auth/popup-blocked') {
-        const confirmRedirect = confirm('O pop-up de login foi bloqueado. Deseja ser redirecionado para a página de login do Google? (A página irá recarregar)');
+        const confirmRedirect = confirm('O pop-up de login foi bloqueado pelo seu navegador. Deseja tentar o login via redirecionamento? (A página irá recarregar)');
         if (confirmRedirect) {
           try {
             await signInWithRedirect(auth, provider);
           } catch (err: any) {
             console.error('Redirect login failed:', err);
-            alert('Não foi possível realizar o login. Tente abrir o site diretamente em uma nova aba do navegador.');
+            alert('Não foi possível realizar o login. Tente abrir o site diretamente em uma aba privada ou outro navegador.');
           }
         }
       } else if (error.code === 'auth/cancelled-popup-request') {
-        // Ignorar
+        console.log('Popup cancelado pelo usuário');
       } else if (error.code === 'auth/unauthorized-domain') {
-        alert('ERRO DE SEGURANÇA: Este domínio (' + window.location.hostname + ') não está autorizado no Firebase Authentication. \n\nPor favor, adicione este domínio no Console do Firebase em: Authentication > Settings > Authorized Domains.');
+        alert('ERRO DE PROJETO: Este domínio não está autorizado no Console do Firebase. \n\nDomínio atual: ' + window.location.hostname);
       } else {
         alert('Erro ao fazer login: ' + (error.message || 'Erro desconhecido.'));
       }
