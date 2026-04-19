@@ -798,53 +798,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
-    console.log('handleLogin disparado');
-    const provider = new GoogleAuthProvider();
-    // Forçar seleção de conta para testes
-    provider.setCustomParameters({ prompt: 'select_account' });
-    
-    try {
-      console.log('Iniciando login com popup...');
-      const result = await signInWithPopup(auth, provider);
-      console.log('Login bem-sucedido via popup:', result.user.email);
-      alert('Login realizado com sucesso!');
-    } catch (error: any) {
-      console.error("Login popup failed:", error);
-      
-      // Detalhes extras para depuração
-      if (error.code) console.log('Erro code:', error.code);
-      if (error.message) console.log('Erro message:', error.message);
-
-      if (error.code === 'auth/popup-blocked') {
-        const confirmRedirect = confirm('O pop-up de login foi bloqueado pelo seu navegador. Deseja tentar o login via redirecionamento? (A página irá recarregar)');
-        if (confirmRedirect) {
-          try {
-            await signInWithRedirect(auth, provider);
-          } catch (err: any) {
-            console.error('Redirect login failed:', err);
-            alert('Não foi possível realizar o login. Tente abrir o site diretamente em uma aba privada ou outro navegador.');
-          }
-        }
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        console.log('Popup cancelado pelo usuário');
-      } else if (error.code === 'auth/unauthorized-domain') {
-        alert('ERRO DE PROJETO: Este domínio não está autorizado no Console do Firebase. \n\nDomínio atual: ' + window.location.hostname);
-      } else {
-        alert('Erro ao fazer login: ' + (error.message || 'Erro desconhecido.'));
-      }
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      handleTabChange('Inicio');
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
-
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
@@ -1028,13 +981,8 @@ export default function App() {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-[11px] font-bold text-white truncate">
-                    {user.isAnonymous ? 'Sessão Local' : (user.displayName || 'Usuário')}
+                    Ativo
                   </span>
-                  {!user.isAnonymous && (
-                    <button onClick={handleLogout} className="text-[9px] text-red-400 hover:text-red-300 transition-colors text-left flex items-center gap-1 mt-0.5 font-bold uppercase tracking-tighter">
-                      <LogOut size={10} /> Sair
-                    </button>
-                  )}
                 </div>
               </div>
             ) : (
@@ -1104,7 +1052,6 @@ export default function App() {
                 onTabChange: handleTabChange,
                 abastecimentoConfig,
                 abastecimentoFiles,
-                onLogin: handleLogin,
                 launches,
                 setLaunches
               })}
@@ -2735,12 +2682,11 @@ function PlanejamentoSection({ onTabChange }: { onTabChange: (tab: SectionKey) =
   );
 }
 
-function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFiles, onLogin, launches, setLaunches }: { 
+function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFiles, launches, setLaunches }: { 
   user: FirebaseUser | null, 
   onTabChange: (tab: SectionKey) => void, 
   abastecimentoConfig?: any, 
   abastecimentoFiles: any[], 
-  onLogin: () => void,
   launches: any[],
   setLaunches: (l: any[]) => void
 }) {
@@ -2752,6 +2698,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [batchDeleteTarget, setBatchDeleteTarget] = useState<{id: string, name: string, count: number} | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -2782,7 +2729,10 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   const [selectedRelprev, setSelectedRelprev] = useState<any>(null);
   const [showAnexos, setShowAnexos] = useState(false);
 
-  const handleDeleteBatch = async (batchIdToDelete: string) => {
+  const handleDeleteBatch = async () => {
+    if (!batchDeleteTarget) return;
+    const { id: batchIdToDelete } = batchDeleteTarget;
+    
     console.log('Iniciando exclusão do lote:', batchIdToDelete);
     try {
       setIsUploading(true);
@@ -2792,6 +2742,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
       console.log('Documentos encontrados:', snap.size);
       if (snap.empty) {
         alert('Nenhum registro encontrado para este arquivo no banco de dados.');
+        setBatchDeleteTarget(null);
         return;
       }
 
@@ -2802,6 +2753,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
       
       await batch.commit();
       console.log('Exclusão em lote concluída com sucesso');
+      setBatchDeleteTarget(null);
       alert('Arquivo e lançamentos excluídos com sucesso!');
     } catch (error: any) {
       console.error('Erro ao excluir lote:', error);
@@ -2815,10 +2767,8 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
     if (!deleteId || !deleteColl) return;
     
     if (!auth.currentUser) {
-      const shouldLogin = confirm('Você precisa estar autenticado com uma conta Google para excluir registros. Deseja fazer login agora?');
-      if (shouldLogin) await onLogin();
-      setDeleteId(null);
-      setDeleteColl(null);
+      alert('Sessão expirada. A página será recarregada.');
+      window.location.reload();
       return;
     }
 
@@ -2857,10 +2807,8 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
     try {
       if (!auth.currentUser) {
         setIsUploading(false);
-        const shouldLogin = confirm('Você precisa estar autenticado com uma conta Google para realizar o upload. Deseja fazer login agora?');
-        if (shouldLogin) {
-          await onLogin();
-        }
+        alert('Sessão expirada. A página será recarregada.');
+        window.location.reload();
         return;
       }
 
@@ -2933,24 +2881,6 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
 
   return (
     <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
-       {!user && (
-         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="flex items-center gap-3">
-               <AlertTriangle className="text-red-500 shrink-0" size={20} />
-               <div>
-                  <p className="text-xs font-bold text-white uppercase tracking-tight">Autenticação do Sistema Necessária</p>
-                  <p className="text-[10px] text-slate-400 uppercase leading-tight">Para gerenciar documentos e relatórios, você deve estar autenticado com sua conta Google.</p>
-               </div>
-            </div>
-            <button 
-              onClick={onLogin}
-              className="px-6 py-2 bg-red-500 text-white rounded text-[10px] font-black uppercase tracking-widest hover:bg-red-400 transition-colors flex items-center gap-2 w-full md:w-auto justify-center shadow-lg shadow-red-500/20"
-            >
-               <LogIn size={14} /> Fazer Login agora
-            </button>
-         </div>
-       )}
-
        <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 md:pb-6 border-b border-slate-800 gap-4">
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-military-gold/20 border border-military-gold flex items-center justify-center text-military-gold shrink-0">
@@ -3417,12 +3347,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                         {batchId !== 'untracked' && (
                           <button 
                             type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if(confirm(`ATENÇÃO: Deseja apagar todos os ${data.items.length} lançamentos do arquivo "${data.name}"?`)) {
-                                handleDeleteBatch(batchId);
-                              }
-                            }}
+                            onClick={() => setBatchDeleteTarget({ id: batchId, name: data.name, count: data.items.length })}
                             className="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-3 py-1.5 rounded text-[9px] uppercase font-black tracking-widest transition-all flex items-center gap-2 border border-red-500/20"
                             title="Apagar todos os lançamentos deste arquivo"
                           >
@@ -3457,6 +3382,50 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
             </div>
           </div>
         )}
+        {/* Batch Delete Confirmation Modal */}
+        <AnimatePresence>
+          {batchDeleteTarget && (
+            <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="card-military max-w-sm w-full p-8 text-center space-y-6 border-red-500/30"
+              >
+                <div className="w-20 h-20 rounded-full bg-red-500/10 text-red-500 mx-auto flex items-center justify-center border border-red-500/20">
+                  <AlertTriangle size={40} className="animate-pulse" />
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">Excluir Lote Inteiro?</h3>
+                  <div className="p-3 bg-red-500/5 rounded border border-red-500/10">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Arquivo Selecionado:</p>
+                    <p className="text-xs text-military-gold font-black truncate">"{batchDeleteTarget.name}"</p>
+                    <p className="text-[10px] text-slate-500 mt-2">Contém {batchDeleteTarget.count} lançamentos</p>
+                  </div>
+                  <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest bg-red-500/10 py-2 rounded">Esta ação removerá tudo permanentemente</p>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={() => setBatchDeleteTarget(null)}
+                    className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors border border-white/5"
+                    disabled={isUploading}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={handleDeleteBatch}
+                    className="flex-1 px-4 py-3 rounded bg-red-600 text-white font-bold text-[10px] uppercase hover:bg-red-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                    disabled={isUploading}
+                  >
+                    {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    {isUploading ? 'EXCLUINDO...' : 'SIM, EXCLUIR'}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
        {/* Delete Confirmation Modal */}
        <AnimatePresence>
          {deleteId && (
