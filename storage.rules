@@ -1,14 +1,9 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /config/abastecimento/{allPaths=**} {
-      // Permite que qualquer usuário leia ou escreva o guia (Modo sem Login)
-      allow read, write: if true;
-    }
-    
-    // Regra padrão de negação para outros caminhos
+    // Acesso total público para suportar o modo sem login em qualquer ambiente (Vercel, etc.)
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }
