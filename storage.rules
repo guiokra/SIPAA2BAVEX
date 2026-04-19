@@ -2,10 +2,8 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /config/abastecimento/{allPaths=**} {
-      // Permite que qualquer usuário autenticado ou não leia o guia
-      allow read: if true;
-      // Permite escrita para qualquer usuário autenticado (conforme solicitado pelo usuário)
-      allow write: if request.auth != null;
+      // Permite que qualquer usuário leia ou escreva o guia (Modo sem Login)
+      allow read, write: if true;
     }
     
     // Regra padrão de negação para outros caminhos

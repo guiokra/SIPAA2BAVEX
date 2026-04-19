@@ -49,14 +49,12 @@ service cloud.firestore {
 
     // Lancamentos (PDV Extractor Data)
     match /Lancamentos/{id} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if true;
     }
 
     // Config
     match /config/abastecimento {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
     function isValidAbastecimentoFile(data) {
@@ -68,7 +66,8 @@ service cloud.firestore {
     // Abastecimento Files
     match /documentos_abastecimento/{fileId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidAbastecimentoFile(request.resource.data);
+      allow create, update: if isValidAbastecimentoFile(request.resource.data);
+      allow delete: if true;
     }
 
     // Default Deny
