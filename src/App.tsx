@@ -1563,13 +1563,25 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
 
     const launch = launches.find(l => l.id === launchId);
     if (launch) {
+      const anv = launch.anv || '';
+      const digits = anv.replace(/\D/g, '');
+      let detectedModel = '';
+      if (digits.startsWith('1')) detectedModel = 'HA-1A';
+      else if (digits.startsWith('2')) detectedModel = 'HM-1A';
+      else if (digits.startsWith('3')) detectedModel = 'HM-2A';
+      else if (digits.startsWith('4')) detectedModel = 'HM-3';
+      else if (digits.startsWith('5')) detectedModel = 'HM-4';
+
       setMissionData(prev => ({
         ...prev,
-        aeronave: launch.anv || '',
+        modeloAnv: detectedModel || prev.modeloAnv,
+        aeronave: anv,
         data: launch.dateLabel ? launch.dateLabel.split('/').reverse().join('-') : '', // Conv DD/MM/AAAA to YYYY-MM-DD
         local: launch.dest || '',
         trigramaTrip: `${launch.p1 || ''}/${launch.p2 || ''}/${launch.mv === '---' ? '' : (launch.mv || '')}`.replace(/\/$/, ''),
-        missao: `LÇ ${launch.num || ''} PDV ${launch.eobt || ''}`.trim()
+        missao: `LÇ ${launch.num || ''} PDV ${launch.eobt || ''}`.trim(),
+        preenchidoPor: launch.p1 || '',
+        funcao: 'PB'
       }));
       updateStamp();
     }
@@ -1790,19 +1802,19 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
               <select 
                 value={selectedLaunchId}
                 onChange={(e) => handleLaunchSelect(e.target.value)}
-                className="bg-bg-sidebar border border-accent-gold/30 text-white text-[10px] font-bold uppercase rounded px-3 py-2 outline-none focus:border-accent-gold transition-colors cursor-pointer"
+                className="bg-bg-sidebar border border-accent-gold/30 text-white text-[9px] font-bold uppercase rounded px-2 py-1.5 outline-none focus:border-accent-gold transition-colors cursor-pointer"
               >
-                <option value="">Selecione um lançamento...</option>
+                <option value="">SELECIONAR...</option>
                 {Object.entries(launches.reduce((acc: any, curr: any) => {
-                  const bId = curr.batchId || 'untracked';
-                  if (!acc[bId]) acc[bId] = { name: curr.batchName || 'Arquivo Avulso', items: [] };
-                  acc[bId].items.push(curr);
+                  const groupKey = curr.dateLabel || 'Sem Data';
+                  if (!acc[groupKey]) acc[groupKey] = [];
+                  acc[groupKey].push(curr);
                   return acc;
-                }, {})).map(([bId, data]: [string, any]) => (
-                  <optgroup key={bId} label={data.name}>
-                    {data.items.map((l: any) => (
+                }, {})).sort((a, b) => b[0].localeCompare(a[0])).map(([date, items]: [string, any]) => (
+                  <optgroup key={date} label={`DATA: ${date}`}>
+                    {items.sort((a: any, b: any) => a.num.localeCompare(b.num)).map((l: any) => (
                       <option key={l.id} value={l.id}>
-                        LÇ {l.num} - {l.anv} - {l.p1}
+                        {`${l.num} • ${l.anv} • ${l.p1}`}
                       </option>
                     ))}
                   </optgroup>
@@ -1857,7 +1869,23 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
                   type="text" 
                   className="input-military w-full"
                   value={missionData.aeronave}
-                  onChange={(e) => { setMissionData({...missionData, aeronave: e.target.value}); updateStamp(); }}
+                  onChange={(e) => { 
+                    const val = e.target.value;
+                    const digits = val.replace(/\D/g, '');
+                    let autoModel = missionData.modeloAnv;
+                    if (digits.startsWith('1')) autoModel = 'HA-1A';
+                    else if (digits.startsWith('2')) autoModel = 'HM-1A';
+                    else if (digits.startsWith('3')) autoModel = 'HM-2A';
+                    else if (digits.startsWith('4')) autoModel = 'HM-3';
+                    else if (digits.startsWith('5')) autoModel = 'HM-4';
+                    
+                    setMissionData({
+                      ...missionData, 
+                      aeronave: val,
+                      modeloAnv: autoModel
+                    }); 
+                    updateStamp(); 
+                  }}
                   placeholder="Ex: EB-20xx" 
                 />
               </div>
@@ -3308,46 +3336,42 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                   <p className="text-[10px] text-slate-500 italic uppercase">Nenhum lançamento importado.</p>
                 ) : (
                   Object.entries(launches.reduce((acc: any, curr: any) => {
-                    const bId = curr.batchId || 'untracked';
-                    if (!acc[bId]) acc[bId] = { name: curr.batchName || 'Arquivo Avulso', items: [] };
-                    acc[bId].items.push(curr);
+                    const groupKey = curr.dateLabel || 'Sem Data';
+                    if (!acc[groupKey]) acc[groupKey] = [];
+                    acc[groupKey].push(curr);
                     return acc;
-                  }, {})).map(([batchId, data]: [string, any]) => (
-                    <div key={batchId} className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                        <div className="flex items-center gap-2">
-                          <FileText size={14} className="text-military-gold" />
-                          <span className="text-[10px] uppercase font-black text-slate-300 tracking-wider font-mono truncate max-w-[200px]">{data.name}</span>
-                          <span className="text-[9px] bg-white/5 px-1.5 py-0.5 rounded text-slate-500">{data.items.length} Lç</span>
-                        </div>
-                        {batchId !== 'untracked' && (
-                          <button 
-                            type="button"
-                            onClick={() => setBatchDeleteTarget({ id: batchId, name: data.name, count: data.items.length })}
-                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-3 py-1.5 rounded text-[9px] uppercase font-black tracking-widest transition-all flex items-center gap-2 border border-red-500/20"
-                            title="Apagar todos os lançamentos deste arquivo"
-                          >
-                            <Trash2 size={12} />
-                            EXCLUIR ARQUIVO
-                          </button>
-                        )}
+                  }, {})).sort((a, b) => b[0].localeCompare(a[0])).map(([date, items]: [string, any]) => (
+                    <div key={date} className="space-y-2">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-1">
+                        <Calendar size={12} className="text-military-gold" />
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">DATA: {date}</span>
+                        <span className="text-[9px] bg-white/5 px-1.5 py-0.5 rounded text-slate-500 ml-auto">{items.length} LANÇAMENTOS</span>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {data.items.map((l: any) => (
-                          <div key={l.id} className="flex items-center justify-between p-2.5 bg-military-black/20 border border-white/5 rounded hover:border-military-gold/20 transition-all group">
-                            <div className="min-w-0">
-                              <div className="text-[9px] text-white font-bold uppercase tracking-tight truncate">LÇ {l.num} - {l.anv}</div>
-                              <div className="text-[8px] text-slate-500 uppercase font-bold tracking-tight">
-                                Data: <span className="text-military-gold">{l.dateLabel}</span> • Trip: <span className="text-slate-300">{l.p1}/{l.p2}</span>
+                      <div className="grid gap-1.5">
+                        {items.sort((a: any, b: any) => a.num.localeCompare(b.num)).map((l: any) => (
+                          <div key={l.id} className="flex items-center justify-between p-2.5 bg-white/2 border border-white/5 rounded hover:border-military-gold/20 transition-all group overflow-hidden">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <span className="text-[10px] font-black text-accent-gold whitespace-nowrap">LÇ {l.num}</span>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
+                                <span className="text-[10px] text-white font-bold whitespace-nowrap">{l.anv}</span>
+                                <span className="text-[10px] text-slate-400 truncate uppercase tracking-tighter">
+                                  {l.p1} {l.dest && `→ ${l.dest}`}
+                                </span>
                               </div>
                             </div>
-                            <button 
-                              onClick={() => confirmDelete('Lancamentos', l.id)} 
-                              className="p-1.5 text-slate-600 hover:text-red-500 transition-colors shrink-0"
-                              title="Excluir"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0">
+                               <button 
+                                onClick={() => {
+                                  if (window.confirm('Excluir este lançamento?')) {
+                                    deleteDoc(doc(db, 'Lancamentos', l.id));
+                                  }
+                                }} 
+                                className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
+                                title="Excluir"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
