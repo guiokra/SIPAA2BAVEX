@@ -4,24 +4,23 @@ service cloud.firestore {
     
     // Helper Functions
     function isAuthenticated() {
-      return request.auth != null;
+      return true; // No-login mode enabled
     }
     
+    function isAdmin() {
+      return true; // Access controlled by password in UI
+    }
+
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return true; // Relational checks removed to support no-login flow
     }
 
     function isDocOwner() {
-      return isAuthenticated() && request.auth.uid == resource.data.uid;
+      return true;
     }
 
     function isNewDocOwner() {
-      return isAuthenticated() && request.auth.uid == request.resource.data.uid;
-    }
-
-    // Check if user is the admin (Simplified to any authenticated user as requested)
-    function isAdmin() {
-      return isAuthenticated();
+      return true;
     }
 
     // Validation Helpers

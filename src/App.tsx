@@ -58,6 +58,7 @@ import {
   onAuthStateChanged, 
   signInWithPopup, 
   signInWithRedirect,
+  signInAnonymously,
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser 
@@ -777,11 +778,19 @@ export default function App() {
 
   // Auth Listener
   useEffect(() => {
-    console.log('Configurando listener de autenticação...');
+    console.log('Configurando listener de autenticação (Modo Automático)...');
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log('Estado de autenticação alterado:', currentUser ? currentUser.email : 'Nenhum usuário');
-      setUser(currentUser);
-      setIsAuthLoading(false);
+      if (currentUser) {
+        console.log('Usuário autenticado:', currentUser.isAnonymous ? 'Anônimo' : currentUser.email);
+        setUser(currentUser);
+        setIsAuthLoading(false);
+      } else {
+        console.log('Nenhum usuário detectado. Iniciando sessão automática...');
+        signInAnonymously(auth).catch((error) => {
+          console.error('Erro ao iniciar sessão anônima:', error);
+          setIsAuthLoading(false);
+        });
+      }
     }, (error) => {
       console.error('Erro no onAuthStateChanged:', error);
       setIsAuthLoading(false);
@@ -790,7 +799,6 @@ export default function App() {
   }, []);
 
   const handleLogin = async () => {
-    alert('Iniciando autenticação Google... Por favor, verifique se uma janela pop-up apareceu.');
     console.log('handleLogin disparado');
     const provider = new GoogleAuthProvider();
     // Forçar seleção de conta para testes
@@ -1019,20 +1027,21 @@ export default function App() {
                   )}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[11px] font-bold text-white truncate">{user.displayName || 'Usuário'}</span>
-                  <button onClick={handleLogout} className="text-[9px] text-red-400 hover:text-red-300 transition-colors text-left flex items-center gap-1 mt-0.5 font-bold uppercase tracking-tighter">
-                    <LogOut size={10} /> Sair
-                  </button>
+                  <span className="text-[11px] font-bold text-white truncate">
+                    {user.isAnonymous ? 'Sessão Local' : (user.displayName || 'Usuário')}
+                  </span>
+                  {!user.isAnonymous && (
+                    <button onClick={handleLogout} className="text-[9px] text-red-400 hover:text-red-300 transition-colors text-left flex items-center gap-1 mt-0.5 font-bold uppercase tracking-tighter">
+                      <LogOut size={10} /> Sair
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
-              <button 
-                onClick={handleLogin}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded bg-military-gold/5 border border-military-gold/20 text-[10px] font-bold text-military-gold hover:bg-military-gold/10 transition-all uppercase tracking-widest"
-              >
-                <LogIn size={14} />
-                Acessar com Google
-              </button>
+              <div className="flex items-center gap-2 px-3 py-2 rounded bg-military-gold/5 border border-military-gold/20 text-[10px] font-bold text-military-gold animate-pulse">
+                <Loader2 size={14} className="animate-spin" />
+                Iniciando Sessão...
+              </div>
             )}
           </div>
 
