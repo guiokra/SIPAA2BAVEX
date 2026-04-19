@@ -47,9 +47,30 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "codigo", "relato", "createdAt"]
+    },
+    "Launch": {
+      "title": "Launch",
+      "description": "Um lançamento extraído do PDV (Plano Diário de Voo)",
+      "type": "object",
+      "properties": {
+        "num": { "type": "string", "description": "Número do lançamento" },
+        "anv": { "type": "string", "description": "Matrícula da aeronave (ex: EB-20xx)" },
+        "p1": { "type": "string", "description": "Trigrama do 1º Piloto" },
+        "p2": { "type": "string", "description": "Trigrama do 2º Piloto" },
+        "mv": { "type": "string", "description": "Trigramas de mecânicos/vários" },
+        "dest": { "type": "string", "description": "Local de destino" },
+        "eobt": { "type": "string", "description": "Horário de decolagem planejado" },
+        "dateLabel": { "type": "string", "description": "Data do PDV formato DD/MM/AAAA" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["num", "anv", "dateLabel", "createdAt"]
     }
   },
   "firestore": {
+    "/Lancamentos/{launchId}": {
+      "schema": "Launch",
+      "description": "Lançamentos extraídos do PDV para auto-preenchimento do FGR"
+    },
     "/fgrMissions/{missionId}": {
       "schema": "FgrMission",
       "description": "Histórico de missões FGR"

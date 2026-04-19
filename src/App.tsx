@@ -1,4 +1,5 @@
 import React, { FC, useState, useEffect, useRef } from 'react';
+import * as pdfjs from 'pdfjs-dist';
 import { 
   Home, 
   FileText, 
@@ -28,20 +29,31 @@ import {
   Gavel,
   Compass,
   Settings,
-  LogIn,
-  Loader2,
-  Unlock,
   Plus,
+  Loader2,
   Trash2,
+  Eye,
+  LogIn,
+  Search,
+  LayoutDashboard,
+  Calendar,
+  Save,
+  Send,
+  MoreHorizontal,
+  History,
+  Info,
+  Check,
   Download,
   Upload,
   Clock,
-  Search,
-  Eye,
-  ExternalLink
+  ExternalLink,
+  Unlock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, storage } from './firebase';
+
+// Setup PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.mjs`;
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
@@ -62,7 +74,10 @@ import {
   Timestamp,
   deleteDoc,
   setDoc,
-  getDoc
+  getDoc,
+  limit,
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import jsPDF from 'jspdf';
@@ -623,6 +638,87 @@ const generateRelprevPDF = (report: any) => {
 
 type SectionKey = 'Inicio' | 'RELPREV' | 'FGR' | 'Mapa de Risco' | 'Portal Notificação' | 'Ações Pós-Acidente' | 'Abastecimento' | 'Memento Meteo' | 'Reporte Fauna' | 'Normas CAvEx' | 'Planeje seu Voo' | 'Admin';
 
+const MONTHS_MAP: Record<string, string> = { 
+  JANEIRO: '01', FEVEREIRO: '02', MARÇO: '03', MARCO: '03', ABRIL: '04', MAIO: '05', JUNHO: '06', 
+  JULHO: '07', AGOSTO: '08', SETEMBRO: '09', OUTUBRO: '10', NOVEMBRO: '11', DEZEMBRO: '12' 
+};
+
+async function extractTextFromPdf(file: File) {
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+  const pdf = await loadingTask.promise;
+  let fullText = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    fullText += content.items.map((item: any) => item.str).join(" ") + "\n";
+  }
+  return fullText;
+}
+
+function parsePDV(text: string) {
+  const dayRegex = /PLANO\s+DIÁRIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE\s+([A-ZÇÃÕÁÉÍÓÚ]+)\s+DE\s+(\d{4})/gi;
+  const days = [];
+  let matches = [...text.matchAll(dayRegex)];
+
+  matches.forEach((match, index) => {
+    const start = match.index || 0;
+    const end = matches[index + 1] ? matches[index + 1].index : text.length;
+    const block = text.slice(start, end);
+    
+    const dayNum = match[1].padStart(2, '0');
+    const month = MONTHS_MAP[match[2].toUpperCase()] || '??';
+    const dateLabel = `${dayNum}/${month}/${match[3]}`;
+
+    const launchRegex = /(\d{2})\s+([A-Z]{2,3})\s+(\d{4})/g;
+    const launches = [];
+    let lMatch;
+    
+    while ((lMatch = launchRegex.exec(block)) !== null) {
+      const lStart = lMatch.index;
+      const lLine = block.slice(lStart, lStart + 500).split('\n')[0];
+      const parts = lLine.split(/\s+/).filter(p => p.trim().length > 0);
+
+      if (parts.length < 5) continue;
+
+      const num = parts[0];
+      const anv = `${parts[1]} ${parts[2]}`;
+      const p1 = parts[3];
+      const p2 = parts[4];
+
+      let adDestIdx = -1;
+      for (let i = 5; i < parts.length; i++) {
+        if (/^[A-Z]{4}$/.test(parts[i])) { 
+          adDestIdx = i;
+          break;
+        }
+      }
+
+      let mvStr = "---";
+      if (adDestIdx > 5) {
+        mvStr = parts.slice(5, adDestIdx).join(" ");
+      }
+
+      const dest = adDestIdx !== -1 ? parts[adDestIdx] : "---";
+
+      let eobt = "---";
+      for (let i = adDestIdx + 1; i < parts.length; i++) {
+        if (/^\d{2}H\d{2}$/i.test(parts[i])) {
+          eobt = parts[i];
+          break;
+        }
+      }
+
+      launches.push({ num, anv, p1, p2, mv: mvStr, dest, eobt });
+    }
+
+    if (launches.length > 0) {
+      days.push({ dateLabel, launches });
+    }
+  });
+  return days;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<SectionKey>('Inicio');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -640,7 +736,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, 'abastecimento_files'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'documentos_abastecimento'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       const files = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAbastecimentoFiles(files);
@@ -654,6 +750,18 @@ export default function App() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [totalRelprev, setTotalRelprev] = useState(0);
+  const [launches, setLaunches] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'Lancamentos'), orderBy('createdAt', 'desc'), limit(100));
+    const unsub = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLaunches(data);
+    }, (err) => {
+      console.error("Erro ao buscar lançamentos:", err);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -665,19 +773,7 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // Connection Test
-  useEffect(() => {
-    async function testConnection() {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
-        }
-      }
-    }
-    testConnection();
-  }, []);
+  // Connection Test removed as it caused permission errors
 
   // Auth Listener
   useEffect(() => {
@@ -759,6 +855,14 @@ export default function App() {
     }
     if (tab === 'Normas CAvEx') {
       window.open('https://drive.google.com/drive/folders/1EDnPJbjEb4dWJYQ_BODhr_HGLUggwtRh', '_blank');
+      return;
+    }
+    if (tab === 'Abastecimento') {
+      if (abastecimentoConfig?.url) {
+        window.open(abastecimentoConfig.url, '_blank');
+      } else {
+        alert('Nenhum guia de abastecimento encontrado no sistema.');
+      }
       return;
     }
     if (tab === 'Admin' && !isAdminAuthenticated) {
@@ -976,7 +1080,9 @@ export default function App() {
                 onTabChange: handleTabChange,
                 abastecimentoConfig,
                 abastecimentoFiles,
-                onLogin: handleLogin
+                onLogin: handleLogin,
+                launches,
+                setLaunches
               })}
             </motion.div>
           </AnimatePresence>
@@ -1486,7 +1592,7 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
   );
 }
 
-function FgrSection({ user, onTabChange }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }) {
+function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, launches: any[] }) {
   const [stamp, setStamp] = useState<string>(new Date().toLocaleString("pt-BR"));
   const [tipoVoo, setTipoVoo] = useState<string>("REGULAR");
   const [isSaving, setIsSaving] = useState(false);
@@ -1502,6 +1608,25 @@ function FgrSection({ user, onTabChange }: { user: FirebaseUser | null, onTabCha
     funcao: ""
   });
   const [p2Selections, setP2Selections] = useState<Record<string, 'SIM' | 'NÃO' | 'NA'>>({});
+  const [selectedLaunchId, setSelectedLaunchId] = useState('');
+
+  const handleLaunchSelect = (launchId: string) => {
+    setSelectedLaunchId(launchId);
+    if (!launchId) return;
+
+    const launch = launches.find(l => l.id === launchId);
+    if (launch) {
+      setMissionData(prev => ({
+        ...prev,
+        aeronave: launch.anv || '',
+        data: launch.dateLabel ? launch.dateLabel.split('/').reverse().join('-') : '', // Conv DD/MM/AAAA to YYYY-MM-DD
+        local: launch.dest || '',
+        trigramaTrip: `${launch.p1 || ''}/${launch.p2 || ''}/${launch.mv === '---' ? '' : (launch.mv || '')}`.replace(/\/$/, ''),
+        missao: `LÇ ${launch.num || ''} PDV ${launch.eobt || ''}`.trim()
+      }));
+      updateStamp();
+    }
+  };
   const [p3Selections, setP3Selections] = useState<Record<string, 'S' | 'N' | 'D'>>({});
   const [p4Selections, setP4Selections] = useState<Record<string, 'S' | 'N' | 'D'>>({});
   const [gravidadeSelections, setGravidadeSelections] = useState<Record<string, boolean>>({});
@@ -1711,8 +1836,34 @@ function FgrSection({ user, onTabChange }: { user: FirebaseUser | null, onTabCha
           <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">FGR — Gerenciamento de Risco</h2>
           <p className="text-text-secondary text-sm">Gerenciamento completo estruturado no banco de dados SIPAA.</p>
         </div>
-        <div className="flex gap-3">
-          <div className="bg-bg-sidebar border border-border-theme px-4 py-2 rounded flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          {launches.length > 0 && (
+            <div className="flex flex-col gap-1 min-w-[240px]">
+              <label className="text-[9px] font-black text-military-gold uppercase tracking-widest pl-1">Auto-Preencher via PDV</label>
+              <select 
+                value={selectedLaunchId}
+                onChange={(e) => handleLaunchSelect(e.target.value)}
+                className="bg-bg-sidebar border border-accent-gold/30 text-white text-[10px] font-bold uppercase rounded px-3 py-2 outline-none focus:border-accent-gold transition-colors cursor-pointer"
+              >
+                <option value="">Selecione um lançamento...</option>
+                {Object.entries(launches.reduce((acc: any, curr: any) => {
+                  const bId = curr.batchId || 'untracked';
+                  if (!acc[bId]) acc[bId] = { name: curr.batchName || 'Arquivo Avulso', items: [] };
+                  acc[bId].items.push(curr);
+                  return acc;
+                }, {})).map(([bId, data]: [string, any]) => (
+                  <optgroup key={bId} label={data.name}>
+                    {data.items.map((l: any) => (
+                      <option key={l.id} value={l.id}>
+                        LÇ {l.num} - {l.anv} - {l.p1}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="bg-bg-sidebar border border-border-theme px-4 py-2 rounded flex items-center gap-3 h-fit mt-auto">
             <span className="text-[10px] text-text-secondary font-bold uppercase tracking-widest">Sincronizado:</span>
             <span className="text-[10px] text-accent-gold font-mono">{stamp}</span>
           </div>
@@ -2560,38 +2711,81 @@ function PlanejamentoSection({ onTabChange }: { onTabChange: (tab: SectionKey) =
   );
 }
 
-function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFiles, onLogin }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any, abastecimentoFiles: any[], onLogin: () => void }) {
+function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFiles, onLogin, launches, setLaunches }: { 
+  user: FirebaseUser | null, 
+  onTabChange: (tab: SectionKey) => void, 
+  abastecimentoConfig?: any, 
+  abastecimentoFiles: any[], 
+  onLogin: () => void,
+  launches: any[],
+  setLaunches: (l: any[]) => void
+}) {
   const [stats, setStats] = useState({ relprevs: 0, fgrs: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
   const [fgrs, setFgrs] = useState<any[]>([]);
-  const [selectedView, setSelectedView] = useState<'stats' | 'relprevs' | 'fgrs' | 'config'>('stats');
+  const [selectedView, setSelectedView] = useState<'stats' | 'relprevs' | 'fgrs' | 'config' | 'pdv'>('stats');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
+    if (!user) return;
+
     const qRelprev = query(collection(db, 'relprevReports'), orderBy('createdAt', 'desc'));
     const qFgr = query(collection(db, 'fgrMissions'), orderBy('createdAt', 'desc'));
 
     const unsubRelprev = onSnapshot(qRelprev, (snap) => {
       setStats(prev => ({ ...prev, relprevs: snap.size }));
       setRelprevs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("Erro no listener de Relprev:", err);
     });
 
     const unsubFgr = onSnapshot(qFgr, (snap) => {
       setStats(prev => ({ ...prev, fgrs: snap.size }));
       setFgrs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("Erro no listener de FGR:", err);
     });
 
     return () => {
       unsubRelprev();
       unsubFgr();
     };
-  }, []);
+  }, [user]);
 
   const [selectedRelprev, setSelectedRelprev] = useState<any>(null);
   const [showAnexos, setShowAnexos] = useState(false);
+
+  const handleDeleteBatch = async (batchIdToDelete: string) => {
+    console.log('Iniciando exclusão do lote:', batchIdToDelete);
+    try {
+      setIsUploading(true);
+      const q = query(collection(db, 'Lancamentos'), where('batchId', '==', batchIdToDelete));
+      const snap = await getDocs(q);
+      
+      console.log('Documentos encontrados:', snap.size);
+      if (snap.empty) {
+        alert('Nenhum registro encontrado para este arquivo no banco de dados.');
+        return;
+      }
+
+      const batch = writeBatch(db);
+      snap.docs.forEach(docSnap => {
+        batch.delete(docSnap.ref);
+      });
+      
+      await batch.commit();
+      console.log('Exclusão em lote concluída com sucesso');
+      alert('Arquivo e lançamentos excluídos com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao excluir lote:', error);
+      alert('Falha ao excluir: ' + (error.message || 'Erro desconhecido'));
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteId || !deleteColl) return;
@@ -2689,8 +2883,8 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
 
       // 3. Add to Collection
       try {
-        console.log('Passo 4: Adicionando ao acervo de arquivos...');
-        await addDoc(collection(db, 'abastecimento_files'), {
+        console.log('Passo 4: Adicionando ao acervo de arquivos (documentos_abastecimento)...');
+        await addDoc(collection(db, 'documentos_abastecimento'), {
           name: fileToUpload.name,
           url,
           size: fileToUpload.size,
@@ -2767,6 +2961,12 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'config' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
             >
               Configurações
+            </button>
+            <button 
+              onClick={() => setSelectedView('pdv')}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'pdv' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
+            >
+              Extrator PDV
             </button>
           </div>
        </div>
@@ -2979,135 +3179,260 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                        const doc = generateFgrPDF(f);
                        window.open(doc.output('bloburl'), '_blank');
                      }}
-                     className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
-                   >
-                     <FileText size={14} /> PDF
-                   </button>
-                   <button 
-                    onClick={() => confirmDelete('fgrMissions', f.id)} 
-                    className="w-10 h-9 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20"
-                   >
-                     <Trash2 size={16} />
-                   </button>
-                 </div>
-               </div>
-             ))}
-           </div>
-
-           {fgrs.length === 0 && (
-             <div className="card-military py-12 text-center opacity-40 italic text-sm">Nenhuma missão encontrada.</div>
-           )}
-         </div>
-       )}
-
-       {selectedView === 'config' && (
-          <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-             <div className="card-military p-6">
-                <div className="flex items-center gap-3 mb-6">
-                   <Settings className="text-military-gold" size={20} />
-                   <h3 className="font-black text-white uppercase text-[10px] tracking-widest">Configurações de Documentos</h3>
+                      className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
+                    >
+                      <FileText size={14} /> PDF
+                    </button>
+                    <button 
+                     onClick={() => confirmDelete('fgrMissions', f.id)} 
+                     className="w-10 h-9 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
-                
-                <div className="space-y-4">
-                   <div className="p-4 bg-military-gold/5 border border-military-gold/20 rounded-lg">
-                      <h4 className="text-xs font-bold text-military-gold uppercase mb-2 tracking-tight">Guia de Abastecimento</h4>
-                      <p className="text-[10px] text-slate-400 mb-6 uppercase leading-relaxed">
-                         Substitua o arquivo PDF padrão. Quando um arquivo for enviado aqui, ele terá prioridade e será aberto automaticamente quando o usuário clicar em "Abastecimento".
-                      </p>
-                      
-                      <div className="flex flex-col sm:flex-row items-center gap-4">
-                         <input 
-                           type="file" 
-                           accept=".pdf"
-                           onChange={handleFileSelect}
-                           className="hidden" 
-                           id="abastecimento-upload" 
-                           disabled={isUploading}
-                         />
-                         <label 
-                           htmlFor="abastecimento-upload"
-                           className={`btn-military py-3 px-8 text-[10px] cursor-pointer inline-flex items-center gap-3 transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
-                         >
-                           {isUploading ? (
-                            <>
-                              <Loader2 size={16} className="text-military-gold animate-spin" />
-                              <span className="animate-pulse">PROCESSANDO...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus size={16} className="text-military-gold" />
-                              Escolher e Enviar PDF
-                            </>
-                          )}
-                        </label>
-                      </div>
-                      
-                      {abastecimentoConfig?.updatedAt && (
-                         <div className="mt-6 pt-4 border-t border-military-gold/10">
-                            <p className="text-[9px] text-slate-500 uppercase tracking-widest">
-                               Última atualização: <span className="text-slate-300 font-bold">{new Date(abastecimentoConfig.updatedAt).toLocaleString()}</span> {abastecimentoConfig.fileName && <>• <span className="text-white font-mono">{abastecimentoConfig.fileName}</span></>} por <span className="text-military-gold font-bold">{abastecimentoConfig.updatedBy || 'Mestre/SIPAA'}</span>
-                            </p>
-                         </div>
-                      )}
-                   </div>
+              ))}
+            </div>
 
-                   {/* Acervo Management List */}
-                   <div className="p-4 bg-white/5 border border-white/10 rounded-lg mt-4">
-                      <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
-                         <Droplets size={14} className="text-military-gold" />
-                         Arquivos no Acervo ({abastecimentoFiles.length})
-                      </h4>
-                      
-                      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                         {abastecimentoFiles.length === 0 ? (
-                            <p className="text-[10px] text-slate-500 italic uppercase py-4">Nenhum arquivo no acervo.</p>
-                         ) : (
-                            abastecimentoFiles.map((file) => (
-                               <div key={file.id} className="flex items-center justify-between p-3 bg-military-black/30 border border-white/5 rounded hover:border-military-gold/30 transition-all group">
-                                  <div className="flex items-center gap-3 overflow-hidden">
-                                     <FileText size={16} className="text-military-gold shrink-0" />
-                                     <div className="flex flex-col min-w-0">
-                                        <span className="text-[10px] text-white font-bold truncate uppercase">{file.name}</span>
-                                        <span className="text-[8px] text-slate-500 uppercase">
-                                           {new Date(file.createdAt).toLocaleDateString()} • {(file.size / 1024 / 1024).toFixed(2)} MB
-                                        </span>
-                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                     <button 
-                                        onClick={() => window.open(file.url, '_blank')}
-                                        className="p-1.5 text-slate-400 hover:text-military-gold transition-colors"
-                                        title="Visualizar"
-                                     >
-                                        <Eye size={14} />
-                                     </button>
-                                     <button 
-                                        onClick={() => confirmDelete('abastecimento_files', file.id)}
-                                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
-                                        title="Excluir"
-                                     >
-                                        <Trash2 size={14} />
-                                     </button>
-                                  </div>
-                               </div>
-                            ))
-                         )}
-                      </div>
-                   </div>
-                </div>
-             </div>
-
-             <div className="card-military p-6 border-blue-500/10 bg-blue-500/5">
-                <div className="flex items-start gap-3">
-                   <AlertCircle className="text-blue-400 shrink-0" size={18} />
-                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider leading-relaxed">
-                      Aviso: Certifique-se de que o arquivo está no formato PDF e não está corrompido antes do envio. O upload de arquivos grandes pode levar alguns segundos dependendo da conexão.
-                   </p>
-                </div>
-             </div>
+            {fgrs.length === 0 && (
+              <div className="card-military py-12 text-center opacity-40 italic text-sm">Nenhuma missão encontrada.</div>
+            )}
           </div>
-       )}
+        )}
 
+        {selectedView === 'config' && (
+          <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="card-military p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Settings className="text-military-gold" size={20} />
+                <h3 className="font-black text-white uppercase text-[10px] tracking-widest">Configurações de Documentos</h3>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="p-4 bg-military-gold/5 border border-military-gold/20 rounded-lg text-left">
+                  <h4 className="text-xs font-bold text-military-gold uppercase mb-2 tracking-tight">Guia de Abastecimento</h4>
+                  <p className="text-[10px] text-slate-400 mb-6 uppercase leading-relaxed">
+                    Substitua o arquivo PDF padrão. Quando um arquivo for enviado aqui, ele terá prioridade e será aberto automaticamente quando o usuário clicar em "Abastecimento".
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <input 
+                      type="file" 
+                      accept=".pdf"
+                      onChange={handleFileSelect}
+                      className="hidden" 
+                      id="abastecimento-upload" 
+                      disabled={isUploading}
+                    />
+                    <label 
+                      htmlFor="abastecimento-upload"
+                      className={`btn-military py-3 px-8 text-[10px] cursor-pointer inline-flex items-center gap-3 transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 size={16} className="text-military-gold animate-spin" />
+                          <span className="animate-pulse">PROCESSANDO...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} className="text-military-gold" />
+                          Escolher e Enviar PDF
+                        </>
+                      )}
+                    </label>
+                  </div>
+                  
+                  {abastecimentoConfig?.updatedAt && (
+                    <div className="mt-6 pt-4 border-t border-military-gold/10">
+                      <p className="text-[9px] text-slate-500 uppercase tracking-widest">
+                        Última atualização: <span className="text-slate-300 font-bold">{new Date(abastecimentoConfig.updatedAt).toLocaleString()}</span> {abastecimentoConfig.fileName && <>• <span className="text-white font-mono">{abastecimentoConfig.fileName}</span></>} por <span className="text-military-gold font-bold">{abastecimentoConfig.updatedBy || 'Mestre/SIPAA'}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 bg-white/5 border border-white/10 rounded-lg mt-4 text-left">
+                  <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
+                    <Droplets size={14} className="text-military-gold" />
+                    Arquivos no Acervo ({abastecimentoFiles.length})
+                  </h4>
+                  
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {abastecimentoFiles.length === 0 ? (
+                      <p className="text-[10px] text-slate-500 italic uppercase py-4">Nenhum arquivo no acervo.</p>
+                    ) : (
+                      abastecimentoFiles.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between p-3 bg-military-black/30 border border-white/5 rounded hover:border-military-gold/30 transition-all group">
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <FileText size={16} className="text-military-gold shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[10px] text-white font-bold truncate uppercase">{file.name}</span>
+                              <span className="text-[8px] text-slate-500 uppercase">
+                                {new Date(file.createdAt).toLocaleDateString()} • {(file.size / 1024 / 1024).toFixed(2)} MB
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => window.open(file.url, '_blank')}
+                              className="p-1.5 text-slate-400 hover:text-military-gold transition-colors"
+                              title="Visualizar"
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button 
+                              onClick={() => confirmDelete('documentos_abastecimento', file.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                              title="Excluir"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card-military p-6 border-blue-500/10 bg-blue-500/5 text-left">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="text-blue-400 shrink-0" size={18} />
+                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider leading-relaxed">
+                  Aviso: Certifique-se de que o arquivo está no formato PDF e não está corrompido antes do envio. O upload de arquivos grandes pode levar alguns segundos dependendo da conexão.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedView === 'pdv' && (
+          <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="card-military p-6 text-left">
+              <div className="flex items-center gap-3 mb-6">
+                <FileSearch className="text-military-gold" size={20} />
+                <h3 className="font-black text-white uppercase text-[10px] tracking-widest">Extrator de PDV para FGR</h3>
+              </div>
+              
+              <div className="p-4 bg-military-gold/5 border border-military-gold/20 rounded-lg">
+                <h4 className="text-xs font-bold text-military-gold uppercase mb-2 tracking-tight">Upload do Plano Diário de Voo</h4>
+                <p className="text-[10px] text-slate-400 mb-6 uppercase leading-relaxed">
+                  Carregue o PDF do PDV. O sistema extrairá os lançamentos e os tornará disponíveis para auto-preenchimento no formulário FGR.
+                </p>
+                
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="file" 
+                    accept=".pdf"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setIsUploading(true);
+                      try {
+                        const text = await extractTextFromPdf(file);
+                        const days = parsePDV(text);
+                        let count = 0;
+                        const batchId = `PDV_${Date.now()}`;
+                        for (const day of days) {
+                          for (const launch of day.launches) {
+                            await addDoc(collection(db, 'Lancamentos'), {
+                              ...launch,
+                              dateLabel: day.dateLabel,
+                              createdAt: new Date().toISOString(),
+                              batchId,
+                              batchName: file.name
+                            });
+                            count++;
+                          }
+                        }
+                        alert(`${count} lançamentos processados e salvos com sucesso.`);
+                      } catch (err: any) {
+                        alert("Erro ao processar PDV: " + err.message);
+                      } finally {
+                        setIsUploading(false);
+                      }
+                    }}
+                    className="hidden" 
+                    id="pdv-upload" 
+                    disabled={isUploading}
+                  />
+                  <label 
+                    htmlFor="pdv-upload"
+                    className={`btn-military py-3 px-8 text-[10px] cursor-pointer inline-flex items-center gap-3 transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+                  >
+                    {isUploading ? <Loader2 size={16} className="text-military-gold animate-spin" /> : <Plus size={16} className="text-military-gold" />}
+                    <span className={isUploading ? "animate-pulse" : ""}>{isUploading ? "PROCESSANDO..." : "CARREGAR PDV (PDF)"}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="card-military p-6 text-left">
+              <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
+                <History size={14} className="text-military-gold" />
+                Lançamentos Disponíveis ({launches.length})
+              </h4>
+              <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                {launches.length === 0 ? (
+                  <p className="text-[10px] text-slate-500 italic uppercase">Nenhum lançamento importado.</p>
+                ) : (
+                  Object.entries(launches.reduce((acc: any, curr: any) => {
+                    const bId = curr.batchId || 'untracked';
+                    if (!acc[bId]) acc[bId] = { name: curr.batchName || 'Arquivo Avulso', items: [] };
+                    acc[bId].items.push(curr);
+                    return acc;
+                  }, {})).map(([batchId, data]: [string, any]) => (
+                    <div key={batchId} className="space-y-3">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <div className="flex items-center gap-2">
+                          <FileText size={14} className="text-military-gold" />
+                          <span className="text-[10px] uppercase font-black text-slate-300 tracking-wider font-mono truncate max-w-[200px]">{data.name}</span>
+                          <span className="text-[9px] bg-white/5 px-1.5 py-0.5 rounded text-slate-500">{data.items.length} Lç</span>
+                        </div>
+                        {batchId !== 'untracked' && (
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if(confirm(`ATENÇÃO: Deseja apagar todos os ${data.items.length} lançamentos do arquivo "${data.name}"?`)) {
+                                handleDeleteBatch(batchId);
+                              }
+                            }}
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-3 py-1.5 rounded text-[9px] uppercase font-black tracking-widest transition-all flex items-center gap-2 border border-red-500/20"
+                            title="Apagar todos os lançamentos deste arquivo"
+                          >
+                            <Trash2 size={12} />
+                            EXCLUIR ARQUIVO
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {data.items.map((l: any) => (
+                          <div key={l.id} className="flex items-center justify-between p-2.5 bg-military-black/20 border border-white/5 rounded hover:border-military-gold/20 transition-all group">
+                            <div className="min-w-0">
+                              <div className="text-[9px] text-white font-bold uppercase tracking-tight truncate">LÇ {l.num} - {l.anv}</div>
+                              <div className="text-[8px] text-slate-500 uppercase font-bold tracking-tight">
+                                Data: <span className="text-military-gold">{l.dateLabel}</span> • Trip: <span className="text-slate-300">{l.p1}/{l.p2}</span>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => confirmDelete('Lancamentos', l.id)} 
+                              className="p-1.5 text-slate-600 hover:text-red-500 transition-colors shrink-0"
+                              title="Excluir"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
        {/* Delete Confirmation Modal */}
        <AnimatePresence>
          {deleteId && (
@@ -3443,7 +3768,7 @@ function AdminStat({ label, value, trend }: any) {
   );
 }
 
-const sectionComponents: Record<string, FC<{ user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, abastecimentoConfig?: any, abastecimentoFiles?: any[], onLogin?: any }>> = {
+const sectionComponents: Record<string, FC<any>> = {
   Inicio: InicioSection,
   RELPREV: RelprevSection,
   FGR: FgrSection,

@@ -40,17 +40,23 @@ service cloud.firestore {
 
     // FGR Missions
     match /fgrMissions/{missionId} {
-      allow read, create, update, delete: if true;
+      allow read, create, update, delete: if isAuthenticated();
     }
 
     // RELPREV Reports
     match /relprevReports/{reportId} {
-      allow read, create, update, delete: if true;
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // Lancamentos (PDV Extractor Data)
+    match /Lancamentos/{id} {
+      allow read: if true;
+      allow write: if true;
     }
 
     // Config
     match /config/abastecimento {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
@@ -61,7 +67,7 @@ service cloud.firestore {
     }
 
     // Abastecimento Files
-    match /abastecimento_files/{fileId} {
+    match /documentos_abastecimento/{fileId} {
       allow read: if true;
       allow write: if isAdmin() && isValidAbastecimentoFile(request.resource.data);
     }
