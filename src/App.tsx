@@ -1025,33 +1025,6 @@ export default function App() {
 
         {/* User profile & Admin Section at Bottom */}
         <div className="px-4 py-4 border-t border-border-theme space-y-4">
-          <div className="px-2 space-y-3">
-            <div className="card-military p-3 bg-white/2 border-white/5">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[9px] uppercase font-bold text-slate-500">Estado do Sistema</span>
-                {isAuthLoading ? (
-                  <span className="flex items-center gap-1.5 text-[10px] font-black text-yellow-500 uppercase tracking-tighter">
-                    <Loader2 size={10} className="animate-spin" />
-                    Conectando
-                  </span>
-                ) : user ? (
-                  <span className="flex items-center gap-1.5 text-[10px] font-black text-green-500 uppercase tracking-tighter">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
-                    Sincronizado
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-[10px] font-black text-military-gold uppercase tracking-tighter opacity-70">
-                    <div className="w-1.5 h-1.5 bg-military-gold rounded-full" />
-                    Modo Local
-                  </span>
-                )}
-              </div>
-              <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
-                 <div className={`h-full transition-all duration-1000 ${user ? 'bg-green-500/40 w-full' : isAuthLoading ? 'bg-yellow-500/40 w-1/2 animate-pulse' : 'bg-red-500/40 w-1/4'}`} />
-              </div>
-            </div>
-          </div>
-
           <button
             onClick={() => handleTabChange('Admin')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest ${
@@ -1894,35 +1867,35 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
 
       const docRef = await addDoc(collection(db, 'fgrMissions'), missionPayload);
 
-      // Gerar e Upload do PDF em background
-      try {
-        const docPdf = generateFgrPDF(missionPayload);
-        const fileName = `fgr_${missionData.missao.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
-        const storageRef = ref(storage, `fgr_pdfs/${fileName}`);
-        
-        const blob = docPdf.output('blob');
-        const uploadTask = await uploadBytes(storageRef, blob);
-        const pdfUrl = await getDownloadURL(uploadTask.ref);
-        
-        await setDoc(doc(db, 'fgrMissions', docRef.id), { 
-          pdfUrl, 
-          fileName 
-        }, { merge: true });
-        
-        // Também abre o PDF para o usuário que enviou
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-      } catch (pdfErr) {
-        console.error("Erro ao processar PDF FGR em background:", pdfErr);
-      }
-
-      const navigateAway = () => resetAll();
-      
       setIsSaving(false);
-      setTimeout(() => {
-        alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
-        navigateAway();
-      }, 100);
+      alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
+      resetAll();
+
+      // Gerar e Upload do PDF em background (Não bloqueia o UI)
+      (async () => {
+        try {
+          const docPdf = generateFgrPDF(missionPayload);
+          const fileName = `fgr_${missionData.missao.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+          const storageRef = ref(storage, `fgr_pdfs/${fileName}`);
+          
+          const blob = docPdf.output('blob');
+          const uploadTask = await uploadBytes(storageRef, blob);
+          const pdfUrl = await getDownloadURL(uploadTask.ref);
+          
+          await setDoc(doc(db, 'fgrMissions', docRef.id), { 
+            pdfUrl, 
+            fileName 
+          }, { merge: true });
+          
+          console.log("PDF FGR processado em background.");
+          
+          // Abre o PDF se possível (pode ser bloqueado se demorar muito)
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+        } catch (pdfErr) {
+          console.error("Erro ao processar PDF FGR em background:", pdfErr);
+        }
+      })();
     } catch (error: any) {
       const msg = error.message || String(error);
       alert(msg.startsWith('{') ? "Falha técnica ao enviar FGR. Verifique a conexão." : msg);
@@ -2513,43 +2486,40 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
 
       const docRef = await addDoc(collection(db, 'abortivas'), reportData);
       
-      // 2. Gerar e Upload do PDF em background (Silencioso para ser rápido)
-      try {
-        const docPdf = generateAbortivaPDF(reportData);
-        const fileName = `abortiva_${formData.numLancamento}_${Date.now()}.pdf`;
-        const storageRef = ref(storage, `abortivas/${fileName}`);
-        
-        const blob = docPdf.output('blob');
-        const uploadTask = await uploadBytes(storageRef, blob);
-        const pdfUrl = await getDownloadURL(uploadTask.ref);
-        
-        // Atualizar o documento com a URL do PDF
-        await setDoc(doc(db, 'abortivas', docRef.id), { 
-          pdfUrl, 
-          fileName 
-        }, { merge: true });
-        
-        console.log("PDF de abortiva enviado e vinculado com sucesso.");
-      } catch (pdfErr) {
-        console.error("Erro ao processar PDF em background:", pdfErr);
-      }
-      
-      const resetForm = () => {
-        setFormData({
-          dataVoo: new Date().toISOString().split('T')[0],
-          numLancamento: "",
-          modeloAnv: "",
-          motivo: "",
-          preenchidoPor: ""
-        });
-        setSelectedLaunchId('');
-      };
-
       setIsSaving(false);
-      setTimeout(() => {
-        alert("Relato de abortiva enviado com sucesso! O SIPAA recebeu as informações e o PDF oficial foi processado no acervo.");
-        resetForm();
-      }, 100);
+      alert("Relato de abortiva enviado com sucesso! O SIPAA recebeu as informações e o PDF oficial será processado no acervo.");
+      
+      setFormData({
+        dataVoo: new Date().toISOString().split('T')[0],
+        numLancamento: "",
+        modeloAnv: "",
+        motivo: "",
+        preenchidoPor: ""
+      });
+      setSelectedLaunchId('');
+
+      // 2. Gerar e Upload do PDF em background (Não bloqueia o UI)
+      (async () => {
+        try {
+          const docPdf = generateAbortivaPDF(reportData);
+          const fileName = `abortiva_${formData.numLancamento}_${Date.now()}.pdf`;
+          const storageRef = ref(storage, `abortivas/${fileName}`);
+          
+          const blob = docPdf.output('blob');
+          const uploadTask = await uploadBytes(storageRef, blob);
+          const pdfUrl = await getDownloadURL(uploadTask.ref);
+          
+          // Atualizar o documento com a URL do PDF
+          await setDoc(doc(db, 'abortivas', docRef.id), { 
+            pdfUrl, 
+            fileName 
+          }, { merge: true });
+          
+          console.log("PDF de abortiva enviado e vinculado com sucesso.");
+        } catch (pdfErr) {
+          console.error("Erro ao processar PDF em background:", pdfErr);
+        }
+      })();
     } catch (err: any) {
       const msg = err.message || String(err);
       alert(msg.startsWith('{') ? "Erro ao salvar abortiva no servidor." : msg);
