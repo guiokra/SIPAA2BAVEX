@@ -80,7 +80,7 @@ import {
   getDocs,
   writeBatch
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -1841,11 +1841,29 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         createdAt: new Date().toISOString()
       };
 
-      await addDoc(collection(db, 'fgrMissions'), missionPayload);
+      const docRef = await addDoc(collection(db, 'fgrMissions'), missionPayload);
 
-      // Generate and Open PDF
-      const doc = generateFgrPDF(missionPayload);
-      window.open(doc.output('bloburl'), '_blank');
+      // Gerar e Upload do PDF em background
+      try {
+        const docPdf = generateFgrPDF(missionPayload);
+        const fileName = `fgr_${missionData.missao.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+        const storageRef = ref(storage, `fgr_pdfs/${fileName}`);
+        
+        const uploadTask = await uploadString(storageRef, docPdf.output('datauristring'), 'data_url');
+        const pdfUrl = await getDownloadURL(uploadTask.ref);
+        
+        await setDoc(doc(db, 'fgrMissions', docRef.id), { 
+          pdfUrl, 
+          fileName 
+        }, { merge: true });
+        
+        // Também abre o PDF para o usuário que enviou
+        docPdf.output('dataurlnewwindow');
+      } catch (pdfErr) {
+        console.error("Erro ao processar PDF FGR em background:", pdfErr);
+      }
+
+      alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
       
       resetAll();
     } catch (error) {
@@ -2417,16 +2435,36 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
     
     setIsSaving(true);
     try {
-      // Salvar apenas no Firestore para ser instantâneo
+      // 1. Salvar no Firestore Primeiro para garantir os dados
       const reportData = {
         ...formData,
         uid: user?.uid || 'anon',
         createdAt: new Date().toISOString()
       };
 
-      await addDoc(collection(db, 'abortivas'), reportData);
+      const docRef = await addDoc(collection(db, 'abortivas'), reportData);
       
-      alert("Relato de abortiva enviado com sucesso! O SIPAA recebeu as informações e poderá gerar o PDF no painel administrativo.");
+      // 2. Gerar e Upload do PDF em background (Silencioso para ser rápido)
+      try {
+        const docPdf = generateAbortivaPDF(reportData);
+        const fileName = `abortiva_${formData.numLancamento}_${Date.now()}.pdf`;
+        const storageRef = ref(storage, `abortivas/${fileName}`);
+        
+        const uploadTask = await uploadString(storageRef, docPdf.output('datauristring'), 'data_url');
+        const pdfUrl = await getDownloadURL(uploadTask.ref);
+        
+        // Atualizar o documento com a URL do PDF
+        await setDoc(doc(db, 'abortivas', docRef.id), { 
+          pdfUrl, 
+          fileName 
+        }, { merge: true });
+        
+        console.log("PDF de abortiva enviado e vinculado com sucesso.");
+      } catch (pdfErr) {
+        console.error("Erro ao processar PDF em background:", pdfErr);
+      }
+      
+      alert("Relato de abortiva enviado com sucesso! O SIPAA recebeu as informações e o PDF oficial foi processado no acervo.");
 
       setFormData({
         dataVoo: new Date().toISOString().split('T')[0],
@@ -3395,31 +3433,35 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                          </span>
                        </td>
                        <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
-                          <button 
-                            onClick={() => {
-                              const doc = generateFgrPDF(f);
-                              doc.output('dataurlnewwindow');
-                            }}
-                            className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
-                          >
-                            <Eye size={14} />
-                            <span className="text-[10px] uppercase font-black">Ver</span>
-                          </button>
-                          <button 
-                            onClick={() => {
-                              const doc = generateFgrPDF(f);
-                              doc.save(`FGR_${f.missao || 'Voo'}.pdf`);
-                            }}
-                            className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
-                            title="Baixar PDF Original"
-                          >
-                            <Download size={14} />
-                            <span className="text-[10px] uppercase font-black">PDF</span>
-                          </button>
-                          <button onClick={() => confirmDelete('fgrMissions', f.id)} className="text-red-400 hover:text-red-300 p-1">
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
+                         <button 
+                           onClick={() => {
+                             if (f.pdfUrl) {
+                               window.open(f.pdfUrl, '_blank');
+                             } else {
+                               const docPdf = generateFgrPDF(f);
+                               docPdf.output('dataurlnewwindow');
+                             }
+                           }}
+                           className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
+                         >
+                           <Eye size={14} />
+                           <span className="text-[10px] uppercase font-black">{f.pdfUrl ? 'Ver PDF' : 'Gerar'}</span>
+                         </button>
+                         <button 
+                           onClick={() => {
+                             const docPdf = generateFgrPDF(f);
+                             docPdf.save(`FGR_${f.missao || 'Voo'}.pdf`);
+                           }}
+                           className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
+                           title="Baixar PDF Original"
+                         >
+                           <Download size={14} />
+                           <span className="text-[10px] uppercase font-black">Baixar</span>
+                         </button>
+                         <button onClick={() => confirmDelete('fgrMissions', f.id)} className="text-red-400 hover:text-red-300 p-1">
+                           <Trash2 size={14} />
+                         </button>
+                       </td>
                      </tr>
                    ))}
                  </tbody>
@@ -3501,28 +3543,31 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                            {a.motivo}
                          </span>
                        </td>
-                       <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                        <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
                           <button 
                             onClick={() => {
-                              const doc = generateAbortivaPDF(a);
-                              // dataurlnewwindow já abre a janela automaticamente e é mais estável
-                              doc.output('dataurlnewwindow');
+                              if (a.pdfUrl) {
+                                window.open(a.pdfUrl, '_blank');
+                              } else {
+                                const docPdf = generateAbortivaPDF(a);
+                                docPdf.output('dataurlnewwindow');
+                              }
                             }}
                             className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
                           >
                             <Eye size={14} />
-                            <span className="text-[10px] uppercase font-black">Ver</span>
+                            <span className="text-[10px] uppercase font-black">{a.pdfUrl ? 'Ver PDF' : 'Gerar'}</span>
                           </button>
                           <button 
                             onClick={() => {
-                              const doc = generateAbortivaPDF(a);
-                              doc.save(`Abortiva_${a.numLancamento || 'Lanç'}.pdf`);
+                              const docPdf = generateAbortivaPDF(a);
+                              docPdf.save(`Abortiva_${a.numLancamento || 'Lanç'}.pdf`);
                             }}
                             className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
                             title="Baixar PDF Original"
                           >
                             <Download size={14} />
-                            <span className="text-[10px] uppercase font-black">PDF</span>
+                            <span className="text-[10px] uppercase font-black">Baixar</span>
                           </button>
                           <button onClick={() => confirmDelete('abortivas', a.id)} className="text-red-400 hover:text-red-300 p-1">
                             <Trash2 size={14} />
@@ -3554,17 +3599,21 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                  <div className="flex items-center gap-2 pt-3 border-t border-white/5">
                    <button 
                      onClick={() => {
-                        const doc = generateAbortivaPDF(a);
-                        doc.output('dataurlnewwindow');
+                        if (a.pdfUrl) {
+                          window.open(a.pdfUrl, '_blank');
+                        } else {
+                          const docPdf = generateAbortivaPDF(a);
+                          docPdf.output('dataurlnewwindow');
+                        }
                      }}
                       className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
                     >
-                      <Eye size={14} /> VER
+                      <Eye size={14} /> {a.pdfUrl ? 'VER PDF' : 'VER'}
                     </button>
                     <button 
                      onClick={() => {
-                       const doc = generateAbortivaPDF(a);
-                       doc.save(`Abortiva_${a.numLancamento}.pdf`);
+                       const docPdf = generateAbortivaPDF(a);
+                       docPdf.save(`Abortiva_${a.numLancamento}.pdf`);
                      }}
                       className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-white/5 text-slate-300 text-[10px] font-black uppercase tracking-wider border border-white/10"
                     >
@@ -3718,13 +3767,17 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                     </div>
                     <button 
                       onClick={() => {
-                        const doc = generateAbortivaPDF(a);
-                        doc.save(`Abortiva_${a.numLancamento}.pdf`);
+                        if (a.pdfUrl) {
+                          window.open(a.pdfUrl, '_blank');
+                        } else {
+                          const docPdf = generateAbortivaPDF(a);
+                          docPdf.save(`Abortiva_${a.numLancamento}.pdf`);
+                        }
                       }}
                       className="p-1.5 text-military-gold hover:text-white transition-colors"
-                      title="Baixar PDF"
+                      title={a.pdfUrl ? "Abrir PDF Oficial" : "Baixar PDF"}
                     >
-                      <Download size={14} />
+                      {a.pdfUrl ? <ExternalLink size={14} /> : <Download size={14} />}
                     </button>
                   </div>
                 ))}
