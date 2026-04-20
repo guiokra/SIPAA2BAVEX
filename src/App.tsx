@@ -3249,6 +3249,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <AdminAction title="Relatórios de Frota" onClick={() => setSelectedView('relprevs')} desc="Visão geral de incidentes por modelo." icon={ShieldCheck} />
                   <AdminAction title="Missões FGR" onClick={() => setSelectedView('fgrs')} desc="Auditoria de gerenciamento de risco." icon={FileText} />
+                  <AdminAction title="Relatos de Abortiva" onClick={() => setSelectedView('abortivas')} desc="Auditoria de interrupções de voo." icon={Zap} />
                 </div>
             </div>
             
@@ -3654,6 +3655,47 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                 <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider leading-relaxed">
                   Aviso: Certifique-se de que o arquivo está no formato PDF e não está corrompido antes do envio. O upload de arquivos grandes pode levar alguns segundos dependendo da conexão.
                 </p>
+              </div>
+            </div>
+
+            <div className="card-military p-6 text-left">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <Zap className="text-military-gold" size={20} />
+                  <h3 className="font-black text-white uppercase text-[10px] tracking-widest">Abortivas Recebidas</h3>
+                </div>
+                <button 
+                  onClick={() => setSelectedView('abortivas')}
+                  className="text-[9px] font-black text-military-gold uppercase tracking-[0.2em] hover:text-white transition-colors"
+                >
+                  Ver Lista Completa →
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {abortivas.slice(0, 5).map(a => (
+                  <div key={a.id} className="flex items-center justify-between p-3 bg-military-black/30 border border-white/5 rounded">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <FileText size={16} className="text-military-gold shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] text-white font-bold truncate uppercase">{a.modeloAnv} | LÇ {a.numLancamento}</span>
+                        <span className="text-[8px] text-slate-500 uppercase">{new Date(a.createdAt).toLocaleDateString()} • {a.motivo}</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const doc = generateAbortivaPDF(a);
+                        window.open(doc.output('bloburl'), '_blank');
+                      }}
+                      className="p-1.5 text-military-gold hover:text-white transition-colors"
+                    >
+                      <Download size={14} />
+                    </button>
+                  </div>
+                ))}
+                {abortivas.length === 0 && (
+                  <p className="text-[10px] text-slate-500 italic uppercase py-4">Nenhuma abortiva registrada.</p>
+                )}
               </div>
             </div>
           </div>
