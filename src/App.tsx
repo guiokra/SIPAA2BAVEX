@@ -1428,9 +1428,6 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
         window.open(doc.output('bloburl'), '_blank');
       }
 
-      setIsSaving(false);
-      alert(isDraft ? "Rascunho salvo com sucesso." : "Relato enviado com sucesso ao SIPAA.");
-      
       // Reset
       setFormData({
         local: '',
@@ -1444,6 +1441,11 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
       });
       setImages([]);
       setExtraFiles([]);
+      
+      setIsSaving(false);
+      setTimeout(() => {
+        alert(isDraft ? "Rascunho salvo com sucesso." : "Relato enviado com sucesso ao SIPAA.");
+      }, 100);
     } catch (error: any) {
       const msg = error.message || String(error);
       alert(msg.startsWith('{') ? "Erro técnico ao processar relato. Verifique sua conexão." : msg);
@@ -1914,10 +1916,13 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         console.error("Erro ao processar PDF FGR em background:", pdfErr);
       }
 
-      setIsSaving(false);
-      alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
+      const navigateAway = () => resetAll();
       
-      resetAll();
+      setIsSaving(false);
+      setTimeout(() => {
+        alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
+        navigateAway();
+      }, 100);
     } catch (error: any) {
       const msg = error.message || String(error);
       alert(msg.startsWith('{') ? "Falha técnica ao enviar FGR. Verifique a conexão." : msg);
@@ -2529,17 +2534,22 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
         console.error("Erro ao processar PDF em background:", pdfErr);
       }
       
-      setIsSaving(false);
-      alert("Relato de abortiva enviado com sucesso! O SIPAA recebeu as informações e o PDF oficial foi processado no acervo.");
+      const resetForm = () => {
+        setFormData({
+          dataVoo: new Date().toISOString().split('T')[0],
+          numLancamento: "",
+          modeloAnv: "",
+          motivo: "",
+          preenchidoPor: ""
+        });
+        setSelectedLaunchId('');
+      };
 
-      setFormData({
-        dataVoo: new Date().toISOString().split('T')[0],
-        numLancamento: "",
-        modeloAnv: "",
-        motivo: "",
-        preenchidoPor: ""
-      });
-      setSelectedLaunchId('');
+      setIsSaving(false);
+      setTimeout(() => {
+        alert("Relato de abortiva enviado com sucesso! O SIPAA recebeu as informações e o PDF oficial foi processado no acervo.");
+        resetForm();
+      }, 100);
     } catch (err: any) {
       const msg = err.message || String(err);
       alert(msg.startsWith('{') ? "Erro ao salvar abortiva no servidor." : msg);
