@@ -2417,27 +2417,46 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
     
     setIsSaving(true);
     try {
-      // 1. Gerar o PDF antecipadamente para upload
+      console.log("Iniciando envio de abortiva...");
+      
+      // 1. Gerar o PDF
       const docPdf = generateAbortivaPDF({
         ...formData,
         createdAt: new Date().toISOString()
       });
-      const pdfBlob = docPdf.output('blob');
       
-      // 2. Upload para o Storage (para que o "arquivo chegue" no admin)
+      // 2. Upload para o Storage com Timeout para não travar
       const fileName = `abortiva_${formData.numLancamento}_${Date.now()}.pdf`;
       const storageRef = ref(storage, `abortivas/${fileName}`);
       let pdfUrl = '';
       
-      try {
-        const snapshot = await uploadBytes(storageRef, pdfBlob);
-        pdfUrl = await getDownloadURL(snapshot.ref);
-      } catch (storageErr) {
-        console.error("Erro ao salvar PDF no Storage:", storageErr);
-        // Continuamos mesmo se o storage falhar, mas avisamos
-      }
+      // Tentativa de upload com limite de tempo (10 segundos)
+      const uploadPromise = async () => {
+        try {
+          console.log("Convertendo PDF para buffer...");
+          const pdfBuffer = docPdf.output('arraybuffer');
+          console.log("Iniciando uploadBytes...");
+          const snapshot = await uploadBytes(storageRef, pdfBuffer, {
+            contentType: 'application/pdf'
+          });
+          console.log("Upload concluído, obtendo URL...");
+          return await getDownloadURL(snapshot.ref);
+        } catch (e) {
+          console.error("Erro interno no upload:", e);
+          return '';
+        }
+      };
 
-      // 3. Salvar no Firestore
+      const timeoutPromise = new Promise<string>((resolve) => 
+        setTimeout(() => {
+          console.warn("Timeout no upload do PDF");
+          resolve('');
+        }, 10000)
+      );
+
+      pdfUrl = await Promise.race([uploadPromise(), timeoutPromise]);
+
+      // 3. Salvar no Firestore (Sempre salvar, mesmo se o PDF falhou)
       const reportData = {
         ...formData,
         uid: user?.uid || 'anon',
@@ -2446,9 +2465,15 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
         createdAt: new Date().toISOString()
       };
 
+      console.log("Salvando dados no Firestore...");
       await addDoc(collection(db, 'abortivas'), reportData);
       
-      alert("Relato de abortiva enviado com sucesso! O arquivo PDF foi gerado e enviado ao SIPAA.");
+      if (!pdfUrl) {
+        alert("Relato enviado, mas houve um erro ou lentidão ao salvar o arquivo PDF. O SIPAA poderá visualizar os dados, mas o arquivo PDF pode estar indisponível.");
+      } else {
+        alert("Relato de abortiva enviado com sucesso! O arquivo PDF foi gerado e enviado ao SIPAA.");
+      }
+
       setFormData({
         dataVoo: new Date().toISOString().split('T')[0],
         numLancamento: "",
@@ -2458,7 +2483,7 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
       });
       setSelectedLaunchId('');
     } catch (err) {
-      console.error("Erro ao enviar abortiva:", err);
+      console.error("Erro crítico ao enviar abortiva:", err);
       handleFirestoreError(err, OperationType.CREATE, 'abortivas');
     } finally {
       setIsSaving(false);
