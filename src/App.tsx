@@ -1428,6 +1428,7 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
         window.open(doc.output('bloburl'), '_blank');
       }
 
+      setIsSaving(false);
       alert(isDraft ? "Rascunho salvo com sucesso." : "Relato enviado com sucesso ao SIPAA.");
       
       // Reset
@@ -1913,6 +1914,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         console.error("Erro ao processar PDF FGR em background:", pdfErr);
       }
 
+      setIsSaving(false);
       alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
       
       resetAll();
@@ -2527,6 +2529,7 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
         console.error("Erro ao processar PDF em background:", pdfErr);
       }
       
+      setIsSaving(false);
       alert("Relato de abortiva enviado com sucesso! O SIPAA recebeu as informações e o PDF oficial foi processado no acervo.");
 
       setFormData({
@@ -3373,7 +3376,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
               onClick={() => setSelectedView('fgrs')}
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'fgrs' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
             >
-              Missões FGR
+              FGR
             </button>
             <button 
               onClick={() => setSelectedView('abortivas')}
@@ -3427,7 +3430,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <AdminAction title="Relatórios de Frota" onClick={() => setSelectedView('relprevs')} desc="Visão geral de incidentes por modelo." icon={ShieldCheck} />
-                  <AdminAction title="Missões FGR" onClick={() => setSelectedView('fgrs')} desc="Auditoria de gerenciamento de risco." icon={FileText} />
+                  <AdminAction title="FGR" onClick={() => setSelectedView('fgrs')} desc="Auditoria de gerenciamento de risco." icon={FileText} />
                   <AdminAction title="Relatos de Abortiva" onClick={() => setSelectedView('abortivas')} desc="Auditoria de interrupções de voo." icon={Zap} />
                 </div>
             </div>
