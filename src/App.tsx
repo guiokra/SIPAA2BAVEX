@@ -1884,8 +1884,8 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         gravidadeSelections,
         mitigation,
         scores,
-        uid: user?.uid || 'guest',
-        relatorName: user?.displayName || 'Convidado',
+        uid: activeUserUid,
+        relatorName: user?.displayName || missionData.preenchidoPor || 'Convidado',
         createdAt: new Date().toISOString()
       };
 
@@ -3115,11 +3115,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   };
 
   useEffect(() => {
-    if (!user) {
-      console.log("AdminSection: Aguardando autenticação do usuário...");
-      return;
-    }
-
+    // Nota: Removido 'if (!user) return' para permitir visualização em modo local/público
     setDbStatus('CONNECTING');
     const qRelprev = query(collection(db, 'relprevReports'), orderBy('createdAt', 'desc'));
     const qFgr = query(collection(db, 'fgrMissions'), orderBy('createdAt', 'desc'));
@@ -3575,7 +3571,9 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                                window.open(f.pdfUrl, '_blank');
                              } else {
                                const docPdf = generateFgrPDF(f);
-                               docPdf.output('dataurlnewwindow');
+                               const fgrBlob = docPdf.output('blob');
+                               const fgrUrl = URL.createObjectURL(fgrBlob);
+                               window.open(fgrUrl, '_blank');
                              }
                            }}
                            className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
@@ -3686,7 +3684,9 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                                 window.open(a.pdfUrl, '_blank');
                               } else {
                                 const docPdf = generateAbortivaPDF(a);
-                                docPdf.output('dataurlnewwindow');
+                                const abBlobAdmin = docPdf.output('blob');
+                                const abUrlAdmin = URL.createObjectURL(abBlobAdmin);
+                                window.open(abUrlAdmin, '_blank');
                               }
                             }}
                             className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
@@ -3738,9 +3738,11 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                         if (a.pdfUrl) {
                           window.open(a.pdfUrl, '_blank');
                         } else {
-                          const docPdf = generateAbortivaPDF(a);
-                          docPdf.output('dataurlnewwindow');
-                        }
+                           const docPdf = generateAbortivaPDF(a);
+                           const abBlobMob = docPdf.output('blob');
+                           const abUrlMob = URL.createObjectURL(abBlobMob);
+                           window.open(abUrlMob, '_blank');
+                         }
                      }}
                       className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
                     >
