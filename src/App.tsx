@@ -1659,7 +1659,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         local: launch.dest || '',
         trigramaTrip: `${launch.p1 || ''}/${launch.p2 || ''}/${launch.mv === '---' ? '' : (launch.mv || '')}`.replace(/\/$/, ''),
         missao: `LÇ ${launch.num || ''} PDV ${launch.eobt || ''}`.trim(),
-        preenchidoPor: launch.p1 || '',
+        preenchidoPor: launch.p2 || '',
         funcao: 'PB'
       }));
       updateStamp();
