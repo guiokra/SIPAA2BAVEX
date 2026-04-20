@@ -1819,6 +1819,10 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
     }
     setIsSaving(true);
     try {
+      if (!user) {
+        throw new Error("Erro de conexão: Autenticação não concluída. Por favor, aguarde o sistema estabilizar (verifique o selo verde 'Sincronizado' na barra lateral).");
+      }
+
       const scores = {
         tgMin,
         tgMax,
@@ -1849,7 +1853,8 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         const fileName = `fgr_${missionData.missao.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
         const storageRef = ref(storage, `fgr_pdfs/${fileName}`);
         
-        const uploadTask = await uploadString(storageRef, docPdf.output('datauristring'), 'data_url');
+        const blob = docPdf.output('blob');
+        const uploadTask = await uploadBytes(storageRef, blob);
         const pdfUrl = await getDownloadURL(uploadTask.ref);
         
         await setDoc(doc(db, 'fgrMissions', docRef.id), { 
@@ -1858,7 +1863,8 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         }, { merge: true });
         
         // Também abre o PDF para o usuário que enviou
-        docPdf.output('dataurlnewwindow');
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
       } catch (pdfErr) {
         console.error("Erro ao processar PDF FGR em background:", pdfErr);
       }
@@ -2435,6 +2441,10 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
     
     setIsSaving(true);
     try {
+      if (!user) {
+        throw new Error("Erro de conexão: Sistema de autenticação em processamento. Por favor, aguarde o selo de 'Sincronizado' na barra lateral e tente novamente.");
+      }
+
       // 1. Salvar no Firestore Primeiro para garantir os dados
       const reportData = {
         ...formData,
@@ -2450,7 +2460,8 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
         const fileName = `abortiva_${formData.numLancamento}_${Date.now()}.pdf`;
         const storageRef = ref(storage, `abortivas/${fileName}`);
         
-        const uploadTask = await uploadString(storageRef, docPdf.output('datauristring'), 'data_url');
+        const blob = docPdf.output('blob');
+        const uploadTask = await uploadBytes(storageRef, blob);
         const pdfUrl = await getDownloadURL(uploadTask.ref);
         
         // Atualizar o documento com a URL do PDF
@@ -3031,10 +3042,31 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [batchDeleteTarget, setBatchDeleteTarget] = useState<{id: string, name: string, count: number} | null>(null);
+  const [dbStatus, setDbStatus] = useState<'IDLE' | 'CONNECTING' | 'CONNECTED' | 'ERROR'>('IDLE');
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  const fetchManual = async () => {
+    setDbStatus('CONNECTING');
+    setLastError(null);
+    try {
+      // Teste de conexão direto
+      const testSnap = await getDocs(query(collection(db, 'fgrMissions'), limit(1)));
+      console.log("Teste de conexão Firestore: OK", testSnap.size);
+      setDbStatus('CONNECTED');
+    } catch (err: any) {
+      console.error("Erro no teste de conexão:", err);
+      setLastError(err.message || String(err));
+      setDbStatus('ERROR');
+    }
+  };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      console.log("AdminSection: Aguardando autenticação do usuário...");
+      return;
+    }
 
+    setDbStatus('CONNECTING');
     const qRelprev = query(collection(db, 'relprevReports'), orderBy('createdAt', 'desc'));
     const qFgr = query(collection(db, 'fgrMissions'), orderBy('createdAt', 'desc'));
     const qAbortivas = query(collection(db, 'abortivas'), orderBy('createdAt', 'desc'));
@@ -3042,8 +3074,11 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
     const unsubRelprev = onSnapshot(qRelprev, (snap) => {
       setStats(prev => ({ ...prev, relprevs: snap.size }));
       setRelprevs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setDbStatus('CONNECTED');
     }, (err) => {
       console.error("Erro no listener de Relprev:", err);
+      setLastError(err.message);
+      setDbStatus('ERROR');
     });
 
     const unsubFgr = onSnapshot(qFgr, (snap) => {
@@ -3051,6 +3086,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
       setFgrs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       console.error("Erro no listener de FGR:", err);
+      setLastError(err.message);
     });
 
     const unsubAbortivas = onSnapshot(qAbortivas, (snap) => {
@@ -3058,6 +3094,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
       setAbortivas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
       console.error("Erro no listener de Abortivas:", err);
+      setLastError(err.message);
     });
 
     return () => {
@@ -3222,7 +3259,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
 
   return (
     <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
-       <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 md:pb-6 border-b border-slate-800 gap-4">
+       <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 md:pb-6 border-b border-slate-800 gap-4">
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-military-gold/20 border border-military-gold flex items-center justify-center text-military-gold shrink-0">
                 <ShieldCheck size={20} className="md:w-6 md:h-6" />
@@ -3232,13 +3269,43 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                <p className="text-military-gold text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] mt-0.5">SIPAA 2º BAvEx — Gestão Centralizada</p>
              </div>
           </div>
-          <div className="flex gap-1 bg-military-black/50 p-1 rounded-lg border border-white/5 overflow-x-auto no-scrollbar">
-            <button 
-              onClick={() => setSelectedView('stats')}
-              className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'stats' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
-            >
-              Dashboard
-            </button>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-4 px-3 py-1.5 bg-military-black border border-border-theme rounded-sm">
+               <div className="hidden sm:flex flex-col">
+                 <span className="text-[7px] uppercase text-slate-500 font-bold">DB ID</span>
+                 <span className="text-[9px] text-slate-400 font-mono">{(db as any)._databaseId?.database || 'default'}</span>
+               </div>
+               <div className="flex flex-col items-end">
+                 <span className="text-[7px] uppercase text-slate-500 font-bold">Conexão</span>
+                 <div className="flex items-center gap-1.5">
+                   <div className={`w-1.5 h-1.5 rounded-full ${
+                     dbStatus === 'CONNECTED' ? 'bg-green-500 shadow-[0_0_5px_#22c55e]' : 
+                     dbStatus === 'ERROR' ? 'bg-red-500' : 'bg-yellow-500'
+                   }`} />
+                   <span className={`text-[9px] font-black uppercase ${
+                     dbStatus === 'CONNECTED' ? 'text-green-500' : 
+                     dbStatus === 'ERROR' ? 'text-red-500' : 'text-yellow-500'
+                   }`}>{dbStatus}</span>
+                 </div>
+               </div>
+               <button 
+                 onClick={fetchManual}
+                 className="p-1 px-2 hover:bg-white/5 rounded-sm text-military-gold transition-colors"
+               >
+                 <History size={12} className={dbStatus === 'CONNECTING' ? 'animate-spin' : ''} />
+               </button>
+            </div>
+          </div>
+       </div>
+
+       <div className="flex gap-1 bg-military-black/50 p-1 rounded-lg border border-white/5 overflow-x-auto no-scrollbar mb-8">
+              <button 
+                onClick={() => setSelectedView('stats')}
+                className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'stats' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
+              >
+                Dashboard
+              </button>
             <button 
               onClick={() => setSelectedView('relprevs')}
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'relprevs' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
@@ -3270,9 +3337,24 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
               Extrator PDV
             </button>
           </div>
-       </div>
 
-       {selectedView === 'stats' && (
+       {lastError && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded flex items-center gap-4 text-left">
+          <AlertCircle className="text-red-500 shrink-0" />
+          <div>
+            <p className="text-xs font-black text-red-500 uppercase tracking-widest">Erro de Sincronização Detectado</p>
+            <p className="text-[11px] text-red-200/70 font-mono mt-1">{lastError}</p>
+            <button 
+              onClick={() => { setLastError(null); fetchManual(); }}
+              className="mt-2 text-[10px] font-bold text-red-400 underline uppercase"
+            >
+              Tentar Restaurar Conexão
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selectedView === 'stats' && (
          <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
               <AdminStat label="Relatos" value={stats.relprevs.toString()} trend="TOTAL" />
