@@ -857,8 +857,7 @@ export default function App() {
       } else {
         console.log('Nenhum usuário detectado. Iniciando sessão automática...');
         signInAnonymously(auth).catch((error) => {
-          console.error('Erro ao iniciar sessão anônima:', error);
-          alert("Erro Crítico de Conexão: Não foi possível autenticar sua sessão. Verifique sua conexão com a internet ou se o site está bloqueado na rede.");
+          console.warn('Login anônimo desativado no console ou erro de rede:', error);
           setIsAuthLoading(false);
         });
       }
@@ -1041,13 +1040,10 @@ export default function App() {
                     Sincronizado
                   </span>
                 ) : (
-                  <button 
-                    onClick={() => { setIsAuthLoading(true); signInAnonymously(auth); }}
-                    className="flex items-center gap-1.5 text-[10px] font-black text-red-500 uppercase tracking-tighter hover:underline"
-                  >
-                    <AlertCircle size={10} />
-                    Desconectado
-                  </button>
+                  <span className="flex items-center gap-1.5 text-[10px] font-black text-military-gold uppercase tracking-tighter opacity-70">
+                    <div className="w-1.5 h-1.5 bg-military-gold rounded-full" />
+                    Modo Local
+                  </span>
                 )}
               </div>
               <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
@@ -1403,15 +1399,15 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
 
     setIsSaving(true);
     try {
-      let activeUser = user;
-      if (!activeUser) {
-        console.log("Tentando re-autenticação rápida...");
-        const cred = await signInAnonymously(auth);
-        activeUser = cred.user;
-      }
-
-      if (!activeUser) {
-        throw new Error("Erro de conexão: Autenticação não concluída. Por favor, aguarde o sistema estabilizar (verifique o selo verde na barra lateral).");
+      let activeUserUid = user?.uid;
+      if (!activeUserUid) {
+        try {
+          const cred = await signInAnonymously(auth);
+          activeUserUid = cred.user.uid;
+        } catch (e) {
+          console.warn("Prosseguindo sem autenticação formal (Modo Público)");
+          activeUserUid = 'public-guest';
+        }
       }
 
       const codigo = `${new Date().getFullYear()}-${String(reports.length + 1).padStart(3, '0')}`;
@@ -1421,7 +1417,7 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
         images,
         extraFiles,
         status: isDraft ? 'RASCUNHO' : 'ENVIADO',
-        uid: activeUser.uid,
+        uid: activeUserUid,
         createdAt: new Date().toISOString()
       };
 
@@ -1861,14 +1857,14 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
     }
     setIsSaving(true);
     try {
-      let activeUser = user;
-      if (!activeUser) {
-        const cred = await signInAnonymously(auth);
-        activeUser = cred.user;
-      }
-
-      if (!activeUser) {
-        throw new Error("Erro de conexão: Autenticação não concluída. Por favor, aguarde o sistema estabilizar (verifique o selo verde 'Sincronizado' na barra lateral).");
+      let activeUserUid = user?.uid;
+      if (!activeUserUid) {
+        try {
+          const cred = await signInAnonymously(auth);
+          activeUserUid = cred.user.uid;
+        } catch (e) {
+          activeUserUid = 'public-fgr';
+        }
       }
 
       const scores = {
@@ -2491,20 +2487,20 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
     
     setIsSaving(true);
     try {
-      let activeUser = user;
-      if (!activeUser) {
-        const cred = await signInAnonymously(auth);
-        activeUser = cred.user;
-      }
-
-      if (!activeUser) {
-        throw new Error("Erro de conexão: Sistema de autenticação em processamento. Por favor, aguarde o selo de 'Sincronizado' na barra lateral e tente novamente.");
+      let activeUserUid = user?.uid;
+      if (!activeUserUid) {
+        try {
+          const cred = await signInAnonymously(auth);
+          activeUserUid = cred.user.uid;
+        } catch (e) {
+          activeUserUid = 'public-abortiva';
+        }
       }
 
       // 1. Salvar no Firestore Primeiro para garantir os dados
       const reportData = {
         ...formData,
-        uid: activeUser.uid,
+        uid: activeUserUid,
         createdAt: new Date().toISOString()
       };
 
