@@ -1030,13 +1030,28 @@ export default function App() {
             <div className="card-military p-3 bg-white/2 border-white/5">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[9px] uppercase font-bold text-slate-500">Estado do Sistema</span>
-                <span className="flex items-center gap-1.5 text-[10px] font-black text-green-500 uppercase tracking-tighter">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
-                  Sincronizado
-                </span>
+                {isAuthLoading ? (
+                  <span className="flex items-center gap-1.5 text-[10px] font-black text-yellow-500 uppercase tracking-tighter">
+                    <Loader2 size={10} className="animate-spin" />
+                    Conectando
+                  </span>
+                ) : user ? (
+                  <span className="flex items-center gap-1.5 text-[10px] font-black text-green-500 uppercase tracking-tighter">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
+                    Sincronizado
+                  </span>
+                ) : (
+                  <button 
+                    onClick={() => { setIsAuthLoading(true); signInAnonymously(auth); }}
+                    className="flex items-center gap-1.5 text-[10px] font-black text-red-500 uppercase tracking-tighter hover:underline"
+                  >
+                    <AlertCircle size={10} />
+                    Desconectado
+                  </button>
+                )}
               </div>
               <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
-                 <div className="bg-accent-gold/40 h-full w-[100%]" />
+                 <div className={`h-full transition-all duration-1000 ${user ? 'bg-green-500/40 w-full' : isAuthLoading ? 'bg-yellow-500/40 w-1/2 animate-pulse' : 'bg-red-500/40 w-1/4'}`} />
               </div>
             </div>
           </div>
@@ -1388,9 +1403,17 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
 
     setIsSaving(true);
     try {
-      if (!user) {
-        throw new Error("Sistema em inicialização. Por favor, aguarde o selo de 'Sincronizado' e tente novamente em instantes.");
+      let activeUser = user;
+      if (!activeUser) {
+        console.log("Tentando re-autenticação rápida...");
+        const cred = await signInAnonymously(auth);
+        activeUser = cred.user;
       }
+
+      if (!activeUser) {
+        throw new Error("Erro de conexão: Autenticação não concluída. Por favor, aguarde o sistema estabilizar (verifique o selo verde na barra lateral).");
+      }
+
       const codigo = `${new Date().getFullYear()}-${String(reports.length + 1).padStart(3, '0')}`;
       const payload = {
         ...formData,
@@ -1398,7 +1421,7 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
         images,
         extraFiles,
         status: isDraft ? 'RASCUNHO' : 'ENVIADO',
-        uid: user?.uid || 'guest',
+        uid: activeUser.uid,
         createdAt: new Date().toISOString()
       };
 
@@ -1838,7 +1861,13 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
     }
     setIsSaving(true);
     try {
-      if (!user) {
+      let activeUser = user;
+      if (!activeUser) {
+        const cred = await signInAnonymously(auth);
+        activeUser = cred.user;
+      }
+
+      if (!activeUser) {
         throw new Error("Erro de conexão: Autenticação não concluída. Por favor, aguarde o sistema estabilizar (verifique o selo verde 'Sincronizado' na barra lateral).");
       }
 
@@ -2462,14 +2491,20 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
     
     setIsSaving(true);
     try {
-      if (!user) {
+      let activeUser = user;
+      if (!activeUser) {
+        const cred = await signInAnonymously(auth);
+        activeUser = cred.user;
+      }
+
+      if (!activeUser) {
         throw new Error("Erro de conexão: Sistema de autenticação em processamento. Por favor, aguarde o selo de 'Sincronizado' na barra lateral e tente novamente.");
       }
 
       // 1. Salvar no Firestore Primeiro para garantir os dados
       const reportData = {
         ...formData,
-        uid: user?.uid || 'anon',
+        uid: activeUser.uid,
         createdAt: new Date().toISOString()
       };
 
