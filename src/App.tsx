@@ -459,6 +459,56 @@ function getRiskClass(r: number, tipoVoo: string = 'REGULAR') {
     responsavel: "Cmt OM"
   };
 };
+const generateAbortivaPDF = (abort: any) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // Header
+  doc.setFillColor(26, 31, 37); // #1a1f25
+  doc.rect(0, 0, pageWidth, 40, 'F');
+  
+  doc.setTextColor(212, 175, 55); // #d4af37
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SIPAA 2º BAvEx', 20, 25);
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10);
+  doc.text('RELATO DE ABORTIVA DE VOO', 20, 32);
+  
+  // Info
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(14);
+  doc.text('Informações da Abortiva', 20, 55);
+  
+  const motivoDisplay = {
+    'DOS': 'DOS (Devido a Ordem Superior)',
+    'DFM': 'DFM (Devido a Falha de Material)',
+    'DCP': 'DCP (Devido a Condições Pessoais)',
+    'DCM': 'DCM (Devido a Condições Meteorológicas)'
+  }[abort.motivo as 'DOS' | 'DFM' | 'DCP' | 'DCM'] || abort.motivo;
+
+  autoTable(doc, {
+    startY: 60,
+    head: [['Campo', 'Informação']],
+    body: [
+      ['Data do Voo', abort.dataVoo || 'N/A'],
+      ['Nº Lançamento', abort.numLancamento || 'N/A'],
+      ['Modelo Anv', abort.modeloAnv || 'N/A'],
+      ['Motivo', motivoDisplay],
+      ['Preenchido por', abort.preenchidoPor || 'N/A']
+    ],
+    theme: 'striped',
+    headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] }
+  });
+
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text(`Gerado em: ${new Date(abort.createdAt).toLocaleString('pt-BR')}`, pageWidth - 20, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+  
+  return doc;
+};
+
 const generateFgrPDF = (mission: any) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -637,7 +687,7 @@ const generateRelprevPDF = (report: any) => {
   return doc;
 };
 
-type SectionKey = 'Inicio' | 'RELPREV' | 'FGR' | 'Mapa de Risco' | 'Portal Notificação' | 'Ações Pós-Acidente' | 'Abastecimento' | 'Memento Meteo' | 'Reporte Fauna' | 'Normas CAvEx' | 'Planeje seu Voo' | 'Admin';
+type SectionKey = 'Inicio' | 'RELPREV' | 'FGR' | 'Abortiva' | 'Mapa de Risco' | 'Portal Notificação' | 'Ações Pós-Acidente' | 'Abastecimento' | 'Memento Meteo' | 'Reporte Fauna' | 'Normas CAvEx' | 'Planeje seu Voo' | 'Admin';
 
 const MONTHS_MAP: Record<string, string> = { 
   JANEIRO: '01', FEVEREIRO: '02', MARÇO: '03', MARCO: '03', ABRIL: '04', MAIO: '05', JUNHO: '06', 
@@ -752,6 +802,15 @@ export default function App() {
   const [adminPassword, setAdminPassword] = useState('');
   const [totalRelprev, setTotalRelprev] = useState(0);
   const [launches, setLaunches] = useState<any[]>([]);
+  const [selectedLaunchIdAbortiva, setSelectedLaunchIdAbortiva] = useState('');
+
+  const [abortivaData, setAbortivaData] = useState({
+    dataVoo: new Date().toISOString().split('T')[0],
+    numLancamento: "",
+    modeloAnv: "",
+    motivo: "", // Will be filled with DCM on selection
+    preenchidoPor: ""
+  });
 
   useEffect(() => {
     const q = query(collection(db, 'Lancamentos'), orderBy('createdAt', 'desc'), limit(100));
@@ -814,6 +873,7 @@ export default function App() {
     { id: 'Inicio', name: 'Início', icon: Home },
     { id: 'RELPREV', name: 'RELPREV', icon: FileSearch },
     { id: 'FGR', name: 'FGR', icon: ShieldCheck },
+    { id: 'Abortiva', name: 'Abortiva', icon: Zap },
     { id: 'Mapa de Risco', name: 'Mapa de Risco', icon: MapIcon },
     { id: 'Portal Notificação', name: 'Portal Notificação', icon: Bell },
     { id: 'Ações Pós-Acidente', name: 'Ações Pós-Acidente', icon: AlertTriangle },
@@ -1096,6 +1156,13 @@ function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
           desc="Gerenciamento de risco operacional." 
           color="blue"
           onClick={() => onTabChange('FGR')}
+        />
+        <QuickCard 
+          icon={Zap} 
+          title="Abortiva de Voo" 
+          desc="Relato de interrupção de missão." 
+          color="orange"
+          onClick={() => onTabChange('Abortiva')}
         />
         <QuickCard 
           icon={AlertTriangle} 
@@ -2305,6 +2372,226 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
   );
 }
 
+function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launches: any[] }) {
+  const [selectedLaunchId, setSelectedLaunchId] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    dataVoo: new Date().toISOString().split('T')[0],
+    numLancamento: "",
+    modeloAnv: "",
+    motivo: "",
+    preenchidoPor: ""
+  });
+
+  const handleLaunchSelectAbortiva = (launchId: string) => {
+    setSelectedLaunchId(launchId);
+    if (!launchId) return;
+
+    const launch = launches.find(l => l.id === launchId);
+    if (launch) {
+      const anv = launch.anv || '';
+      const digits = anv.replace(/\D/g, '');
+      let detectedModel = '';
+      if (digits.startsWith('1')) detectedModel = 'HA-1A';
+      else if (digits.startsWith('2')) detectedModel = 'HM-1A';
+      else if (digits.startsWith('3')) detectedModel = 'HM-2A';
+      else if (digits.startsWith('4')) detectedModel = 'HM-3';
+      else if (digits.startsWith('5')) detectedModel = 'HM-4';
+
+      setFormData(prev => ({
+        ...prev,
+        dataVoo: launch.dateLabel ? launch.dateLabel.split('/').reverse().join('-') : '',
+        numLancamento: launch.num || '',
+        modeloAnv: detectedModel || prev.modeloAnv,
+        motivo: 'DCM', // Default per request
+        preenchidoPor: launch.p1 || ''
+      }));
+    }
+  };
+
+  const handleSend = async () => {
+    if (!formData.dataVoo || !formData.numLancamento || !formData.modeloAnv || !formData.motivo || !formData.preenchidoPor) {
+      alert("Por favor, preencha todos os campos obrigatórios.");
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const reportData = {
+        ...formData,
+        uid: user?.uid || 'anon',
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'abortivas'), reportData);
+      
+      alert("Relato de abortiva enviado com sucesso!");
+      setFormData({
+        dataVoo: new Date().toISOString().split('T')[0],
+        numLancamento: "",
+        modeloAnv: "",
+        motivo: "",
+        preenchidoPor: ""
+      });
+      setSelectedLaunchId('');
+    } catch (err) {
+      console.error("Erro ao enviar abortiva:", err);
+      handleFirestoreError(err, OperationType.CREATE, 'abortivas');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const motivos = [
+    { id: 'DOS', text: 'DOS (Devido a Ordem Superior)' },
+    { id: 'DFM', text: 'DFM (Devido a Falha de Material)' },
+    { id: 'DCP', text: 'DCP (Devido a Condições Pessoais)' },
+    { id: 'DCM', text: 'DCM (Devido a Condições Meteorológicas)' }
+  ];
+
+  return (
+    <div className="space-y-6 pb-20 text-left">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">Abortiva de Voo</h2>
+        <p className="text-text-secondary text-sm">Relate interrupções de missões planejadas.</p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        {launches.length > 0 && (
+          <div className="flex flex-col gap-1 min-w-[240px]">
+            <label className="text-[9px] font-black text-military-gold uppercase tracking-widest pl-1">Auto-Preencher via PDV</label>
+            <select 
+              value={selectedLaunchId}
+              onChange={(e) => handleLaunchSelectAbortiva(e.target.value)}
+              className="bg-bg-sidebar border border-accent-gold/30 text-white text-[9px] font-bold uppercase rounded px-2 py-1.5 outline-none focus:border-accent-gold transition-colors cursor-pointer"
+            >
+              <option value="">SELECIONAR...</option>
+              {Object.entries(launches.reduce((acc: any, curr: any) => {
+                const groupKey = curr.dateLabel || 'Sem Data';
+                if (!acc[groupKey]) acc[groupKey] = [];
+                acc[groupKey].push(curr);
+                return acc;
+              }, {})).sort((a, b) => b[0].localeCompare(a[0])).map(([date, items]: [string, any]) => (
+                <optgroup key={date} label={`DATA: ${date}`}>
+                  {items.sort((a: any, b: any) => a.num.localeCompare(b.num)).map((l: any) => (
+                    <option key={l.id} value={l.id}>
+                      {`${l.num} • ${l.anv} • ${l.p1}`}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="card-military p-0 overflow-hidden max-w-2xl">
+        <div className="bg-white/5 px-6 py-3 border-b border-border-theme">
+          <span className="text-[10px] font-black uppercase text-accent-gold tracking-[0.2em]">Formulário de Abortiva</span>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Data do Voo *</label>
+              <input 
+                type="date" 
+                className="input-military w-full px-4 py-3"
+                value={formData.dataVoo}
+                onChange={e => setFormData({...formData, dataVoo: e.target.value})}
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Número do Lançamento *</label>
+              <input 
+                type="text" 
+                className="input-military w-full px-4 py-3"
+                value={formData.numLancamento}
+                onChange={e => setFormData({...formData, numLancamento: e.target.value})}
+                placeholder="Ex: 01"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Modelo Anv *</label>
+            <div className="flex flex-wrap gap-4">
+              {['HA-1A', 'HM-1A', 'HM-2A', 'HM-3', 'HM-4'].map(m => (
+                <label key={m} className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative flex items-center justify-center">
+                    <input 
+                      type="radio" 
+                      name="abortivaModelo" 
+                      className="peer sr-only"
+                      checked={formData.modeloAnv === m}
+                      onChange={() => setFormData({...formData, modeloAnv: m})}
+                    />
+                    <div className="w-4 h-4 rounded-full border border-border-theme bg-bg-deep peer-checked:border-accent-gold transition-all"></div>
+                    <div className="absolute w-2 h-2 rounded-full bg-accent-gold opacity-0 peer-checked:opacity-100 transition-all"></div>
+                  </div>
+                  <span className={`text-xs font-bold ${formData.modeloAnv === m ? 'text-white' : 'text-text-secondary'} group-hover:text-white transition-colors`}>{m}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Motivo *</label>
+            <div className="flex flex-col gap-3">
+              {motivos.map(m => (
+                <label key={m.id} className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative flex items-center justify-center">
+                    <input 
+                      type="radio" 
+                      name="abortivaMotivo" 
+                      className="peer sr-only"
+                      checked={formData.motivo === m.id}
+                      onChange={() => setFormData({...formData, motivo: m.id})}
+                    />
+                    <div className="w-4 h-4 rounded-full border border-border-theme bg-bg-deep peer-checked:border-accent-gold transition-all"></div>
+                    <div className="absolute w-2 h-2 rounded-full bg-accent-gold opacity-0 peer-checked:opacity-100 transition-all"></div>
+                  </div>
+                  <span className={`text-xs font-bold ${formData.motivo === m.id ? 'text-white' : 'text-text-secondary'} group-hover:text-white transition-colors`}>{m.text}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Preenchido por *</label>
+            <input 
+              type="text" 
+              className="input-military w-full px-4 py-3"
+              value={formData.preenchidoPor}
+              onChange={e => setFormData({...formData, preenchidoPor: e.target.value})}
+              placeholder="Trigrama"
+            />
+          </div>
+
+          <div className="pt-4 flex gap-4">
+             <button 
+               onClick={handleSend}
+               disabled={isSaving}
+               className="btn-military flex-1 h-12 uppercase font-black tracking-widest flex items-center justify-center gap-3"
+             >
+               {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+               {isSaving ? 'Enviando...' : 'Enviar Abortiva'}
+             </button>
+             <button 
+               onClick={() => {
+                 setFormData({ dataVoo: new Date().toISOString().split('T')[0], numLancamento: "", modeloAnv: "", motivo: "", preenchidoPor: "" });
+                 setSelectedLaunchId('');
+               }}
+               className="px-6 border border-border-theme text-text-secondary text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-colors"
+             >
+               Limpar
+             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MapaRiscoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
     <div className="space-y-8">
@@ -2694,10 +2981,11 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   launches: any[],
   setLaunches: (l: any[]) => void
 }) {
-  const [stats, setStats] = useState({ relprevs: 0, fgrs: 0 });
+  const [stats, setStats] = useState({ relprevs: 0, fgrs: 0, abortivas: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
   const [fgrs, setFgrs] = useState<any[]>([]);
-  const [selectedView, setSelectedView] = useState<'stats' | 'relprevs' | 'fgrs' | 'config' | 'pdv'>('stats');
+  const [abortivas, setAbortivas] = useState<any[]>([]);
+  const [selectedView, setSelectedView] = useState<'stats' | 'relprevs' | 'fgrs' | 'abortivas' | 'config' | 'pdv'>('stats');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -2709,6 +2997,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
 
     const qRelprev = query(collection(db, 'relprevReports'), orderBy('createdAt', 'desc'));
     const qFgr = query(collection(db, 'fgrMissions'), orderBy('createdAt', 'desc'));
+    const qAbortivas = query(collection(db, 'abortivas'), orderBy('createdAt', 'desc'));
 
     const unsubRelprev = onSnapshot(qRelprev, (snap) => {
       setStats(prev => ({ ...prev, relprevs: snap.size }));
@@ -2724,9 +3013,17 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
       console.error("Erro no listener de FGR:", err);
     });
 
+    const unsubAbortivas = onSnapshot(qAbortivas, (snap) => {
+      setStats(prev => ({ ...prev, abortivas: snap.size }));
+      setAbortivas(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("Erro no listener de Abortivas:", err);
+    });
+
     return () => {
       unsubRelprev();
       unsubFgr();
+      unsubAbortivas();
     };
   }, [user]);
 
@@ -2915,6 +3212,12 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
               Missões FGR
             </button>
             <button 
+              onClick={() => setSelectedView('abortivas')}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'abortivas' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
+            >
+              Abortivas
+            </button>
+            <button 
               onClick={() => setSelectedView('config')}
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === 'config' ? 'bg-military-gold text-military-black' : 'text-slate-400 hover:text-white'}`}
             >
@@ -2933,9 +3236,9 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
          <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
               <AdminStat label="Relatos" value={stats.relprevs.toString()} trend="TOTAL" />
+              <AdminStat label="Abortivas" value={stats.abortivas.toString()} trend="TOTAL" />
               <AdminStat label="FGR" value={stats.fgrs.toString()} trend="TOTAL" />
               <AdminStat label="Mapa" value="ATIVO" trend="ATUALIZADO" />
-              <AdminStat label="Fauna" value="15" trend="ALERTAS" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
@@ -3157,6 +3460,97 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
             )}
           </div>
         )}
+
+       {selectedView === 'abortivas' && (
+         <div className="space-y-4">
+           {/* Desktop Table - Only on large screens */}
+           <div className="hidden xl:block card-military overflow-hidden">
+             <div className="overflow-x-auto no-scrollbar">
+               <table className="w-full text-left">
+                 <thead>
+                   <tr className="border-b border-border-theme text-[10px] uppercase text-text-secondary font-black">
+                     <th className="px-4 py-3">Data</th>
+                     <th className="px-4 py-3">Lançamento</th>
+                     <th className="px-4 py-3">Aeronave</th>
+                     <th className="px-4 py-3">Motivo</th>
+                     <th className="px-4 py-3 text-right font-black tracking-widest text-military-gold">PDF / AÇÕES</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-border-theme/30 text-[11px]">
+                   {abortivas.map(a => (
+                     <tr key={a.id} className="hover:bg-white/2 transition-colors">
+                       <td className="px-4 py-3 font-mono">{new Date(a.createdAt).toLocaleDateString()}</td>
+                       <td className="px-4 py-3 text-white font-bold">{a.numLancamento}</td>
+                       <td className="px-4 py-3 text-text-secondary uppercase">{a.modeloAnv} | {a.preenchidoPor}</td>
+                       <td className="px-4 py-3">
+                         <span className="px-2 py-0.5 rounded text-[9px] font-black tracking-widest bg-orange-500/20 text-orange-500">
+                           {a.motivo}
+                         </span>
+                       </td>
+                       <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                          <button 
+                            onClick={() => {
+                              const doc = generateAbortivaPDF(a);
+                              window.open(doc.output('bloburl'), '_blank');
+                            }}
+                            className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
+                          >
+                            <FileText size={14} />
+                            <span className="text-[10px] uppercase font-black">Ver PDF</span>
+                          </button>
+                          <button onClick={() => confirmDelete('abortivas', a.id)} className="text-red-400 hover:text-red-300 p-1">
+                            <Trash2 size={14} />
+                          </button>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+           </div>
+
+           {/* Mobile/Tablet List - Show on anything smaller than XL */}
+           <div className="xl:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+             {abortivas.map(a => (
+               <div key={a.id} className="card-military p-4 space-y-3 flex flex-col justify-between">
+                 <div>
+                   <div className="flex justify-between items-start mb-2">
+                     <span className="text-white font-black text-xs uppercase tracking-tight truncate">Lç {a.numLancamento}</span>
+                     <span className="px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 bg-orange-500/20 text-orange-500">
+                       {a.motivo}
+                     </span>
+                   </div>
+                   <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
+                     <div className="truncate">Mod: <span className="text-slate-300">{a.modeloAnv}</span></div>
+                     <div className="text-right">{new Date(a.createdAt).toLocaleDateString()}</div>
+                   </div>
+                 </div>
+                 <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                   <button 
+                     onClick={() => {
+                       const doc = generateAbortivaPDF(a);
+                       window.open(doc.output('bloburl'), '_blank');
+                     }}
+                      className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
+                    >
+                      <FileText size={14} /> PDF
+                    </button>
+                    <button 
+                     onClick={() => confirmDelete('abortivas', a.id)} 
+                     className="w-10 h-9 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+             ))}
+           </div>
+
+           {abortivas.length === 0 && (
+             <div className="card-military py-12 text-center opacity-40 italic text-sm">Nenhum relato de abortiva encontrado.</div>
+           )}
+         </div>
+       )}
 
         {selectedView === 'config' && (
           <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -3765,6 +4159,7 @@ const sectionComponents: Record<string, FC<any>> = {
   Inicio: InicioSection,
   RELPREV: RelprevSection,
   FGR: FgrSection,
+  Abortiva: AbortivaSection,
   'Mapa de Risco': MapaRiscoSection,
   'Portal Notificação': NotificacaoSection,
   'Ações Pós-Acidente': PosAcidenteSection,

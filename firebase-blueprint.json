@@ -64,6 +64,21 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["num", "anv", "dateLabel", "createdAt"]
+    },
+    "Abortiva": {
+      "title": "Abortiva",
+      "description": "Relato de abortiva de voo selecionada via PDV",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "dataVoo": { "type": "string", "format": "date" },
+        "numLancamento": { "type": "string" },
+        "modeloAnv": { "type": "string" },
+        "motivo": { "type": "string", "enum": ["DOS", "DFM", "DCP", "DCM"] },
+        "preenchidoPor": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "dataVoo", "numLancamento", "modeloAnv", "motivo", "preenchidoPor", "createdAt"]
     }
   },
   "firestore": {
@@ -78,6 +93,10 @@
     "/relprevReports/{reportId}": {
       "schema": "RelprevReport",
       "description": "Relatos de prevenção"
+    },
+    "/abortivas/{abortivaId}": {
+      "schema": "Abortiva",
+      "description": "Relatos de abortiva de voo"
     },
     "/config/abastecimento": {
       "schema": {
