@@ -170,8 +170,9 @@ interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -189,6 +190,16 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  // Mostrar alerta amigável antes de disparar erro técnico
+  if (errorMessage.includes('Insufficient permissions') || errorMessage.includes('permission-denied')) {
+    alert("Erro de Permissão: Você não tem autorização para realizar esta operação no momento.");
+  } else if (errorMessage.includes('offline')) {
+    alert("Erro de Conexão: O sistema parece estar offline. Verifique sua internet.");
+  } else if (!errorMessage.startsWith('{')) {
+    alert(`Erro no Sistema: ${errorMessage}`);
+  }
+  
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -847,6 +858,7 @@ export default function App() {
         console.log('Nenhum usuário detectado. Iniciando sessão automática...');
         signInAnonymously(auth).catch((error) => {
           console.error('Erro ao iniciar sessão anônima:', error);
+          alert("Erro Crítico de Conexão: Não foi possível autenticar sua sessão. Verifique sua conexão com a internet ou se o site está bloqueado na rede.");
           setIsAuthLoading(false);
         });
       }
@@ -1376,6 +1388,9 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
 
     setIsSaving(true);
     try {
+      if (!user) {
+        throw new Error("Sistema em inicialização. Por favor, aguarde o selo de 'Sincronizado' e tente novamente em instantes.");
+      }
       const codigo = `${new Date().getFullYear()}-${String(reports.length + 1).padStart(3, '0')}`;
       const payload = {
         ...formData,
@@ -1409,7 +1424,9 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
       });
       setImages([]);
       setExtraFiles([]);
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error.message || String(error);
+      alert(msg.startsWith('{') ? "Erro técnico ao processar relato. Verifique sua conexão." : msg);
       handleFirestoreError(error, OperationType.CREATE, 'relprevReports');
     } finally {
       setIsSaving(false);
@@ -1770,8 +1787,10 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
 
   const hasImpediment = Object.values(p2Selections).some(v => v === 'NÃO');
 
-  const handleSave = async (force: boolean = false) => {
-    if (!force) {
+  const handleSave = async (forceParam: any = false) => {
+    const isForced = forceParam === true; // Garante que eventos React não ativem o force por engano
+    
+    if (!isForced) {
       const errors: string[] = [];
       
       // Validação Parte I
@@ -1872,7 +1891,9 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
       alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
       
       resetAll();
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error.message || String(error);
+      alert(msg.startsWith('{') ? "Falha técnica ao enviar FGR. Verifique a conexão." : msg);
       handleFirestoreError(error, OperationType.CREATE, 'fgrMissions');
     } finally {
       setIsSaving(false);
@@ -2485,7 +2506,9 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
         preenchidoPor: ""
       });
       setSelectedLaunchId('');
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err.message || String(err);
+      alert(msg.startsWith('{') ? "Erro ao salvar abortiva no servidor." : msg);
       console.error("Erro ao enviar abortiva:", err);
       handleFirestoreError(err, OperationType.CREATE, 'abortivas');
     } finally {
