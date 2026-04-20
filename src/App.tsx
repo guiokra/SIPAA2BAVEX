@@ -3764,6 +3764,55 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
 
             <div className="card-military p-6 text-left">
               <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
+                <FileText size={14} className="text-military-gold" />
+                Arquivos Processados
+              </h4>
+              <div className="space-y-3">
+                {(() => {
+                  const batches = Object.values(launches.reduce((acc: any, curr: any) => {
+                    if (!curr.batchId) return acc;
+                    if (!acc[curr.batchId]) {
+                      acc[curr.batchId] = {
+                        id: curr.batchId,
+                        name: curr.batchName || 'Sem Nome',
+                        count: 0,
+                        date: curr.createdAt || new Date().toISOString()
+                      };
+                    }
+                    acc[curr.batchId].count++;
+                    return acc;
+                  }, {}));
+
+                  return batches.length === 0 ? (
+                    <p className="text-[10px] text-slate-500 italic uppercase">Nenhum arquivo processado.</p>
+                  ) : (
+                    batches.sort((a: any, b: any) => b.date.localeCompare(a.date)).map((b: any) => (
+                      <div key={b.id} className="flex items-center justify-between p-3 bg-military-black/30 border border-white/5 rounded hover:border-red-500/30 transition-all group">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <FileSearch size={16} className="text-military-gold shrink-0" />
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[10px] text-white font-bold truncate uppercase">{b.name}</span>
+                            <span className="text-[8px] text-slate-500 uppercase">
+                              {b.count} lançamentos • {new Date(b.date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setBatchDeleteTarget({ id: b.id, name: b.name, count: b.count })}
+                          className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
+                          title="Excluir Lote"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="card-military p-6 text-left">
+              <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
                 <History size={14} className="text-military-gold" />
                 Lançamentos Disponíveis ({launches.length})
               </h4>
