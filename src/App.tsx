@@ -2417,15 +2417,38 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
     
     setIsSaving(true);
     try {
+      // 1. Gerar o PDF antecipadamente para upload
+      const docPdf = generateAbortivaPDF({
+        ...formData,
+        createdAt: new Date().toISOString()
+      });
+      const pdfBlob = docPdf.output('blob');
+      
+      // 2. Upload para o Storage (para que o "arquivo chegue" no admin)
+      const fileName = `abortiva_${formData.numLancamento}_${Date.now()}.pdf`;
+      const storageRef = ref(storage, `abortivas/${fileName}`);
+      let pdfUrl = '';
+      
+      try {
+        const snapshot = await uploadBytes(storageRef, pdfBlob);
+        pdfUrl = await getDownloadURL(snapshot.ref);
+      } catch (storageErr) {
+        console.error("Erro ao salvar PDF no Storage:", storageErr);
+        // Continuamos mesmo se o storage falhar, mas avisamos
+      }
+
+      // 3. Salvar no Firestore
       const reportData = {
         ...formData,
         uid: user?.uid || 'anon',
+        pdfUrl: pdfUrl || null,
+        fileName: fileName,
         createdAt: new Date().toISOString()
       };
 
       await addDoc(collection(db, 'abortivas'), reportData);
       
-      alert("Relato de abortiva enviado com sucesso!");
+      alert("Relato de abortiva enviado com sucesso! O arquivo PDF foi gerado e enviado ao SIPAA.");
       setFormData({
         dataVoo: new Date().toISOString().split('T')[0],
         numLancamento: "",
@@ -3491,13 +3514,27 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                        <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
                           <button 
                             onClick={() => {
-                              const doc = generateAbortivaPDF(a);
-                              window.open(doc.output('bloburl'), '_blank');
+                              if (a.pdfUrl) {
+                                window.open(a.pdfUrl, '_blank');
+                              } else {
+                                const doc = generateAbortivaPDF(a);
+                                window.open(doc.output('bloburl'), '_blank');
+                              }
                             }}
                             className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
                           >
                             <FileText size={14} />
                             <span className="text-[10px] uppercase font-black">Ver PDF</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const doc = generateAbortivaPDF(a);
+                              doc.save(`Abortiva_${a.numLancamento || 'Lanç'}.pdf`);
+                            }}
+                            className="text-slate-400 hover:text-white p-1"
+                            title="Baixar PDF Original"
+                          >
+                            <Download size={14} />
                           </button>
                           <button onClick={() => confirmDelete('abortivas', a.id)} className="text-red-400 hover:text-red-300 p-1">
                             <Trash2 size={14} />
@@ -3529,12 +3566,25 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                  <div className="flex items-center gap-2 pt-3 border-t border-white/5">
                    <button 
                      onClick={() => {
-                       const doc = generateAbortivaPDF(a);
-                       window.open(doc.output('bloburl'), '_blank');
+                       if (a.pdfUrl) {
+                         window.open(a.pdfUrl, '_blank');
+                       } else {
+                         const doc = generateAbortivaPDF(a);
+                         window.open(doc.output('bloburl'), '_blank');
+                       }
                      }}
                       className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
                     >
-                      <FileText size={14} /> PDF
+                      <FileText size={14} /> VER
+                    </button>
+                    <button 
+                     onClick={() => {
+                       const doc = generateAbortivaPDF(a);
+                       doc.save(`Abortiva_${a.numLancamento}.pdf`);
+                     }}
+                      className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-white/5 text-slate-300 text-[10px] font-black uppercase tracking-wider border border-white/10"
+                    >
+                      <Download size={14} /> BAIXAR
                     </button>
                     <button 
                      onClick={() => confirmDelete('abortivas', a.id)} 
@@ -3684,12 +3734,17 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                     </div>
                     <button 
                       onClick={() => {
-                        const doc = generateAbortivaPDF(a);
-                        window.open(doc.output('bloburl'), '_blank');
+                        if (a.pdfUrl) {
+                          window.open(a.pdfUrl, '_blank');
+                        } else {
+                          const doc = generateAbortivaPDF(a);
+                          doc.save(`Abortiva_${a.numLancamento}.pdf`);
+                        }
                       }}
                       className="p-1.5 text-military-gold hover:text-white transition-colors"
+                      title={a.pdfUrl ? "Abrir PDF Oficial" : "Gerar e Baixar PDF"}
                     >
-                      <Download size={14} />
+                      {a.pdfUrl ? <ExternalLink size={14} /> : <Download size={14} />}
                     </button>
                   </div>
                 ))}
