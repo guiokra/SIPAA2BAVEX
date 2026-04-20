@@ -3194,12 +3194,6 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   const handleDelete = async () => {
     if (!deleteId || !deleteColl) return;
     
-    if (!auth.currentUser) {
-      alert('Sessão expirada. A página será recarregada.');
-      window.location.reload();
-      return;
-    }
-
     try {
       await deleteDoc(doc(db, deleteColl, deleteId));
       setDeleteId(null);
@@ -3207,6 +3201,26 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
     } catch (error) {
       console.error('Erro ao excluir:', error);
       alert('Erro ao excluir registro. Verifique a conexão.');
+    }
+  };
+
+  const handleDeleteAllAbortivas = async () => {
+    if (abortivas.length === 0) return;
+    if (!window.confirm(`ATENÇÃO: Você está prestes a apagar permanentEMENTE ${abortivas.length} registros de abortivas. Confirmar?`)) return;
+
+    setDbStatus('CONNECTING');
+    try {
+      const batch = writeBatch(db);
+      abortivas.forEach(a => {
+        batch.delete(doc(db, 'abortivas', a.id));
+      });
+      await batch.commit();
+      alert('Todas as abortivas foram excluídas com sucesso.');
+    } catch (error: any) {
+      console.error('Erro ao excluir todas as abortivas:', error);
+      alert('Erro ao excluir: ' + (error.message || 'Erro de conexão'));
+    } finally {
+      setDbStatus('CONNECTED');
     }
   };
 
@@ -3233,13 +3247,6 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
     setIsUploading(true);
     
     try {
-      if (!auth.currentUser) {
-        setIsUploading(false);
-        alert('Sessão expirada. A página será recarregada.');
-        window.location.reload();
-        return;
-      }
-
       // 1. Upload to Storage
       const path = `config/abastecimento/guia_${Date.now()}_${fileToUpload.name.replace(/\D/g, '')}.pdf`;
       console.log('--- INICIANDO PROCESSO DE UPLOAD ---');
@@ -3653,6 +3660,19 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
 
        {selectedView === 'abortivas' && (
          <div className="space-y-4">
+           {/* Header with Clear All Button */}
+           <div className="flex justify-between items-center mb-2 px-2">
+             <h3 className="text-xs font-black text-white uppercase tracking-widest">Acervo de Abortivas</h3>
+             {abortivas.length > 0 && (
+               <button 
+                 onClick={handleDeleteAllAbortivas}
+                 className="flex items-center gap-2 px-3 py-1.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-black uppercase tracking-tighter hover:bg-red-500 hover:text-white transition-all"
+               >
+                 <Trash2 size={12} /> Limpar Acervo ({abortivas.length})
+               </button>
+             )}
+           </div>
+
            {/* Desktop Table - Only on large screens */}
            <div className="hidden xl:block card-military overflow-hidden">
              <div className="overflow-x-auto no-scrollbar">
