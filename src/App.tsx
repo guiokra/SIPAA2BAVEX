@@ -713,7 +713,19 @@ async function extractTextFromPdf(file: File) {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    fullText += content.items.map((item: any) => item.str).join(" ") + "\n";
+    const items = [...content.items] as any[];
+    
+    // Sort items by Y descending, then X ascending
+    items.sort((a, b) => {
+      const yA = a.transform[5];
+      const yB = b.transform[5];
+      const xA = a.transform[4];
+      const xB = b.transform[4];
+      if (Math.abs(yA - yB) > 5) return yB - yA;
+      return xA - xB;
+    });
+
+    fullText += items.map((item: any) => item.str).join(" ") + "\n";
   }
   return fullText;
 }
