@@ -47,7 +47,8 @@ import {
   Upload,
   Clock,
   ExternalLink,
-  Unlock
+  Unlock,
+  Edit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, storage } from './firebase';
@@ -78,7 +79,8 @@ import {
   getDoc,
   limit,
   getDocs,
-  writeBatch
+  writeBatch,
+  updateDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import jsPDF from 'jspdf';
@@ -757,8 +759,20 @@ function parsePDV(text: string) {
       }
 
       let mvStr = "---";
+      let missaoStr = "---";
       if (adDestIdx > 5) {
-        mvStr = parts.slice(5, adDestIdx).join(" ");
+        const mvSection = parts.slice(5, adDestIdx);
+        if (mvSection.length > 1) {
+          // Se tiver mais de um termo, assumimos o último como Missão (ex: TREINAMENTO)
+          // e os anteriores como o MV (ex: SGT SILVA)
+          missaoStr = mvSection[mvSection.length - 1];
+          mvStr = mvSection.slice(0, -1).join(" ");
+        } else {
+          // Se tiver apenas um termo, é difícil saber se é MV ou Missão.
+          // Pela lógica do user, Missão é obrigatório, então vamos assumir como Missão.
+          missaoStr = mvSection[0];
+          mvStr = "---";
+        }
       }
 
       const dest = adDestIdx !== -1 ? parts[adDestIdx] : "---";
@@ -771,7 +785,7 @@ function parsePDV(text: string) {
         }
       }
 
-      launches.push({ num, anv, p1, p2, mv: mvStr, dest, eobt });
+      launches.push({ num, anv, p1, p2, mv: mvStr, missao: missaoStr, dest, eobt });
     }
 
     if (launches.length > 0) {
@@ -820,7 +834,8 @@ export default function App() {
     numLancamento: "",
     modeloAnv: "",
     motivo: "", // Will be filled with DCM on selection
-    preenchidoPor: ""
+    preenchidoPor: "",
+    tripulacao: ""
   });
 
   useEffect(() => {
@@ -1627,6 +1642,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
     modeloAnv: "",
     aeronave: "",
     missao: "",
+    mv: "",
     local: "",
     data: new Date().toISOString().split('T')[0],
     trigramaTrip: "",
@@ -1655,10 +1671,11 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         ...prev,
         modeloAnv: detectedModel || prev.modeloAnv,
         aeronave: anv,
-        data: launch.dateLabel ? launch.dateLabel.split('/').reverse().join('-') : '', // Conv DD/MM/AAAA to YYYY-MM-DD
+        data: launch.dateLabel ? (launch.dateLabel.includes('/') ? launch.dateLabel.split('/').reverse().join('-') : launch.dateLabel) : '', 
         local: launch.dest || '',
-        trigramaTrip: `${launch.p1 || ''}/${launch.p2 || ''}/${launch.mv === '---' ? '' : (launch.mv || '')}`.replace(/\/$/, ''),
-        missao: `LÇ ${launch.num || ''} PDV ${launch.eobt || ''}`.trim(),
+        trigramaTrip: `${launch.p1 || ''}/${launch.p2 || ''}/${launch.mv !== '---' ? launch.mv : ''}`.replace(/\/+$/, '').split('/').filter(Boolean).join('/'),
+        mv: launch.missao || '', // Using the new missao field for the description
+        missao: `LÇ ${launch.num || ''}`.trim(),
         preenchidoPor: launch.p2 || '',
         funcao: 'PB'
       }));
@@ -1712,6 +1729,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
       modeloAnv: "",
       aeronave: "",
       missao: "",
+      mv: "",
       local: "",
       data: new Date().toISOString().split('T')[0],
       trigramaTrip: "",
@@ -1931,7 +1949,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
                   <optgroup key={date} label={`DATA: ${date}`}>
                     {items.sort((a: any, b: any) => a.num.localeCompare(b.num)).map((l: any) => (
                       <option key={l.id} value={l.id}>
-                        {`${l.num} • ${l.anv} • ${l.p1}`}
+                        {`${l.num} • ${l.anv} • ${l.p1}${l.mv && l.mv !== '---' ? ` • ${l.mv}` : ''}`}
                       </option>
                     ))}
                   </optgroup>
@@ -2007,17 +2025,29 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
                 />
               </div>
 
-              {/* Missão and Local */}
               <div className="space-y-3">
                 <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
-                  Missão (Lç PDV e/ou OMA/OM) <span className="text-red-500 ml-1">*</span>
+                  Número Lançamento (Lç PDV) <span className="text-red-500 ml-1">*</span>
                 </label>
                 <input 
                   type="text" 
                   className="input-military w-full"
                   value={missionData.missao}
                   onChange={(e) => { setMissionData({...missionData, missao: e.target.value}); updateStamp(); }}
-                  placeholder="Descrição da missão" 
+                  placeholder="Número do lançamento" 
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
+                  Missão / Voo
+                </label>
+                <input 
+                  type="text" 
+                  className="input-military w-full"
+                  value={missionData.mv}
+                  onChange={(e) => { setMissionData({...missionData, mv: e.target.value}); updateStamp(); }}
+                  placeholder="Ex: TREINAMENTO" 
                 />
               </div>
 
@@ -2049,7 +2079,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
 
               <div className="space-y-3">
                 <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
-                  Trigramas da Tripulação (Anv Líder) <span className="text-red-500 ml-1">*</span>
+                  Tripulação (1P / 2P / MV) <span className="text-red-500 ml-1">*</span>
                 </label>
                 <input 
                   type="text" 
@@ -2429,6 +2459,8 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
     dataVoo: new Date().toISOString().split('T')[0],
     numLancamento: "",
     modeloAnv: "",
+    mv: "",
+    destino: "",
     motivo: "",
     preenchidoPor: ""
   });
@@ -2453,6 +2485,9 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
         dataVoo: launch.dateLabel ? launch.dateLabel.split('/').reverse().join('-') : '',
         numLancamento: launch.num || '',
         modeloAnv: detectedModel || prev.modeloAnv,
+        mv: launch.missao || '', // Using launch.missao for mission description
+        destino: launch.dest || '',
+        tripulacao: `${launch.p1 || ''}/${launch.p2 || ''}/${launch.mv !== '---' ? launch.mv : ''}`.replace(/\/+$/, '').split('/').filter(Boolean).join('/'),
         motivo: 'DCM', // Default per request
         preenchidoPor: launch.p1 || ''
       }));
@@ -2493,6 +2528,8 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
         dataVoo: new Date().toISOString().split('T')[0],
         numLancamento: "",
         modeloAnv: "",
+        mv: "",
+        destino: "",
         motivo: "",
         preenchidoPor: ""
       });
@@ -2622,6 +2659,42 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Missão / Voo</label>
+              <input 
+                type="text" 
+                className="input-military w-full px-4 py-3"
+                value={formData.mv}
+                onChange={e => setFormData({...formData, mv: e.target.value})}
+                placeholder="Ex: TREINAMENTO"
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Tripulação (1P / 2P / MV)</label>
+              <input 
+                type="text" 
+                className="input-military w-full px-4 py-3"
+                value={formData.tripulacao || ''}
+                onChange={e => setFormData({...formData, tripulacao: e.target.value})}
+                placeholder="Ex: ABC/DEF/GHI"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Destino</label>
+              <input 
+                type="text" 
+                className="input-military w-full px-4 py-3"
+                value={formData.destino}
+                onChange={e => setFormData({...formData, destino: e.target.value})}
+                placeholder="Ex: SBTA"
+              />
+            </div>
+          </div>
+
           <div className="space-y-3">
             <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Motivo *</label>
             <div className="flex flex-col gap-3">
@@ -2666,7 +2739,7 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
              </button>
              <button 
                onClick={() => {
-                 setFormData({ dataVoo: new Date().toISOString().split('T')[0], numLancamento: "", modeloAnv: "", motivo: "", preenchidoPor: "" });
+                 setFormData({ dataVoo: new Date().toISOString().split('T')[0], numLancamento: "", modeloAnv: "", motivo: "", preenchidoPor: "", tripulacao: "" });
                  setSelectedLaunchId('');
                }}
                className="px-6 border border-border-theme text-text-secondary text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-colors"
@@ -3081,6 +3154,21 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
   const [batchDeleteTarget, setBatchDeleteTarget] = useState<{id: string, name: string, count: number} | null>(null);
   const [dbStatus, setDbStatus] = useState<'IDLE' | 'CONNECTING' | 'CONNECTED' | 'ERROR'>('IDLE');
   const [lastError, setLastError] = useState<string | null>(null);
+  const [editingLaunch, setEditingLaunch] = useState<any | null>(null);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualDate, setManualDate] = useState("");
+
+  const handleDateMask = (val: string) => {
+    let clean = val.replace(/\D/g, "");
+    if (clean.length > 8) clean = clean.slice(0, 8);
+    
+    let result = "";
+    if (clean.length > 0) result += clean.slice(0, 2);
+    if (clean.length > 2) result += "/" + clean.slice(2, 4);
+    if (clean.length > 4) result += "/" + clean.slice(4, 8);
+    
+    setManualDate(result);
+  };
 
   const fetchManual = async () => {
     setDbStatus('CONNECTING');
@@ -3184,6 +3272,45 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
     } catch (error) {
       console.error('Erro ao excluir:', error);
       alert('Erro ao excluir registro. Verifique a conexão.');
+    }
+  };
+
+  const handleSaveManualLaunch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
+    
+    const data = {
+      num: formData.get('num') as string,
+      anv: formData.get('anv') as string,
+      p1: formData.get('p1') as string,
+      p2: formData.get('p2') as string,
+      mv: formData.get('mv') as string,
+      missao: formData.get('missao') as string,
+      dest: formData.get('dest') as string,
+      eobt: formData.get('eobt') as string,
+      dateLabel: formData.get('dateLabel') as string,
+      createdAt: editingLaunch?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      manual: true
+    };
+
+    try {
+      if (editingLaunch) {
+        await updateDoc(doc(db, 'Lancamentos', editingLaunch.id), data);
+        alert('Lançamento atualizado com sucesso.');
+      } else {
+        await addDoc(collection(db, 'Lancamentos'), {
+          ...data,
+          batchId: 'MANUAL',
+          batchName: 'Lançamentos Manuais'
+        });
+        alert('Lançamento manual criado com sucesso.');
+      }
+      setIsManualModalOpen(false);
+      setEditingLaunch(null);
+    } catch (err: any) {
+      alert('Erro ao salvar lançamento: ' + err.message);
     }
   };
 
@@ -3987,6 +4114,18 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                     {isUploading ? <Loader2 size={16} className="text-military-gold animate-spin" /> : <Plus size={16} className="text-military-gold" />}
                     <span className={isUploading ? "animate-pulse" : ""}>{isUploading ? "PROCESSANDO..." : "CARREGAR PDV (PDF)"}</span>
                   </label>
+
+                  <button 
+                    onClick={() => {
+                      setEditingLaunch(null);
+                      setManualDate("");
+                      setIsManualModalOpen(true);
+                    }}
+                    className="btn-military py-3 px-8 text-[10px] inline-flex items-center gap-3 transition-all hover:scale-105 active:scale-95"
+                  >
+                    <Plus size={16} className="text-military-black" />
+                    <span className="font-black text-military-black">LANÇAMENTO MANUAL</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -4086,11 +4225,22 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
                                   <span className="text-[10px] text-white font-bold whitespace-nowrap">{l.anv}</span>
                                   <span className="text-[10px] text-slate-400 truncate uppercase tracking-tighter">
-                                    {l.p1} {l.dest && `→ ${l.dest}`}
+                                    {l.p1} {l.dest && `→ ${l.dest}`} {l.mv && l.mv !== '---' && ` • MV: ${l.mv}`}
                                   </span>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
+                                <button 
+                                  onClick={() => {
+                                    setEditingLaunch(l);
+                                    setManualDate(l.dateLabel || "");
+                                    setIsManualModalOpen(true);
+                                  }}
+                                  className="p-1.5 text-slate-600 hover:text-military-gold transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit size={12} />
+                                </button>
                                 <button 
                                   onClick={() => {
                                     if (window.confirm('Excluir este lançamento?')) {
@@ -4279,6 +4429,159 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                 </div>
               </motion.div>
             </div>
+         )}
+       </AnimatePresence>
+
+       {/* Manual Flight Modal */}
+       <AnimatePresence>
+         {isManualModalOpen && (
+           <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md">
+             <motion.div 
+               initial={{ opacity: 0, scale: 0.95, y: 20 }}
+               animate={{ opacity: 1, scale: 1, y: 0 }}
+               exit={{ opacity: 0, scale: 0.95, y: 20 }}
+               className="card-military max-w-lg w-full p-8 space-y-6 overflow-y-auto max-h-[90vh]"
+             >
+               <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                 <div className="flex items-center gap-3">
+                   <div className="w-10 h-10 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold">
+                     {editingLaunch ? <Edit size={20} /> : <Plus size={20} />}
+                   </div>
+                   <h3 className="text-xl font-black text-white uppercase tracking-tighter">
+                     {editingLaunch ? 'Editar Lançamento' : 'Novo Lançamento Manual'}
+                   </h3>
+                 </div>
+                 <button 
+                   onClick={() => {
+                     setIsManualModalOpen(false);
+                     setEditingLaunch(null);
+                   }} 
+                   className="text-slate-500 hover:text-white p-2"
+                 >
+                   <X size={20} />
+                 </button>
+               </div>
+
+               <form onSubmit={handleSaveManualLaunch} className="grid grid-cols-2 gap-4">
+                 <div className="col-span-2 space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Data (DD/MM/AAAA)</label>
+                   <input 
+                     name="dateLabel"
+                     required
+                     placeholder="Ex: 21/04/2026"
+                     value={manualDate}
+                     onChange={(e) => handleDateMask(e.target.value)}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+                 <div className="space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Número Lançamento</label>
+                   <input 
+                     name="num" 
+                     required
+                     placeholder="Ex: 45"
+                     defaultValue={editingLaunch?.num || ''}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+                 <div className="space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Aeronave (Prefixo)</label>
+                   <input 
+                     name="anv" 
+                     required
+                     placeholder="Ex: HM-1A 4022"
+                     defaultValue={editingLaunch?.anv || ''}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+                 <div className="space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">1P</label>
+                   <input 
+                     name="p1" 
+                     required
+                     placeholder="Posto Nome"
+                     defaultValue={editingLaunch?.p1 || ''}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+                 <div className="space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">2P</label>
+                   <input 
+                     name="p2" 
+                     required
+                     placeholder="Posto Nome"
+                     defaultValue={editingLaunch?.p2 || ''}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+                 <div className="col-span-2 space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">MV (Mecânicos de Voo)</label>
+                   <input 
+                     name="mv" 
+                     placeholder="Ex: SGT NOME / SGT NOME"
+                     defaultValue={editingLaunch?.mv || '---'}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+                 <div className="col-span-2 space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Missão</label>
+                   <input 
+                     name="missao" 
+                     placeholder="Ex: TREINAMENTO / TRANSPORTE"
+                     defaultValue={editingLaunch?.missao || '---'}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+                 <div className="space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Destino</label>
+                   <input 
+                     name="dest" 
+                     placeholder="Ex: SBTA"
+                     defaultValue={editingLaunch?.dest || '---'}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+                 <div className="space-y-1.5">
+                   <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">EOBT (Hora Saída)</label>
+                   <input 
+                     name="eobt" 
+                     placeholder="Ex: 09H30"
+                     defaultValue={editingLaunch?.eobt || '---'}
+                     className="input-military w-full h-11"
+                   />
+                 </div>
+
+
+                 <div className="col-span-2 pt-6 flex gap-3">
+                   <button 
+                     type="button"
+                     onClick={() => {
+                       setIsManualModalOpen(false);
+                       setEditingLaunch(null);
+                     }}
+                     className="flex-1 py-4 rounded bg-slate-800 text-white font-black text-[10px] uppercase hover:bg-slate-700 transition-colors border border-white/5"
+                   >
+                     Cancelar
+                   </button>
+                   <button 
+                     type="submit"
+                     className="flex-2 py-4 rounded bg-military-gold text-military-black font-black text-[10px] uppercase hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-military-gold/20 flex items-center justify-center gap-2"
+                   >
+                     <Save size={16} />
+                     {editingLaunch ? 'SALVAR ALTERAÇÕES' : 'CRIAR LANÇAMENTO'}
+                   </button>
+                 </div>
+               </form>
+             </motion.div>
+           </div>
          )}
        </AnimatePresence>
     </div>
