@@ -1429,20 +1429,20 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="bg-white rounded-lg shadow-2xl overflow-hidden text-slate-800 border border-slate-200">
-        <div className="p-10 text-center border-b border-slate-100">
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-1">Relato de Prevenção</h2>
-          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Batalhão Guerreiro</p>
+    <div className="max-w-3xl mx-auto space-y-6 pb-20">
+      <div className="card-military overflow-hidden">
+        <div className="p-10 text-center border-b border-white/5 bg-white/2">
+          <h2 className="text-3xl font-black text-white tracking-tight mb-1 uppercase">Relato de Prevenção</h2>
+          <p className="text-accent-gold font-bold uppercase tracking-widest text-xs">BATALHÃO GUERREIRO — SIPAA</p>
         </div>
 
         <div className="p-8 md:p-12 space-y-10">
           {/* Local */}
           <div className="space-y-2">
-            <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Local: <span className="text-red-500">*</span></label>
+            <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Local: <span className="text-red-500">*</span></label>
             <input 
               type="text"
-              className="w-full px-5 py-4 rounded border-2 border-slate-100 focus:border-military-gold outline-none transition-all text-sm font-medium bg-slate-50/50"
+              className="input-military w-full"
               value={formData.local}
               onChange={e => setFormData({...formData, local: e.target.value})}
             />
@@ -1451,29 +1451,29 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
           {/* Data e Hora */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Data e Horário do Fato <span className="text-red-500">*</span></label>
+              <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Data e Horário do Fato <span className="text-red-500">*</span></label>
               <div className="flex gap-4">
                 <input 
                   type="date"
-                  className="flex-1 px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 outline-none text-sm font-medium"
+                  className="input-military flex-1"
                   value={formData.dataFato}
                   onChange={e => setFormData({...formData, dataFato: e.target.value})}
                 />
                 <input 
                   type="time"
-                  className="w-32 px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 outline-none text-sm font-medium"
+                  className="input-military w-32"
                   value={formData.horaFato}
                   onChange={e => setFormData({...formData, horaFato: e.target.value})}
                 />
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Hora Minutos</p>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter pl-1">Hora Minutos</p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Pessoal envolvido e/ou aeronave <span className="text-red-500">*</span></label>
+              <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Pessoal envolvido e/ou aeronave <span className="text-red-500">*</span></label>
               <input 
                 type="text"
-                className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 outline-none text-sm font-medium"
+                className="input-military w-full"
                 value={formData.envolvidos}
                 onChange={e => setFormData({...formData, envolvidos: e.target.value})}
               />
@@ -1482,10 +1482,10 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
 
           {/* Situação */}
           <div className="space-y-2">
-            <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Situação: <span className="text-red-500">*</span></label>
+            <label className="text-[10px] font-black text-military-gold uppercase tracking-widest pl-1">Situação: <span className="text-red-500">*</span></label>
             <textarea 
-              className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 h-48 outline-none text-sm font-medium resize-none leading-relaxed"
-              placeholder="Digite aqui..."
+              className="input-military w-full h-48 resize-none leading-relaxed"
+              placeholder="Descreva detalhadamente o fato observado..."
               value={formData.situacao}
               onChange={e => setFormData({...formData, situacao: e.target.value})}
             />
@@ -1495,25 +1495,25 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
           <div className="space-y-4">
             <label className="block w-full cursor-pointer group">
               <input type="file" className="hidden" accept="image/*" multiple onChange={e => handleFileChange(e, 'image')} />
-              <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 flex flex-col items-center justify-center bg-slate-50/50 group-hover:bg-slate-100/80 transition-all gap-4">
-                <div className="w-16 h-16 rounded-full bg-white shadow-md flex items-center justify-center text-slate-400 group-hover:text-military-gold transition-colors">
+              <div className="border-2 border-dashed border-white/10 rounded-xl p-12 flex flex-col items-center justify-center bg-white/2 group-hover:bg-white/5 group-hover:border-military-gold/30 transition-all gap-4">
+                <div className="w-16 h-16 rounded-full bg-bg-deep shadow-lg border border-white/5 flex items-center justify-center text-military-gold group-hover:scale-110 transition-transform">
                   <FileSearch size={28} />
                 </div>
                 <div className="text-center">
-                  <span className="block font-black text-slate-700 text-sm uppercase tracking-widest mb-1">Selecionar Imagem</span>
-                  <span className="text-[11px] text-slate-400 font-medium">Drag and drop your image here</span>
+                  <span className="block font-black text-white text-sm uppercase tracking-widest mb-1">Selecionar Imagem</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Arraste ou clique para anexar fotos</span>
                 </div>
               </div>
             </label>
             
             {images.length > 0 && (
-              <div className="flex gap-4 overflow-x-auto pb-4 pt-2 px-2 scroll-mt-4">
+              <div className="flex gap-4 overflow-x-auto pb-4 pt-2 px-2 custom-scrollbar">
                 {images.map((img, i) => (
                   <div key={i} className="relative shrink-0 group">
-                    <img src={img} className="w-24 h-24 object-cover rounded-lg border-2 border-slate-100 shadow-sm" alt="Preview" />
+                    <img src={img} className="w-24 h-24 object-cover rounded-lg border border-white/10 shadow-lg" alt="Preview" />
                     <button 
                       onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-500 transition-colors"
                     >
                       <X size={12} />
                     </button>
@@ -1525,65 +1525,65 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
 
           {/* File Upload Area */}
           <div className="space-y-4">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-tighter">Caso precise anexar mais fotos ou arquivos, utilize o espaço abaixo</p>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter text-center">Caso precise anexar mais fotos ou arquivos, utilize o espaço abaixo</p>
             <label className="block w-full cursor-pointer group">
               <input type="file" className="hidden" multiple onChange={e => handleFileChange(e, 'file')} />
-              <div className="border-2 border-dashed border-slate-200 rounded-xl p-10 flex flex-col items-center justify-center bg-slate-50/50 group-hover:bg-slate-100/80 transition-all gap-3 text-center">
-                <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-military-gold transition-colors">
+              <div className="border-2 border-dashed border-white/10 rounded-xl p-10 flex flex-col items-center justify-center bg-white/2 group-hover:bg-white/5 group-hover:border-military-gold/30 transition-all gap-3 text-center">
+                <div className="w-12 h-12 rounded-full bg-bg-deep shadow-md border border-white/5 flex items-center justify-center text-military-gold group-hover:scale-110 transition-transform">
                   <Download size={22} />
                 </div>
                 <div>
-                  <span className="block font-black text-slate-700 text-sm uppercase tracking-widest mb-1">Pesquisar Arquivos</span>
-                  <span className="text-[11px] text-slate-400 font-medium">Arraste e solte seus arquivos aqui</span>
+                  <span className="block font-black text-white text-sm uppercase tracking-widest mb-1">Anexar Documentos</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">PDFs, Docs ou Imagens adicionais</span>
                 </div>
               </div>
             </label>
             {extraFiles.length > 0 && (
-              <div className="text-[11px] text-slate-500 font-bold bg-slate-50 p-3 rounded border border-slate-100 flex items-center gap-2">
-                <CheckSquare size={14} className="text-green-500" />
+              <div className="text-[10px] text-green-500 font-black uppercase bg-green-500/10 p-3 rounded border border-green-500/20 flex items-center gap-2 tracking-widest italic">
+                <CheckSquare size={14} className="animate-pulse" />
                 {extraFiles.length} arquivos adicionais anexados para análise.
               </div>
             )}
           </div>
 
           {/* Relator */}
-          <div className="space-y-4 pt-4">
-            <label className="text-xs font-black text-slate-700 uppercase tracking-widest block">Identificação do Relator (opcional)</label>
+          <div className="space-y-4 pt-4 border-t border-white/5">
+            <label className="text-[10px] font-black text-military-gold uppercase tracking-widest block pl-1">Identificação do Relator (opcional)</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
                 <input 
                   type="text"
-                  placeholder="Posto / Graduação"
-                  className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 text-sm font-medium outline-none focus:border-slate-300"
+                  placeholder="Ex: MAJ GUERREIRO"
+                  className="input-military w-full"
                   value={formData.relatorPosto}
                   onChange={e => setFormData({...formData, relatorPosto: e.target.value})}
                 />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter px-1">Posto / Graduação</span>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter px-1">Posto / Graduação</span>
               </div>
               <div className="space-y-2">
                 <input 
                   type="text"
-                  placeholder="Nome de Guerra"
-                  className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 text-sm font-medium outline-none focus:border-slate-300"
+                  placeholder="Ex: SILVA"
+                  className="input-military w-full"
                   value={formData.relatorNome}
                   onChange={e => setFormData({...formData, relatorNome: e.target.value})}
                 />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter px-1">Nome de Guerra</span>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter px-1">Nome de Guerra</span>
               </div>
             </div>
           </div>
 
           {/* Email */}
           <div className="space-y-2 pt-2">
-            <label className="text-xs font-black text-slate-700 uppercase tracking-widest block">E-mail para retorno (opcional)</label>
+            <label className="text-[10px] font-black text-military-gold uppercase tracking-widest block pl-1">E-mail para retorno (opcional)</label>
             <input 
               type="email"
-              placeholder="exemplo@exemplo.com"
-              className="w-full px-5 py-4 rounded border-2 border-slate-100 bg-slate-50/50 text-sm font-medium outline-none focus:border-slate-300"
+              placeholder="exemplo@exercito.mil.br"
+              className="input-military w-full"
               value={formData.email}
               onChange={e => setFormData({...formData, email: e.target.value})}
             />
-            <p className="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-tighter italic">exemplo@exemplo.com</p>
+            <p className="text-[9px] font-bold text-slate-500 px-1 uppercase tracking-tighter italic">Para recebimento de feedback sobre a prevenção</p>
           </div>
 
           {/* Buttons */}
@@ -1591,19 +1591,19 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
             <button 
               onClick={() => handleSubmit(true)}
               disabled={isSaving}
-              className="flex-1 py-5 border-2 border-slate-200 rounded-lg text-slate-600 font-black uppercase text-xs tracking-[0.2em] hover:bg-slate-50 hover:border-slate-300 transition-all"
+              className="flex-1 py-5 border border-white/10 rounded font-black uppercase text-[10px] tracking-[0.2em] text-slate-400 hover:bg-white/5 hover:text-white transition-all disabled:opacity-30"
             >
               Salvar Rascunho
             </button>
             <button 
               onClick={() => handleSubmit(false)}
               disabled={isSaving}
-              className="flex-1 py-5 bg-[#5eb968] hover:bg-[#4ea858] text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] transition-all shadow-xl shadow-green-500/10 flex items-center justify-center gap-3 disabled:opacity-50"
+              className="flex-1 py-5 bg-military-gold text-bg-deep rounded font-black uppercase text-[10px] tracking-[0.2em] transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
             >
               {isSaving ? <Loader2 className="animate-spin" size={18} /> : (
                 <>
-                  <FileSearch size={18} />
-                  Enviar Relato
+                  <Send size={18} />
+                  Enviar Relato Oficial
                 </>
               )}
             </button>
@@ -1611,7 +1611,7 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
         </div>
       </div>
 
-      <div className="text-center text-[10px] text-text-secondary font-bold uppercase tracking-widest opacity-40 py-8">
+      <div className="text-center text-[9px] text-slate-600 font-bold uppercase tracking-[0.3em] opacity-60 py-8">
         Sistema de Investigação e Prevenção de Acidentes Aeronáuticos — SIPAA
       </div>
     </div>
