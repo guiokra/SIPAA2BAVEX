@@ -4062,32 +4062,50 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                         <span className="text-[9px] bg-white/5 px-1.5 py-0.5 rounded text-slate-500 ml-auto">{items.length} LANÇAMENTOS</span>
                       </div>
                       <div className="grid gap-1.5">
-                        {items.sort((a: any, b: any) => a.num.localeCompare(b.num)).map((l: any) => (
-                          <div key={l.id} className="flex items-center justify-between p-2.5 bg-white/2 border border-white/5 rounded hover:border-military-gold/20 transition-all group overflow-hidden">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <span className="text-[10px] font-black text-accent-gold whitespace-nowrap">LÇ {l.num}</span>
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
-                                <span className="text-[10px] text-white font-bold whitespace-nowrap">{l.anv}</span>
-                                <span className="text-[10px] text-slate-400 truncate uppercase tracking-tighter">
-                                  {l.p1} {l.dest && `→ ${l.dest}`}
-                                </span>
+                        {items.sort((a: any, b: any) => a.num.localeCompare(b.num)).map((l: any) => {
+                          const launchDateISO = l.dateLabel ? l.dateLabel.split('/').reverse().join('-') : '';
+                          const hasFgr = fgrs.some(f => f.data === launchDateISO && (f.missao?.includes(`LÇ ${l.num}`) || f.missao?.includes(`LANC ${l.num}`)));
+                          const hasAbortiva = abortivas.some(a => a.dataVoo === launchDateISO && a.numLancamento === l.num);
+
+                          return (
+                            <div key={l.id} className="flex items-center justify-between p-2.5 bg-white/2 border border-white/5 rounded hover:border-military-gold/20 transition-all group overflow-hidden">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {hasFgr && (
+                                    <span className="flex items-center gap-0.5 text-[8px] font-black bg-green-500/20 text-green-500 border border-green-500/30 px-1 py-0.5 rounded uppercase tracking-tighter">
+                                      FGR
+                                    </span>
+                                  )}
+                                  {hasAbortiva && (
+                                    <span className="flex items-center gap-0.5 text-[8px] font-black bg-green-500/20 text-green-500 border border-green-500/30 px-1 py-0.5 rounded uppercase tracking-tighter">
+                                      Abortiva
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-black text-accent-gold whitespace-nowrap">LÇ {l.num}</span>
+                                </div>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
+                                  <span className="text-[10px] text-white font-bold whitespace-nowrap">{l.anv}</span>
+                                  <span className="text-[10px] text-slate-400 truncate uppercase tracking-tighter">
+                                    {l.p1} {l.dest && `→ ${l.dest}`}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button 
+                                  onClick={() => {
+                                    if (window.confirm('Excluir este lançamento?')) {
+                                      deleteDoc(doc(db, 'Lancamentos', l.id));
+                                    }
+                                  }} 
+                                  className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                               <button 
-                                onClick={() => {
-                                  if (window.confirm('Excluir este lançamento?')) {
-                                    deleteDoc(doc(db, 'Lancamentos', l.id));
-                                  }
-                                }} 
-                                className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
-                                title="Excluir"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))
