@@ -52,7 +52,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, storage } from './firebase';
-import { extractPDVData, PDVLaunch } from './services/geminiService';
 
 // Setup PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.mjs`;
@@ -4097,33 +4096,24 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                       setIsUploading(true);
                       try {
                         const text = await extractTextFromPdf(file);
-                        const rawLaunches = await extractPDVData(text);
-                        
+                        const days = parsePDV(text);
                         let count = 0;
                         const batchId = `PDV_${Date.now()}`;
-                        
-                        for (const l of rawLaunches) {
-                          const dateLabel = normalizePDVDate(l.Dia);
-                          await addDoc(collection(db, 'Lancamentos'), {
-                            num: l.Lç,
-                            anv: l.Anv,
-                            p1: l["1P"],
-                            p2: l["2P"],
-                            mv: l.MV,
-                            dest: l.AD_DEST,
-                            eobt: l.EOBT,
-                            missao: l.Missao,
-                            dateLabel,
-                            createdAt: new Date().toISOString(),
-                            batchId,
-                            batchName: file.name
-                          });
-                          count++;
+                        for (const day of days) {
+                          for (const launch of day.launches) {
+                            await addDoc(collection(db, 'Lancamentos'), {
+                              ...launch,
+                              dateLabel: day.dateLabel,
+                              createdAt: new Date().toISOString(),
+                              batchId,
+                              batchName: file.name
+                            });
+                            count++;
+                          }
                         }
-                        
-                        alert(`${count} lançamentos processados pela IA e salvos com sucesso.`);
+                        alert(`${count} lançamentos processados e salvos com sucesso.`);
                       } catch (err: any) {
-                        alert("Erro ao processar PDV com IA: " + err.message);
+                        alert("Erro ao processar PDV: " + err.message);
                       } finally {
                         setIsUploading(false);
                       }
@@ -4250,7 +4240,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
                                   <span className="text-[10px] text-white font-black whitespace-nowrap uppercase tracking-tighter">{l.anv}</span>
                                   <span className="text-[10px] text-slate-400 truncate uppercase tracking-tighter font-medium">
-                                    {l.p1} • {l.p2} • {l.mv} • {l.dest} • {l.missao}
+                                    {l.p1} - {l.p2} - {l.mv} - {l.dest} - {l.missao}
                                   </span>
                                 </div>
                               </div>
