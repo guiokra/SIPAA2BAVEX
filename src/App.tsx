@@ -766,11 +766,23 @@ function parsePDV(text: string) {
       let missaoStr = "---";
       const tbnIdx = parts.lastIndexOf("TBN");
       if (tbnIdx !== -1 && tbnIdx < parts.length - 1) {
-        // A missão pode ter espaços (ex: DVI / EMG 2)
-        missaoStr = parts.slice(tbnIdx + 1).join(" ").replace(/\s+\-\s*$/, "").trim();
+        // A missão pode ter espaços (ex: DVI / EMG 2). Paramos ao encontrar "(" (LEG) ou "-"
+        const missionParts = [];
+        for (let i = tbnIdx + 1; i < parts.length; i++) {
+          const p = parts[i];
+          if (p.includes('(') || p === '-') break;
+          missionParts.push(p);
+        }
+        missaoStr = missionParts.join(" ").trim();
       } else {
         // Fallback: se não achar TBN, tenta pegar o que sobrou após o EOBT ou DEST
-        missaoStr = parts.slice(adDestIdx + 1).filter(p => !/^\d{2}H\d{2}$/i.test(p) && !/^\d+$/.test(p)).join(" ");
+        const remaining = parts.slice(adDestIdx + 1).filter(p => !/^\d{2}H\d{2}$/i.test(p) && !/^\d+$/.test(p));
+        const missionParts = [];
+        for (const p of remaining) {
+          if (p.includes('(') || p === '-') break;
+          missionParts.push(p);
+        }
+        missaoStr = missionParts.join(" ").trim();
       }
 
       let eobt = "---";
