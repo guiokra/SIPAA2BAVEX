@@ -752,30 +752,26 @@ function parsePDV(text: string) {
 
       let adDestIdx = -1;
       for (let i = 5; i < parts.length; i++) {
+        // Matches exactly 4 uppercase letters (SBTA, SBSJ, etc)
         if (/^[A-Z]{4}$/.test(parts[i])) { 
           adDestIdx = i;
           break;
         }
       }
 
-      let mvStr = "---";
-      let missaoStr = "---";
-      if (adDestIdx > 5) {
-        const mvSection = parts.slice(5, adDestIdx);
-        if (mvSection.length > 1) {
-          // Se tiver mais de um termo, assumimos o último como Missão (ex: TREINAMENTO)
-          // e os anteriores como o MV (ex: SGT SILVA)
-          missaoStr = mvSection[mvSection.length - 1];
-          mvStr = mvSection.slice(0, -1).join(" ");
-        } else {
-          // Se tiver apenas um termo, é difícil saber se é MV ou Missão.
-          // Pela lógica do user, Missão é obrigatório, então vamos assumir como Missão.
-          missaoStr = mvSection[0];
-          mvStr = "---";
-        }
-      }
-
+      const mvStr = adDestIdx > 5 ? parts.slice(5, adDestIdx).join(" ") : "---";
       const dest = adDestIdx !== -1 ? parts[adDestIdx] : "---";
+
+      // Encontrar a Missão: Geralmente após o POB (TBN)
+      let missaoStr = "---";
+      const tbnIdx = parts.lastIndexOf("TBN");
+      if (tbnIdx !== -1 && tbnIdx < parts.length - 1) {
+        // A missão pode ter espaços (ex: DVI / EMG 2)
+        missaoStr = parts.slice(tbnIdx + 1).join(" ").replace(/\s+\-\s*$/, "").trim();
+      } else {
+        // Fallback: se não achar TBN, tenta pegar o que sobrou após o EOBT ou DEST
+        missaoStr = parts.slice(adDestIdx + 1).filter(p => !/^\d{2}H\d{2}$/i.test(p) && !/^\d+$/.test(p)).join(" ");
+      }
 
       let eobt = "---";
       for (let i = adDestIdx + 1; i < parts.length; i++) {
@@ -4223,8 +4219,8 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
 
                           return (
                             <div key={l.id} className="flex items-center justify-between p-2.5 bg-white/2 border border-white/5 rounded hover:border-military-gold/20 transition-all group overflow-hidden">
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="flex items-center gap-6 sm:gap-10 min-w-0 flex-1">
+                                <div className="flex items-center gap-3 shrink-0">
                                   {hasFgr && (
                                     <span className="flex items-center gap-0.5 text-[8px] font-black bg-green-500/20 text-green-500 border border-green-500/30 px-1 py-0.5 rounded uppercase tracking-tighter">
                                       FGR
@@ -4237,15 +4233,15 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                                   )}
                                   <span className="text-[10px] font-black text-accent-gold whitespace-nowrap uppercase tracking-tighter">LÇ {l.num}</span>
                                 </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-6 min-w-0">
                                   <span className="text-[10px] text-white font-black whitespace-nowrap uppercase tracking-tighter">{l.anv}</span>
-                                  <span className="text-[10px] text-slate-500 truncate uppercase tracking-tighter font-bold flex gap-3">
-                                    <span>{l.p1}</span>
-                                    <span>{l.p2}</span>
-                                    <span>{l.mv}</span>
-                                    <span>{l.dest}</span>
-                                    <span>{l.missao}</span>
-                                  </span>
+                                  <div className="flex items-center gap-4 sm:gap-6 text-[10px] text-slate-500 uppercase tracking-tighter font-bold">
+                                    <span className="shrink-0">{l.p1}</span>
+                                    <span className="shrink-0">{l.p2}</span>
+                                    <span className="shrink-0">{l.mv}</span>
+                                    <span className="shrink-0">{l.dest}</span>
+                                    <span className="truncate">{l.missao}</span>
+                                  </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
