@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, storage } from './firebase';
+import { extractPDVData, PDVLaunch } from './services/geminiService';
 
 // Setup PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.mjs`;
@@ -794,6 +795,21 @@ function parsePDV(text: string) {
   });
   return days;
 }
+
+const normalizePDVDate = (dateStr: string) => {
+  if (!dateStr) return 'Sem Data';
+  const parts = dateStr.toUpperCase().replace('PARA O DIA ', '').split(/\s+/);
+  // Expected: ["14", "DE", "ABRIL", "DE", "2026"]
+  const day = parts[0]?.padStart(2, '0');
+  const monthName = parts[parts.length - 3] || ''; // "ABRIL"
+  const year = parts[parts.length - 1] || ''; // "2026"
+  const month = MONTHS_MAP[monthName] || '??';
+  
+  if (day && month !== '??' && year.length === 4) {
+    return `${day}/${month}/${year}`;
+  }
+  return dateStr; // Fallback to raw if logic fails
+};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<SectionKey>('Inicio');
@@ -4081,24 +4097,33 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                       setIsUploading(true);
                       try {
                         const text = await extractTextFromPdf(file);
-                        const days = parsePDV(text);
+                        const rawLaunches = await extractPDVData(text);
+                        
                         let count = 0;
                         const batchId = `PDV_${Date.now()}`;
-                        for (const day of days) {
-                          for (const launch of day.launches) {
-                            await addDoc(collection(db, 'Lancamentos'), {
-                              ...launch,
-                              dateLabel: day.dateLabel,
-                              createdAt: new Date().toISOString(),
-                              batchId,
-                              batchName: file.name
-                            });
-                            count++;
-                          }
+                        
+                        for (const l of rawLaunches) {
+                          const dateLabel = normalizePDVDate(l.Dia);
+                          await addDoc(collection(db, 'Lancamentos'), {
+                            num: l.Lç,
+                            anv: l.Anv,
+                            p1: l["1P"],
+                            p2: l["2P"],
+                            mv: l.MV,
+                            dest: l.AD_DEST,
+                            eobt: l.EOBT,
+                            missao: l.Missao,
+                            dateLabel,
+                            createdAt: new Date().toISOString(),
+                            batchId,
+                            batchName: file.name
+                          });
+                          count++;
                         }
-                        alert(`${count} lançamentos processados e salvos com sucesso.`);
+                        
+                        alert(`${count} lançamentos processados pela IA e salvos com sucesso.`);
                       } catch (err: any) {
-                        alert("Erro ao processar PDV: " + err.message);
+                        alert("Erro ao processar PDV com IA: " + err.message);
                       } finally {
                         setIsUploading(false);
                       }
@@ -4220,12 +4245,12 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                                       Abortiva
                                     </span>
                                   )}
-                                  <span className="text-[10px] font-black text-accent-gold whitespace-nowrap">LÇ {l.num}</span>
+                                  <span className="text-[10px] font-black text-accent-gold whitespace-nowrap uppercase tracking-tighter">Lç {l.num}</span>
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
-                                  <span className="text-[10px] text-white font-bold whitespace-nowrap">{l.anv}</span>
-                                  <span className="text-[10px] text-slate-400 truncate uppercase tracking-tighter">
-                                    {l.p1} {l.dest && `→ ${l.dest}`} {l.mv && l.mv !== '---' && ` • MV: ${l.mv}`}
+                                  <span className="text-[10px] text-white font-black whitespace-nowrap uppercase tracking-tighter">{l.anv}</span>
+                                  <span className="text-[10px] text-slate-400 truncate uppercase tracking-tighter font-medium">
+                                    {l.p1} • {l.p2} • {l.mv} • {l.dest} • {l.missao}
                                   </span>
                                 </div>
                               </div>
