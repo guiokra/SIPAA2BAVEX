@@ -4235,12 +4235,16 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                                       Abortiva
                                     </span>
                                   )}
-                                  <span className="text-[10px] font-black text-accent-gold whitespace-nowrap uppercase tracking-tighter">Lç {l.num}</span>
+                                  <span className="text-[10px] font-black text-accent-gold whitespace-nowrap uppercase tracking-tighter">LÇ {l.num}</span>
                                 </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
                                   <span className="text-[10px] text-white font-black whitespace-nowrap uppercase tracking-tighter">{l.anv}</span>
-                                  <span className="text-[10px] text-slate-400 truncate uppercase tracking-tighter font-medium">
-                                    {l.p1} - {l.p2} - {l.mv} - {l.dest} - {l.missao}
+                                  <span className="text-[10px] text-slate-500 truncate uppercase tracking-tighter font-bold flex gap-3">
+                                    <span>{l.p1}</span>
+                                    <span>{l.p2}</span>
+                                    <span>{l.mv}</span>
+                                    <span>{l.dest}</span>
+                                    <span>{l.missao}</span>
                                   </span>
                                 </div>
                               </div>
