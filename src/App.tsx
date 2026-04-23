@@ -569,9 +569,12 @@ const generateFgrPDF = (mission: any) => {
   doc.setFontSize(14);
   doc.text('Parte II — Condições Impeditivas', 20, p2Y);
   
-  const p2Rows = PARTE_II_DATA.filter(item => mission.p2Selections[item.id]).map(item => {
+  const p2Rows = PARTE_II_DATA.map(item => {
     const resp = mission.p2Selections[item.id];
-    const displayResp = resp === 'NA' ? 'DESCONHECIDO' : resp;
+    let displayResp = '---';
+    if (resp === 'SIM') displayResp = 'SIM';
+    else if (resp === 'NÃO') displayResp = 'NÃO';
+    else if (resp === 'NA') displayResp = 'DESCONHECIDO';
     return [item.text, displayResp];
   });
 
@@ -604,9 +607,6 @@ const generateFgrPDF = (mission: any) => {
     const items = (PARTE_III_DATA as any)[category];
     if (!items) return;
 
-    const filteredItems = items.filter((item: any) => mission.p3Selections[item.id]);
-    if (filteredItems.length === 0) return;
-
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text(p3Titles[category], 20, currentY + 5);
@@ -614,10 +614,10 @@ const generateFgrPDF = (mission: any) => {
     autoTable(doc, {
       startY: currentY + 7,
       head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
-      body: filteredItems.map((item: any) => {
+      body: items.map((item: any) => {
         const resp = mission.p3Selections[item.id];
         const weight = (item.w as any)[resp] || 0;
-        const respLabel = { S: 'SIM', N: 'NÃO', D: 'DESCONHECIDO' }[resp as 'S'|'N'|'D'];
+        const respLabel = { S: 'SIM', N: 'NÃO', D: 'DESCONHECIDO' }[resp as 'S'|'N'|'D'] || '---';
         return [
           item.id.replace('p3_', '').toUpperCase(),
           item.text,
@@ -663,9 +663,6 @@ const generateFgrPDF = (mission: any) => {
     Object.entries(PARTE_IV_DATA).forEach(([category, items]) => {
       if (!activeProfiles.includes(category)) return;
 
-      const filteredItems = items.filter(item => mission.p4Selections[item.id]);
-      if (filteredItems.length === 0 && category !== 'REGULAR') return; 
-
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text(category === 'REGULAR' ? 'Valor Básico' : category, 20, currentY + 5);
@@ -673,10 +670,10 @@ const generateFgrPDF = (mission: any) => {
       autoTable(doc, {
         startY: currentY + 7,
         head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
-        body: filteredItems.map(item => {
+        body: items.map(item => {
           const resp = mission.p4Selections[item.id];
           const weight = (item.w as any)[resp] || 0;
-          const respLabel = { S: 'SIM', N: 'NÃO', D: 'DESCONHECIDO' }[resp as 'S'|'N'|'D'];
+          const respLabel = { S: 'SIM', N: 'NÃO', D: 'DESCONHECIDO' }[resp as 'S'|'N'|'D'] || '---';
           return [
             item.id.replace('p4_', '').toUpperCase(),
             item.text,
@@ -2094,9 +2091,9 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
       // Preencher seleções faltantes (opcional, mas garante que apareçam no PDF se desejado)
       PARTE_II_DATA.forEach(item => { if (!finalP2Selections[item.id]) (finalP2Selections as any)[item.id] = '---'; });
       Object.keys(PARTE_III_DATA).forEach(cat => {
-        (PARTE_III_DATA as any)[cat].forEach((item: any) => { if (!finalP3Selections[item.id]) (finalP3Selections as any)[item.id] = 'D'; });
+        (PARTE_III_DATA as any)[cat].forEach((item: any) => { if (!finalP3Selections[item.id]) (finalP3Selections as any)[item.id] = '---'; });
       });
-      p4Questions.forEach((item: any) => { if (!finalP4Selections[item.id]) (finalP4Selections as any)[item.id] = 'D'; });
+      p4Questions.forEach((item: any) => { if (!finalP4Selections[item.id]) (finalP4Selections as any)[item.id] = '---'; });
     }
 
     if (hasImpediment) {
