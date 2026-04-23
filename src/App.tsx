@@ -34,6 +34,7 @@ import {
   Trash2,
   Eye,
   LogIn,
+  Check,
   Search,
   LayoutDashboard,
   Calendar,
@@ -42,7 +43,6 @@ import {
   MoreHorizontal,
   History,
   Info,
-  Check,
   Download,
   Upload,
   Clock,
@@ -562,44 +562,59 @@ const generateFgrPDF = (mission: any) => {
     headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] }
   });
 
-  // Parte II - Assertivas
+  // Parte II - Condições Impeditivas
   const p2Y = (doc as any).lastAutoTable.finalY + 10;
   doc.setFontSize(14);
-  doc.text('II - Condições Impeditivas', 20, p2Y);
+  doc.text('Parte II — Condições Impeditivas', 20, p2Y);
   
   autoTable(doc, {
     startY: p2Y + 5,
     head: [['Assertiva', 'Resposta']],
-    body: PARTE_II_DATA.map(item => [
-      item.text,
-      mission.p2Selections[item.id] || '---'
-    ]),
+    body: PARTE_II_DATA.map(item => {
+      const resp = mission.p2Selections[item.id];
+      const displayResp = resp === 'NA' ? 'DESCONHECIDO' : (resp || '---');
+      return [item.text, displayResp];
+    }),
     theme: 'grid',
     styles: { fontSize: 7 },
-    columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 20, halign: 'center' } }
+    columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 30, halign: 'center' } }
   });
 
-  // Parte III - Fatores
+  // Parte III - Fatores de Gestão
   doc.addPage();
   doc.setFontSize(14);
-  doc.text('III - Fatores Baseados na Gestão', 20, 20);
+  doc.text('Parte III — Fatores de Gestão', 20, 20);
   
   let currentY = 25;
-  Object.entries(PARTE_III_DATA).forEach(([category, items]) => {
+  // Use the established order/titles from the form
+  const p3Order = ['RH', 'METEO', 'MATERIAL', 'MISSAO', 'ORG'];
+  const p3Titles: any = {
+    RH: 'Recursos Humanos',
+    METEO: 'Meteorologia',
+    MATERIAL: 'Material',
+    MISSAO: 'Missão',
+    ORG: 'Organização'
+  };
+
+  p3Order.forEach(category => {
+    const items = (PARTE_III_DATA as any)[category];
+    if (!items) return;
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text(category, 20, currentY + 5);
+    doc.text(p3Titles[category], 20, currentY + 5);
     
     autoTable(doc, {
       startY: currentY + 7,
       head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
-      body: items.map(item => {
+      body: items.map((item: any) => {
         const resp = mission.p3Selections[item.id] || 'D';
         const weight = (item.w as any)[resp] || 0;
+        const respLabel = { S: 'SIM', N: 'NÃO', D: 'DESCONHECIDO' }[resp as 'S'|'N'|'D'];
         return [
           item.id.replace('p3_', '').toUpperCase(),
           item.text,
-          { S: 'SIM', N: 'NÃO', D: 'N/A' }[resp as 'S'|'N'|'D'],
+          respLabel,
           weight.toString()
         ];
       }),
@@ -607,7 +622,7 @@ const generateFgrPDF = (mission: any) => {
       styles: { fontSize: 7 },
       columnStyles: { 
         0: { cellWidth: 15 },
-        2: { cellWidth: 20, halign: 'center' },
+        2: { cellWidth: 30, halign: 'center' },
         3: { cellWidth: 15, halign: 'center' }
       },
       didParseCell: (data) => {
@@ -623,7 +638,64 @@ const generateFgrPDF = (mission: any) => {
     currentY = (doc as any).lastAutoTable.finalY + 5;
   });
 
-  // Parte IV - Fatores de Gravidade
+  // Parte IV - Tipo de Voo
+  const activeProfiles = mission.perfisVoo || ['REGULAR'];
+  const showPartIV = activeProfiles.length > 0;
+
+  if (showPartIV) {
+    if (currentY > pageHeight - 40) {
+      doc.addPage();
+      currentY = 20;
+    } else {
+      currentY += 10;
+    }
+    doc.setFontSize(14);
+    doc.text('Parte IV — Tipo de Voo', 20, currentY);
+    currentY += 5;
+
+    Object.entries(PARTE_IV_DATA).forEach(([category, items]) => {
+      if (!activeProfiles.includes(category)) return;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(category === 'REGULAR' ? 'Valor Básico' : category, 20, currentY + 5);
+      
+      autoTable(doc, {
+        startY: currentY + 7,
+        head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
+        body: items.map(item => {
+          const resp = mission.p4Selections[item.id] || 'D';
+          const weight = (item.w as any)[resp] || 0;
+          const respLabel = { S: 'SIM', N: 'NÃO', D: 'DESCONHECIDO' }[resp as 'S'|'N'|'D'];
+          return [
+            item.id.replace('p4_', '').toUpperCase(),
+            item.text,
+            respLabel,
+            weight.toString()
+          ];
+        }),
+        theme: 'grid',
+        styles: { fontSize: 7 },
+        columnStyles: { 
+          0: { cellWidth: 15 },
+          2: { cellWidth: 30, halign: 'center' },
+          3: { cellWidth: 15, halign: 'center' }
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 3) {
+            const val = parseInt(data.cell.text[0]);
+            if (val > 0) {
+              data.cell.styles.textColor = [255, 0, 0];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        }
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 5;
+    });
+  }
+
+  // Parte V - Fatores de Gravidade
   if (currentY > pageHeight - 40) {
     doc.addPage();
     currentY = 20;
@@ -631,68 +703,56 @@ const generateFgrPDF = (mission: any) => {
     currentY += 10;
   }
   doc.setFontSize(14);
-  doc.text('IV - Fatores de Gravidade', 20, currentY);
+  doc.text('V - Avaliação de Gravidade', 20, currentY);
   currentY += 5;
-  Object.entries(PARTE_IV_DATA).forEach(([category, items]) => {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(category, 20, currentY + 5);
-    
-    autoTable(doc, {
-      startY: currentY + 7,
-      head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
-      body: items.map(item => {
-        const resp = mission.p4Selections[item.id] || 'D';
-        const weight = (item.w as any)[resp] || 0;
-        return [
-          item.id.replace('p4_', '').toUpperCase(),
-          item.text,
-          { S: 'SIM', N: 'NÃO', D: 'N/A' }[resp as 'S'|'N'|'D'],
-          weight.toString()
-        ];
-      }),
-      theme: 'grid',
-      styles: { fontSize: 7 },
-      columnStyles: { 
-        0: { cellWidth: 15 },
-        2: { cellWidth: 20, halign: 'center' },
-        3: { cellWidth: 15, halign: 'center' }
-      },
-      didParseCell: (data) => {
-        if (data.section === 'body' && data.column.index === 3) {
-          const val = parseInt(data.cell.text[0]);
-          if (val > 0) {
-            data.cell.styles.textColor = [255, 0, 0];
-            data.cell.styles.fontStyle = 'bold';
-          }
-        }
-      }
-    });
-    currentY = (doc as any).lastAutoTable.finalY + 5;
+
+  const activeGrav = GRAVIDADE_DATA.filter(g => {
+    if (g.fixed) return true;
+    const isAuto = g.autoByTipo && activeProfiles.includes(g.autoByTipo);
+    return isAuto || mission.gravidadeSelections[g.id];
   });
 
-  // Risk Box (Destaque)
+  autoTable(doc, {
+    startY: currentY,
+    head: [['ID', 'Fator de Gravidade', 'Pontos']],
+    body: activeGrav.map(g => [
+      g.id.toUpperCase(),
+      g.text,
+      `+${g.pts}`
+    ]),
+    theme: 'grid',
+    styles: { fontSize: 7 },
+    columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 20, halign: 'center' } }
+  });
+  
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`TOTAL DE GRAVIDADE: ${mission.scores.gravTotal}`, 20, currentY);
+
+  // Risk Box (Destaque) - Renomeado para VI
   if (currentY > pageHeight - 60) {
     doc.addPage();
     currentY = 20;
   }
   const riskY = currentY + 10;
-  const riskStatus = getRiskClass(mission.scores.riskMax, mission.tipoVoo);
+  const isComplexFinal = activeProfiles.some((p: string) => p !== 'REGULAR');
+  const riskStatus = getRiskClass(mission.scores.riskMax, isComplexFinal ? 'COMPLEX' : 'REGULAR');
   
   doc.setFillColor(riskStatus.hex[0], riskStatus.hex[1], riskStatus.hex[2]);
-  doc.rect(20, riskY, pageWidth - 40, 30, 'F');
+  doc.rect(20, riskY, pageWidth - 40, 35, 'F');
   
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('V - AVALIAÇÃO FINAL DE RISCO', pageWidth / 2, riskY + 8, { align: 'center' });
+  doc.text('VI - AVALIAÇÃO FINAL DE RISCO', pageWidth / 2, riskY + 8, { align: 'center' });
   doc.setFontSize(18);
   doc.text(`${riskStatus.label.toUpperCase()} (${mission.scores.riskMax} pts)`, pageWidth / 2, riskY + 18, { align: 'center' });
   
-  // Ação e Responsabilidade no PDF
   doc.setFontSize(7);
   doc.text(`AÇÃO: ${riskStatus.decisao.toUpperCase()}`, pageWidth / 2, riskY + 24, { align: 'center' });
   doc.text(`RESPONSABILIDADE: ${riskStatus.responsavel.toUpperCase()}`, pageWidth / 2, riskY + 28, { align: 'center' });
+  doc.text(`FÓRMULA: TG (${mission.scores.tgMax}) x GRAVIDADE (${mission.scores.gravTotal}) = ${mission.scores.riskMax}`, pageWidth / 2, riskY + 32, { align: 'center' });
 
   // Scores Table
   const scoresY = riskY + 40;
@@ -713,14 +773,22 @@ const generateFgrPDF = (mission: any) => {
     styles: { fontSize: 9 }
   });
  
-  // Mitigation
+  // Mitigation Table for automatic pagination
   if (mission.mitigation) {
     const mitigY = (doc as any).lastAutoTable.finalY + 10;
+    if (mitigY > pageHeight - 40) {
+      doc.addPage();
+    }
     doc.setFontSize(14);
-    doc.text('Medidas Mitigadoras', 20, mitigY);
-    doc.setFontSize(10);
-    const splitText = doc.splitTextToSize(mission.mitigation, pageWidth - 40);
-    doc.text(splitText, 20, mitigY + 7);
+    doc.text('Medidas Mitigadoras', 20, (doc as any).lastAutoTable.finalY > pageHeight - 40 ? 20 : mitigY);
+    
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY > pageHeight - 40 ? 25 : mitigY + 5,
+      body: [[mission.mitigation]],
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 2, textColor: [0, 0, 0] },
+      columnStyles: { 0: { cellWidth: pageWidth - 40 } }
+    });
   }
 
   doc.setFontSize(8);
@@ -1755,7 +1823,7 @@ function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTa
 
 function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void, launches: any[] }) {
   const [stamp, setStamp] = useState<string>(new Date().toLocaleString("pt-BR"));
-  const [tipoVoo, setTipoVoo] = useState<string>("REGULAR");
+  const [perfisVoo, setPerfisVoo] = useState<string[]>(["REGULAR"]);
   const [isSaving, setIsSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [missionData, setMissionData] = useState({
@@ -1844,7 +1912,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
   };
 
   const resetAll = () => {
-    setTipoVoo("REGULAR");
+    setPerfisVoo(["REGULAR"]);
     setMissionData({
       modeloAnv: "",
       aeronave: "",
@@ -1897,7 +1965,10 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
   const p3TotalMin = p3Categories.reduce((acc, c) => acc + c.scores.min, 0);
   const p3TotalMax = p3Categories.reduce((acc, c) => acc + c.scores.max, 0);
 
-  const p4Questions = tipoVoo === 'REGULAR' ? [] : (PARTE_IV_DATA as any)[tipoVoo] || [];
+  const p4Questions = perfisVoo.includes('REGULAR') && perfisVoo.length === 1 
+    ? [] 
+    : perfisVoo.filter(p => p !== 'REGULAR').flatMap(p => (PARTE_IV_DATA as any)[p] || []);
+  
   const p4Scores = calcSection(p4Questions, p4Selections);
 
   const tgMin = p3TotalMin + p4Scores.min;
@@ -1905,10 +1976,10 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
 
   const gravTotal = GRAVIDADE_DATA.reduce((acc, g) => {
     if (g.fixed) return acc + g.pts;
-    const isRestricted = tipoVoo === "REGULAR" && 
-      (g.id === "g2" || g.id === "g3" || g.id === "g4" || g.id === "g9");
-    if (isRestricted) return acc;
-    const isAuto = g.autoByTipo && g.autoByTipo === tipoVoo;
+    
+    // Auto-selection based on any of the selected profiles
+    const isAuto = g.autoByTipo && perfisVoo.includes(g.autoByTipo);
+    
     if (isAuto || gravidadeSelections[g.id]) return acc + g.pts;
     return acc;
   }, 0);
@@ -1916,12 +1987,13 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
   const riskMin = tgMin * gravTotal;
   const riskMax = tgMax * gravTotal;
 
-  const riskMaxStatus = getRiskClass(riskMax, tipoVoo);
+  const isComplex = perfisVoo.some(p => p !== 'REGULAR');
+  const riskMaxStatus = getRiskClass(riskMax, isComplex ? 'COMPLEX' : 'REGULAR');
 
   const hasImpediment = Object.values(p2Selections).some(v => v === 'NÃO');
 
   const handleSave = async (forceParam: any = false) => {
-    const isForced = forceParam === true; // Garante que eventos React não ativem o force por engano
+    const isForced = forceParam === true; 
     
     if (!isForced) {
       const errors: string[] = [];
@@ -1946,17 +2018,15 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
         errors.push("Parte III: Responda todas as assertivas dos Fatores de Gestão.");
       }
 
-      // Validação Parte IV
-      if (tipoVoo !== 'REGULAR') {
-        const p4Questions = (PARTE_IV_DATA as any)[tipoVoo] || [];
+      // Validação Parte IV - multiple profiles
+      if (isComplex) {
         if (Object.keys(p4Selections).length < p4Questions.length) {
-          errors.push(`Parte IV: Responda todas as assertivas específicas para voo ${tipoVoo}.`);
+          errors.push(`Parte IV: Responda todas as assertivas específicas para os perfis selecionados.`);
         }
       }
 
       if (errors.length > 0) {
         setValidationErrors(errors);
-        // Rolar para o primeiro erro ou apenas alertar visualmente
         const element = document.getElementById('validation-errors-anchor');
         element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
@@ -1991,7 +2061,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
 
       const missionPayload = {
         ...missionData,
-        tipoVoo,
+        perfisVoo,
         p2Selections,
         p3Selections,
         p4Selections,
@@ -2377,95 +2447,132 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
             <div className="space-y-8">
               <div className="space-y-4">
                  <h3 className="text-sm font-black uppercase text-white tracking-widest px-2">Parte IV — Tipo de Voo</h3>
-                 <div className="card-military p-4 flex gap-4 items-center bg-bg-sidebar">
-                    <div className="flex-1">
-                       <label className="text-[9px] uppercase font-black text-accent-gold tracking-[0.2em] mb-2 block">Perfil de Voo</label>
-                       <select 
-                         className="input-military w-full text-sm font-bold bg-bg-deep"
-                         value={tipoVoo}
-                         onChange={(e) => { setTipoVoo(e.target.value); updateStamp(); setP4Selections({}); }}
-                       >
-                         <option value="REGULAR">Voo Regular</option>
-                         <option value="INSTRUCAO">Voo de Instrução</option>
-                         <option value="IFR">Voo IFR</option>
-                         <option value="OVN">Voo OVN</option>
-                         <option value="TECNICO">Voo Técnico (Mnt/Ens)</option>
-                       </select>
+                 <div className="card-military p-4 space-y-4 bg-bg-sidebar">
+                    <div>
+                       <label className="text-[9px] uppercase font-black text-accent-gold tracking-[0.2em] mb-3 block">Perfil de Voo</label>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                         {[
+                           { id: 'REGULAR', label: 'Valor Básico' },
+                           { id: 'INSTRUCAO', label: 'Voo de Instrução' },
+                           { id: 'IFR', label: 'Voo IFR' },
+                           { id: 'OVN', label: 'Voo OVN' },
+                           { id: 'TECNICO', label: 'Voo Técnico (Mnt/Ens)' }
+                         ].map((profile) => (
+                           <label 
+                             key={profile.id} 
+                             className={`flex items-center gap-3 group ${profile.id === 'REGULAR' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                           >
+                             <div className="relative flex items-center justify-center">
+                               <input 
+                                 type="checkbox"
+                                 className="peer sr-only"
+                                 disabled={profile.id === 'REGULAR'}
+                                 checked={perfisVoo.includes(profile.id)}
+                                 onChange={(e) => {
+                                   let nextPerfis = [...perfisVoo];
+                                   if (profile.id !== 'REGULAR') {
+                                     if (e.target.checked) {
+                                       if (!nextPerfis.includes(profile.id)) nextPerfis.push(profile.id);
+                                     } else {
+                                       nextPerfis = nextPerfis.filter(p => p !== profile.id);
+                                     }
+                                   }
+                                   if (!nextPerfis.includes('REGULAR')) nextPerfis.push('REGULAR');
+                                   setPerfisVoo(nextPerfis);
+                                   setP4Selections({});
+                                   updateStamp();
+                                 }}
+                               />
+                               <div className="w-5 h-5 rounded border border-border-theme bg-bg-deep peer-checked:border-accent-gold peer-checked:bg-accent-gold/20 peer-disabled:opacity-50 transition-all"></div>
+                               <Check className="absolute w-3 h-3 text-accent-gold opacity-0 peer-checked:opacity-100 transition-all" />
+                             </div>
+                             <span className={`text-[11px] font-bold ${perfisVoo.includes(profile.id) ? 'text-white' : 'text-text-secondary'} group-hover:text-white transition-colors`}>
+                               {profile.label}
+                             </span>
+                           </label>
+                         ))}
+                       </div>
                     </div>
-                    <div className="bg-bg-deep border border-border-theme px-4 py-2 rounded text-center">
-                       <span className="text-[8px] font-black text-text-secondary uppercase block mb-1">Total (III+IV)</span>
-                       <span className="text-lg font-mono text-white font-black">{tgMax}</span>
+                    <div className="bg-bg-deep border border-border-theme px-4 py-3 rounded flex items-center justify-between">
+                       <div>
+                          <span className="text-[8px] font-black text-text-secondary uppercase block mb-0.5 tracking-[0.1em]">Total Acumulado</span>
+                          <span className="text-[9px] font-bold text-accent-gold/60 uppercase block leading-none">Parte III + IV</span>
+                       </div>
+                       <span className="text-2xl font-mono text-white font-black">{tgMax}</span>
                     </div>
                  </div>
 
-                 {tipoVoo !== 'REGULAR' && p4Questions.length > 0 && (
-                   <div className="card-military p-0 overflow-hidden border-border-theme/40 mt-4">
-                     <div className="bg-bg-sidebar px-4 py-2 border-b border-border-theme flex justify-between items-center">
-                       <span className="text-[10px] font-bold uppercase text-accent-gold tracking-widest">Critérios Específicos — {tipoVoo}</span>
-                     </div>
-                     <table className="w-full text-left border-collapse">
-                       <thead>
-                         <tr className="border-b border-border-theme/30 bg-white/2">
-                           <th className="px-4 py-2 text-[9px] uppercase font-black text-text-secondary tracking-tighter">Critério</th>
-                           <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">S</th>
-                           <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">N</th>
-                           <th className="px-2 py-2 text-[center] w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">D</th>
-                         </tr>
-                       </thead>
-                       <tbody>
-                         {p4Questions.map((q: any) => (
-                           <tr key={q.id} className="border-b border-border-theme/10 hover:bg-white/2">
-                             <td className="px-4 py-2.5 text-xs text-text-primary leading-tight">{q.text}</td>
-                             {['S', 'N', 'D'].map(val => (
-                               <td key={val} className="px-2 py-2.5 text-center">
-                                 <button 
-                                   onClick={() => handleP4(q.id, val as any)}
-                                   className={`w-7 h-7 rounded border transition-all text-[9px] font-black ${p4Selections[q.id] === val ? 'bg-accent-gold text-bg-deep border-accent-gold' : 'border-border-theme text-text-secondary'}`}
-                                 >
-                                   {(q.w as any)[val]}
-                                 </button>
-                               </td>
-                             ))}
-                           </tr>
-                         ))}
-                       </tbody>
-                     </table>
-                   </div>
-                 )}
+                 {perfisVoo.filter(p => p !== 'REGULAR').map(p => {
+                    const questions = (PARTE_IV_DATA as any)[p] || [];
+                    if (questions.length === 0) return null;
+                    return (
+                      <div key={p} className="card-military p-0 overflow-hidden border-border-theme/40 mt-4">
+                        <div className="bg-bg-sidebar px-4 py-2 border-b border-border-theme flex justify-between items-center">
+                          <span className="text-[10px] font-bold uppercase text-accent-gold tracking-widest">Critérios — {p}</span>
+                        </div>
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-border-theme/30 bg-white/2">
+                              <th className="px-4 py-2 text-[9px] uppercase font-black text-text-secondary tracking-tighter">Critério</th>
+                              <th className="px-2 py-2 text-center w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">S</th>
+                              <th className="px-2 py-2 text-center w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">N</th>
+                              <th className="px-2 py-2 text-center w-12 font-black text-[9px] uppercase tracking-tighter text-text-secondary">D</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {questions.map((q: any) => (
+                              <tr key={q.id} className="border-b border-border-theme/10 hover:bg-white/2">
+                                <td className="px-4 py-2.5 text-xs text-text-primary leading-tight">{q.text}</td>
+                                {['S', 'N', 'D'].map(val => (
+                                  <td key={val} className="px-2 py-2.5 text-center">
+                                    <button 
+                                      onClick={() => handleP4(q.id, val as any)}
+                                      className={`w-7 h-7 rounded border transition-all text-[9px] font-black ${p4Selections[q.id] === val ? 'bg-accent-gold text-bg-deep border-accent-gold shadow-[0_0_8px_rgba(212,175,55,0.2)]' : 'border-border-theme text-text-secondary'}`}
+                                    >
+                                      {(q.w as any)[val]}
+                                    </button>
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                 })}
               </div>
 
-                  <div className="card-military p-0 overflow-hidden text-left border-border-theme/40">
-                     <div className="bg-bg-sidebar/50 px-6 py-4 border-b border-border-theme/30 flex justify-between items-center">
-                        <span className="text-[11px] font-black uppercase text-accent-gold tracking-[0.2em]">Parte V — Avaliação de Gravidade</span>
-                     </div>
-                     <div className="p-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {GRAVIDADE_DATA.filter(g => !g.fixed).map(g => {
-                            const isAuto = g.autoByTipo && g.autoByTipo === tipoVoo;
-                            const isRestricted = tipoVoo === "REGULAR" && 
-                               (g.id === "g2" || g.id === "g3" || g.id === "g4" || g.id === "g9");
-                            
-                            if (isRestricted) return null;
-
-                            return (
-                              <button
-                                key={g.id}
-                                disabled={isAuto}
-                                onClick={() => handleGrav(g.id)}
-                                className={`flex items-center justify-between p-3 rounded border text-left transition-all ${
-                                  (isAuto || gravidadeSelections[g.id]) 
-                                    ? 'bg-accent-gold/20 border-accent-gold text-white' 
-                                    : 'bg-white/2 border-white/5 text-text-secondary hover:border-white/20'
-                                }`}
-                              >
-                                <span className="text-[11px] font-bold uppercase tracking-tight">{g.text}</span>
-                                <span className={`text-[10px] font-mono ${isAuto || gravidadeSelections[g.id] ? 'text-accent-gold' : 'text-slate-500'}`}>+{g.pts}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                     </div>
-                  </div>
+              <div className="card-military p-0 overflow-hidden text-left border-border-theme/40">
+                 <div className="bg-bg-sidebar/50 px-6 py-4 border-b border-border-theme/30 flex justify-between items-center">
+                    <span className="text-[11px] font-black uppercase text-accent-gold tracking-[0.2em]">Parte V — Avaliação de Gravidade</span>
+                 </div>
+                 <div className="p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {GRAVIDADE_DATA.filter(g => !g.fixed).map(g => {
+                        const isAuto = g.autoByTipo && perfisVoo.includes(g.autoByTipo);
+                        
+                        return (
+                          <button
+                            key={g.id}
+                            disabled={isAuto}
+                            onClick={() => handleGrav(g.id)}
+                            className={`flex items-center justify-between p-3 rounded border text-left transition-all ${
+                              (isAuto || gravidadeSelections[g.id]) 
+                                ? 'bg-accent-gold/20 border-accent-gold text-white shadow-[0_4px_12px_rgba(212,175,55,0.15)] ring-1 ring-accent-gold/30' 
+                                : 'bg-white/2 border-white/5 text-text-secondary hover:border-white/20'
+                            }`}
+                          >
+                            <span className="text-[11px] font-bold uppercase tracking-tight">{g.text}</span>
+                            <div className="flex items-center gap-2">
+                              {isAuto && <span className="text-[8px] font-black text-accent-gold/60 uppercase">Auto</span>}
+                              <span className={`text-[10px] font-mono ${isAuto || gravidadeSelections[g.id] ? 'text-accent-gold' : 'text-slate-500'}`}>+{g.pts}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                 </div>
+              </div>
 
                   <div className="card-military p-0 overflow-hidden text-left bg-gradient-to-br from-bg-sidebar to-bg-deep border-border-theme/40">
                      <div className="bg-bg-sidebar/50 px-6 py-4 border-b border-border-theme/30 flex justify-between items-center">
