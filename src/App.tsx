@@ -545,19 +545,21 @@ const generateFgrPDF = (mission: any) => {
   doc.setFontSize(14);
   doc.text('I - Informações da Missão', 20, 55);
   
+  const missionInfoRows = [
+    mission.modeloAnv && ['Modelo (Anv Líder)', mission.modeloAnv],
+    mission.aeronave && ['Matrícula(s) Anv', mission.aeronave],
+    mission.missao && ['Missão', mission.missao],
+    mission.local && ['Local', mission.local],
+    mission.data && ['Data', mission.data.includes('-') ? mission.data.split('-').reverse().join('/') : mission.data],
+    mission.trigramaTrip && ['Trigramas Tripulação', mission.trigramaTrip],
+    mission.preenchidoPor && ['Preenchido por', mission.preenchidoPor],
+    mission.funcao && ['Função', mission.funcao]
+  ].filter(Boolean) as string[][];
+
   autoTable(doc, {
     startY: 60,
     head: [['Campo', 'Informação']],
-    body: [
-      ['Modelo (Anv Líder)', mission.modeloAnv || 'N/A'],
-      ['Matrícula(s) Anv', mission.aeronave || 'N/A'],
-      ['Missão', mission.missao || 'N/A'],
-      ['Local', mission.local || 'N/A'],
-      ['Data', mission.data ? (mission.data.includes('-') ? mission.data.split('-').reverse().join('/') : mission.data) : 'N/A'],
-      ['Trigramas Tripulação', mission.trigramaTrip || 'N/A'],
-      ['Preenchido por', mission.preenchidoPor || 'N/A'],
-      ['Função', mission.funcao || 'N/A']
-    ],
+    body: missionInfoRows,
     theme: 'striped',
     headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] }
   });
@@ -567,14 +569,16 @@ const generateFgrPDF = (mission: any) => {
   doc.setFontSize(14);
   doc.text('Parte II — Condições Impeditivas', 20, p2Y);
   
+  const p2Rows = PARTE_II_DATA.filter(item => mission.p2Selections[item.id]).map(item => {
+    const resp = mission.p2Selections[item.id];
+    const displayResp = resp === 'NA' ? 'DESCONHECIDO' : resp;
+    return [item.text, displayResp];
+  });
+
   autoTable(doc, {
     startY: p2Y + 5,
     head: [['Assertiva', 'Resposta']],
-    body: PARTE_II_DATA.map(item => {
-      const resp = mission.p2Selections[item.id];
-      const displayResp = resp === 'NA' ? 'DESCONHECIDO' : (resp || '---');
-      return [item.text, displayResp];
-    }),
+    body: p2Rows,
     theme: 'grid',
     styles: { fontSize: 7 },
     columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 30, halign: 'center' } }
@@ -600,6 +604,9 @@ const generateFgrPDF = (mission: any) => {
     const items = (PARTE_III_DATA as any)[category];
     if (!items) return;
 
+    const filteredItems = items.filter((item: any) => mission.p3Selections[item.id]);
+    if (filteredItems.length === 0) return;
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text(p3Titles[category], 20, currentY + 5);
@@ -607,8 +614,8 @@ const generateFgrPDF = (mission: any) => {
     autoTable(doc, {
       startY: currentY + 7,
       head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
-      body: items.map((item: any) => {
-        const resp = mission.p3Selections[item.id] || 'D';
+      body: filteredItems.map((item: any) => {
+        const resp = mission.p3Selections[item.id];
         const weight = (item.w as any)[resp] || 0;
         const respLabel = { S: 'SIM', N: 'NÃO', D: 'DESCONHECIDO' }[resp as 'S'|'N'|'D'];
         return [
@@ -656,6 +663,9 @@ const generateFgrPDF = (mission: any) => {
     Object.entries(PARTE_IV_DATA).forEach(([category, items]) => {
       if (!activeProfiles.includes(category)) return;
 
+      const filteredItems = items.filter(item => mission.p4Selections[item.id]);
+      if (filteredItems.length === 0 && category !== 'REGULAR') return; 
+
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text(category === 'REGULAR' ? 'Valor Básico' : category, 20, currentY + 5);
@@ -663,8 +673,8 @@ const generateFgrPDF = (mission: any) => {
       autoTable(doc, {
         startY: currentY + 7,
         head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
-        body: items.map(item => {
-          const resp = mission.p4Selections[item.id] || 'D';
+        body: filteredItems.map(item => {
+          const resp = mission.p4Selections[item.id];
           const weight = (item.w as any)[resp] || 0;
           const respLabel = { S: 'SIM', N: 'NÃO', D: 'DESCONHECIDO' }[resp as 'S'|'N'|'D'];
           return [
