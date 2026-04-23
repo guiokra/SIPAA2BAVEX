@@ -20,6 +20,7 @@ import {
   LogOut,
   User,
   ShieldCheck,
+  ShieldAlert,
   Target,
   FileSearch,
   CheckSquare,
@@ -1203,11 +1204,9 @@ export default function App() {
         className={`fixed lg:relative z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-full shadow-2xl transition-all duration-300 ease-in-out`}
       >
         <div className="p-6 flex items-center gap-3 border-b border-border-theme">
-          <img 
-            src="https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png" 
-            alt="2º BAvEx Logo" 
-            className="w-10 h-10 object-contain drop-shadow-md"
-          />
+          <div className="w-10 h-10 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30">
+            <ShieldAlert className="text-accent-gold" size={24} />
+          </div>
           <div className="flex flex-col">
             <span className="text-lg font-bold tracking-widest text-accent-gold leading-none">2º BAvEx</span>
             <span className="text-[10px] text-text-secondary font-medium mt-1 uppercase tracking-widest">Exército Brasileiro</span>
@@ -1322,20 +1321,14 @@ function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
     <div className="space-y-8">
       {/* Hero Welcome */}
       <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-[#101826] to-[#0d121d] border border-border-theme p-8 lg:p-10 shadow-2xl">
-        <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
-          <img 
-            src="https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png" 
-            alt="" 
-            className="w-48 h-48 grayscale brightness-200"
-          />
+        <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+          <ShieldAlert size={160} className="text-accent-gold" />
         </div>
         <div className="relative z-10 max-w-2xl">
           <div className="flex items-center gap-4 mb-6">
-            <img 
-              src="https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png" 
-              alt="2º BAvEx" 
-              className="w-16 h-16 object-contain"
-            />
+            <div className="w-16 h-16 bg-accent-gold/20 flex items-center justify-center rounded-xl border border-accent-gold/30 shadow-2xl">
+              <ShieldAlert className="text-accent-gold" size={32} />
+            </div>
             <div className="w-[1px] h-12 bg-border-theme" />
             <div>
               <p className="text-accent-gold text-[10px] font-black uppercase tracking-[0.2em]">
