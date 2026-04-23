@@ -2076,6 +2076,29 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
 
     setValidationErrors([]);
 
+    let finalMissionData = { ...missionData };
+    let finalP2Selections = { ...p2Selections };
+    let finalP3Selections = { ...p3Selections };
+    let finalP4Selections = { ...p4Selections };
+
+    if (isForced) {
+      // Preencher campos de texto da Parte I com ---
+      if (!finalMissionData.modeloAnv) finalMissionData.modeloAnv = '---';
+      if (!finalMissionData.aeronave.trim()) finalMissionData.aeronave = '---';
+      if (!finalMissionData.missao.trim()) finalMissionData.missao = '---';
+      if (!finalMissionData.local.trim()) finalMissionData.local = '---';
+      if (!finalMissionData.trigramaTrip.trim()) finalMissionData.trigramaTrip = '---';
+      if (!finalMissionData.preenchidoPor.trim()) finalMissionData.preenchidoPor = '---';
+      if (!finalMissionData.funcao) finalMissionData.funcao = '---';
+
+      // Preencher seleções faltantes (opcional, mas garante que apareçam no PDF se desejado)
+      PARTE_II_DATA.forEach(item => { if (!finalP2Selections[item.id]) (finalP2Selections as any)[item.id] = '---'; });
+      Object.keys(PARTE_III_DATA).forEach(cat => {
+        (PARTE_III_DATA as any)[cat].forEach((item: any) => { if (!finalP3Selections[item.id]) (finalP3Selections as any)[item.id] = 'D'; });
+      });
+      p4Questions.forEach((item: any) => { if (!finalP4Selections[item.id]) (finalP4Selections as any)[item.id] = 'D'; });
+    }
+
     if (hasImpediment) {
        alert("MISSÃO IMPEDIDA: Qualquer resposta 'NÃO' na Parte II exige autorização expressa do Cmt U Ae para execução do voo.");
        return;
@@ -2101,33 +2124,37 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
       };
 
       const missionPayload = {
-        ...missionData,
+        ...finalMissionData,
         perfisVoo,
-        p2Selections,
-        p3Selections,
-        p4Selections,
+        p2Selections: finalP2Selections,
+        p3Selections: finalP3Selections,
+        p4Selections: finalP4Selections,
         gravidadeSelections,
         mitigation,
         scores,
         uid: activeUserUid,
-        relatorName: user?.displayName || missionData.preenchidoPor || 'Convidado',
+        relatorName: user?.displayName || finalMissionData.preenchidoPor || 'Convidado',
         createdAt: new Date().toISOString()
       };
 
       const docRef = await addDoc(collection(db, 'fgrMissions'), missionPayload);
+      
+      // Abrir PDF imediatamente após o sucesso do salvamento para conferência
+      const docPdf = generateFgrPDF(missionPayload);
+      const blob = docPdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
 
       setIsSaving(false);
       alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
       resetAll();
 
-      // Gerar e Upload do PDF em background (Não bloqueia o UI)
+      // Upload do PDF em background (Não bloqueia o UI)
       (async () => {
         try {
-          const docPdf = generateFgrPDF(missionPayload);
-          const fileName = `fgr_${missionData.missao.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+          const fileName = `fgr_${finalMissionData.missao.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
           const storageRef = ref(storage, `fgr_pdfs/${fileName}`);
           
-          const blob = docPdf.output('blob');
           const uploadTask = await uploadBytes(storageRef, blob);
           const pdfUrl = await getDownloadURL(uploadTask.ref);
           
@@ -2137,10 +2164,6 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
           }, { merge: true });
           
           console.log("PDF FGR processado em background.");
-          
-          // Abre o PDF se possível (pode ser bloqueado se demorar muito)
-          const url = URL.createObjectURL(blob);
-          window.open(url, '_blank');
         } catch (pdfErr) {
           console.error("Erro ao processar PDF FGR em background:", pdfErr);
         }
