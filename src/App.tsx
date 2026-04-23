@@ -525,6 +525,7 @@ const generateAbortivaPDF = (abort: any) => {
 const generateFgrPDF = (mission: any) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   
   // Header
   doc.setFillColor(26, 31, 37); // #1a1f25
@@ -571,15 +572,111 @@ const generateFgrPDF = (mission: any) => {
     head: [['Assertiva', 'Resposta']],
     body: PARTE_II_DATA.map(item => [
       item.text,
-      mission.p2Selections[item.id] || 'N/A'
+      mission.p2Selections[item.id] || '---'
     ]),
     theme: 'grid',
-    styles: { fontSize: 8 },
+    styles: { fontSize: 7 },
     columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 20, halign: 'center' } }
   });
+
+  // Parte III - Fatores
+  doc.addPage();
+  doc.setFontSize(14);
+  doc.text('III - Fatores Baseados na Gestão', 20, 20);
   
+  let currentY = 25;
+  Object.entries(PARTE_III_DATA).forEach(([category, items]) => {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(category, 20, currentY + 5);
+    
+    autoTable(doc, {
+      startY: currentY + 7,
+      head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
+      body: items.map(item => {
+        const resp = mission.p3Selections[item.id] || 'D';
+        const weight = (item.w as any)[resp] || 0;
+        return [
+          item.id.replace('p3_', '').toUpperCase(),
+          item.text,
+          { S: 'SIM', N: 'NÃO', D: 'N/A' }[resp as 'S'|'N'|'D'],
+          weight.toString()
+        ];
+      }),
+      theme: 'grid',
+      styles: { fontSize: 7 },
+      columnStyles: { 
+        0: { cellWidth: 15 },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 15, halign: 'center' }
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 3) {
+          const val = parseInt(data.cell.text[0]);
+          if (val > 0) {
+            data.cell.styles.textColor = [255, 0, 0];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      }
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 5;
+  });
+
+  // Parte IV - Fatores de Gravidade
+  if (currentY > pageHeight - 40) {
+    doc.addPage();
+    currentY = 20;
+  } else {
+    currentY += 10;
+  }
+  doc.setFontSize(14);
+  doc.text('IV - Fatores de Gravidade', 20, currentY);
+  currentY += 5;
+  Object.entries(PARTE_IV_DATA).forEach(([category, items]) => {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(category, 20, currentY + 5);
+    
+    autoTable(doc, {
+      startY: currentY + 7,
+      head: [['ID', 'Assertiva', 'Resposta', 'Peso']],
+      body: items.map(item => {
+        const resp = mission.p4Selections[item.id] || 'D';
+        const weight = (item.w as any)[resp] || 0;
+        return [
+          item.id.replace('p4_', '').toUpperCase(),
+          item.text,
+          { S: 'SIM', N: 'NÃO', D: 'N/A' }[resp as 'S'|'N'|'D'],
+          weight.toString()
+        ];
+      }),
+      theme: 'grid',
+      styles: { fontSize: 7 },
+      columnStyles: { 
+        0: { cellWidth: 15 },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 15, halign: 'center' }
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 3) {
+          const val = parseInt(data.cell.text[0]);
+          if (val > 0) {
+            data.cell.styles.textColor = [255, 0, 0];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      }
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 5;
+  });
+
   // Risk Box (Destaque)
-  const riskY = (doc as any).lastAutoTable.finalY + 10;
+  if (currentY > pageHeight - 60) {
+    doc.addPage();
+    currentY = 20;
+  }
+  const riskY = currentY + 10;
   const riskStatus = getRiskClass(mission.scores.riskMax, mission.tipoVoo);
   
   doc.setFillColor(riskStatus.hex[0], riskStatus.hex[1], riskStatus.hex[2]);
@@ -1260,7 +1357,7 @@ const PARTE_III_DATA = {
     { id: "p3_rh_1", text: "Um dos pilotos realizou pelo menos um voo em menos de 30 dias.", w: { S: 0, N: 2, D: 2 } },
     { id: "p3_rh_2", text: "O 1P/PO possui MENOS de 50 HV no modelo na função de 1P.", w: { S: 2, N: 0, D: 2 } },
     { id: "p3_rh_3", text: "O PA/PB possui MENOS de 50 HV no modelo na função de 2P.", w: { S: 2, N: 0, D: 2 } },
-    { id: "p3_rh_4", text: "OM/OV/MV possui MENOS de 50 HV no modelo na função de MV/OM/VL.", w: { S: 2, N: 0, D: 2 } },
+    { id: "p3_rh_4", text: "O MVO/MVI possui MENOS de 50 HV no modelo na função de MVO/MVI.", w: { S: 2, N: 0, D: 2 } },
     { id: "p3_rh_5", text: "MVA/MVB possui MENOS de 50 HV no modelo na função de MVA/MVB.", w: { S: 2, N: 0, D: 2 } },
     { id: "p3_rh_6", text: "A tripulação participou do CRM nos últimos 24 meses.", w: { S: 0, N: 2, D: 2 } },
     { id: "p3_rh_7", text: "Briefing da missão realizado de forma completa e detalhada.", w: { S: 0, N: 2, D: 2 } },
