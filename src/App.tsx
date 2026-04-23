@@ -505,7 +505,7 @@ const generateAbortivaPDF = (abort: any) => {
     startY: 60,
     head: [['Campo', 'Informação']],
     body: [
-      ['Data do Voo', abort.dataVoo || 'N/A'],
+      ['Data do Voo', abort.dataVoo ? (abort.dataVoo.includes('-') ? abort.dataVoo.split('-').reverse().join('/') : abort.dataVoo) : 'N/A'],
       ['Nº Lançamento', abort.numLancamento || 'N/A'],
       ['Modelo Anv', abort.modeloAnv || 'N/A'],
       ['Motivo', motivoDisplay],
@@ -553,7 +553,7 @@ const generateFgrPDF = (mission: any) => {
       ['Matrícula(s) Anv', mission.aeronave || 'N/A'],
       ['Missão', mission.missao || 'N/A'],
       ['Local', mission.local || 'N/A'],
-      ['Data', mission.data || 'N/A'],
+      ['Data', mission.data ? (mission.data.includes('-') ? mission.data.split('-').reverse().join('/') : mission.data) : 'N/A'],
       ['Trigramas Tripulação', mission.trigramaTrip || 'N/A'],
       ['Preenchido por', mission.preenchidoPor || 'N/A'],
       ['Função', mission.funcao || 'N/A']
@@ -845,7 +845,8 @@ const generateRelprevPDF = (report: any) => {
   };
 
   addBlock('Local', report.local);
-  addBlock('Data e Horário do Fato', `${report.dataFato} às ${report.horaFato}`);
+  const displayDataFato = report.dataFato ? (report.dataFato.includes('-') ? report.dataFato.split('-').reverse().join('/') : report.dataFato) : 'N/A';
+  addBlock('Data e Horário do Fato', `${displayDataFato} às ${report.horaFato}`);
   addBlock('Pessoal envolvido e/ou aeronave', report.envolvidos);
   addBlock('Situação', report.situacao);
   
@@ -860,7 +861,7 @@ const generateRelprevPDF = (report: any) => {
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(180, 180, 180);
-  doc.text(`Protocolo SIPAA: ${report.codigo} | Gerado em ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  doc.text(`Protocolo SIPAA: ${report.codigo} | Gerado em ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
   return doc;
 };
@@ -1148,14 +1149,21 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="card-military max-w-sm w-full p-8 space-y-6"
             >
-              <div className="flex justify-between items-center">
-                <h3 className="text-military-gold font-black uppercase text-xs tracking-widest flex items-center gap-2">
-                  <Lock size={14} />
-                  Acesso Administrativo
-                </h3>
-                <button onClick={() => setIsAdminModalOpen(false)} className="text-text-secondary hover:text-white">
-                  <X size={18} />
-                </button>
+              <div className="flex flex-col items-center gap-4 text-center mb-4">
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png" 
+                  alt="2º BAvEx" 
+                  className="w-16 h-16 object-contain"
+                />
+                <div className="flex justify-between items-center w-full">
+                  <h3 className="text-military-gold font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                    <Lock size={14} />
+                    Acesso Administrativo
+                  </h3>
+                  <button onClick={() => setIsAdminModalOpen(false)} className="text-text-secondary hover:text-white">
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
               <form onSubmit={handleAdminLogin} className="space-y-4">
                 <div className="space-y-1.5">
@@ -1188,9 +1196,11 @@ export default function App() {
         className={`fixed lg:relative z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-full shadow-2xl transition-all duration-300 ease-in-out`}
       >
         <div className="p-6 flex items-center gap-3 border-b border-border-theme">
-          <div className="logo-hex w-10 h-10 bg-gradient-to-br from-accent-gold to-accent-gold-dark flex items-center justify-center shadow-lg text-bg-deep font-bold text-[10px] text-center shrink-0">
-            SIPAA
-          </div>
+          <img 
+            src="https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png" 
+            alt="2º BAvEx Logo" 
+            className="w-10 h-10 object-contain drop-shadow-md"
+          />
           <div className="flex flex-col">
             <span className="text-lg font-bold tracking-widest text-accent-gold leading-none">2º BAvEx</span>
             <span className="text-[10px] text-text-secondary font-medium mt-1 uppercase tracking-widest">Exército Brasileiro</span>
@@ -1262,7 +1272,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-6 text-[12px] text-text-secondary">
-            <span className="hidden md:block">Taubaté, SP | 24 OUT 2026 | 14:35 Z</span>
+            <span className="hidden md:block">Taubaté, SP | {new Date().toLocaleDateString('pt-BR')} | {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} Z</span>
             <div className="h-4 w-[1px] bg-border-theme hidden sm:block" />
             <div className="relative p-1.5 hover:bg-white/5 rounded transition-colors cursor-pointer">
               <Bell size={16} />
@@ -1305,7 +1315,28 @@ function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
     <div className="space-y-8">
       {/* Hero Welcome */}
       <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-[#101826] to-[#0d121d] border border-border-theme p-8 lg:p-10 shadow-2xl">
+        <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+          <img 
+            src="https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png" 
+            alt="" 
+            className="w-48 h-48 grayscale brightness-200"
+          />
+        </div>
         <div className="relative z-10 max-w-2xl">
+          <div className="flex items-center gap-4 mb-6">
+            <img 
+              src="https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png" 
+              alt="2º BAvEx" 
+              className="w-16 h-16 object-contain"
+            />
+            <div className="w-[1px] h-12 bg-border-theme" />
+            <div>
+              <p className="text-accent-gold text-[10px] font-black uppercase tracking-[0.2em]">
+                Exército Brasileiro
+              </p>
+              <h1 className="text-xl font-bold text-white tracking-widest">2º BAvEx</h1>
+            </div>
+          </div>
           <p className="text-accent-gold text-xs font-bold uppercase tracking-[0.2em] mb-4">
             Seção de Investigação e Prevenção de Acidentes Aeronáuticos
           </p>
@@ -3108,7 +3139,7 @@ function AbastecimentoSection({ onTabChange, abastecimentoFiles }: { onTabChange
                     <FileText size={24} />
                   </div>
                   <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-tighter">
-                    {new Date(file.createdAt).toLocaleDateString()}
+                    {new Date(file.createdAt).toLocaleDateString('pt-BR')}
                   </span>
                 </div>
                 
@@ -3233,7 +3264,7 @@ function FaunaSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void 
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Data</label>
-                      <input type="date" className="input-military" defaultValue="2026-04-16" />
+                      <input type="date" className="input-military" defaultValue={new Date().toISOString().split('T')[0]} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Horário Aproximado</label>
@@ -3258,10 +3289,10 @@ function FaunaSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void 
               <div className="card-military">
                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Histórico de Incidentes</h3>
                  <div className="space-y-5">
-                    <FaunaItem date="Hoje, 09:30" species="Bando de Quero-quero" local="Área de Manobra" />
-                    <FaunaItem date="15 Abr, 16:20" species="Urubus (Forte Concentração)" local="Setor Final Aproximação" />
-                    <FaunaItem date="14 Abr, 08:15" species="Lebrão / Fauna Terrestre" local="Pista de Pouso lateral" />
-                    <FaunaItem date="12 Abr, 11:00" species="Aves não identificadas" local="Hangar Principal" />
+                    <FaunaItem date={`${new Date().toLocaleDateString('pt-BR')} 09:30`} species="Bando de Quero-quero" local="Área de Manobra" />
+                    <FaunaItem date="15/04/2026 16:20" species="Urubus (Forte Concentração)" local="Setor Final Aproximação" />
+                    <FaunaItem date="14/04/2026 08:15" species="Lebrão / Fauna Terrestre" local="Pista de Pouso lateral" />
+                    <FaunaItem date="12/04/2026 11:00" species="Aves não identificadas" local="Hangar Principal" />
                  </div>
               </div>
               <div className="card-military bg-military-gold/5 border-military-gold/20">
@@ -3798,7 +3829,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                   <tbody className="divide-y divide-border-theme/30 text-[11px]">
                     {relprevs.map(r => (
                       <tr key={r.id} className="hover:bg-white/2 transition-colors">
-                        <td className="px-4 py-3 font-mono">{new Date(r.createdAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 font-mono">{new Date(r.createdAt).toLocaleDateString('pt-BR')}</td>
                         <td className="px-4 py-3 text-military-gold font-bold">{r.codigo}</td>
                         <td className="px-4 py-3 text-white truncate max-w-[200px]">{r.situacao}</td>
                         <td className="px-4 py-3 text-text-secondary">{r.relatorNome || 'Anônimo'}</td>
@@ -3840,7 +3871,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                   <div>
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-military-gold font-mono font-black text-xs leading-none">{r.codigo}</span>
-                      <span className="text-[9px] text-text-secondary">{new Date(r.createdAt).toLocaleDateString()}</span>
+                      <span className="text-[9px] text-text-secondary">{new Date(r.createdAt).toLocaleDateString('pt-BR')}</span>
                     </div>
                     <h4 className="text-white font-bold text-sm leading-tight mb-2 line-clamp-2">{r.situacao}</h4>
                     <div className="text-[9px] text-text-secondary uppercase font-bold tracking-widest truncate">
@@ -3898,7 +3929,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                  <tbody className="divide-y divide-border-theme/30 text-[11px]">
                    {fgrs.map(f => (
                      <tr key={f.id} className="hover:bg-white/2 transition-colors">
-                       <td className="px-4 py-3 font-mono">{new Date(f.createdAt).toLocaleDateString()}</td>
+                       <td className="px-4 py-3 font-mono">{new Date(f.createdAt).toLocaleDateString('pt-BR')}</td>
                        <td className="px-4 py-3 text-white font-bold">{f.missao}</td>
                        <td className="px-4 py-3 text-text-secondary uppercase">{f.aeronave} | {f.relatorName || 'Conv.'}</td>
                        <td className="px-4 py-3">
@@ -3962,7 +3993,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                    </div>
                    <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
                      <div className="truncate">Av: <span className="text-slate-300">{f.aeronave}</span></div>
-                     <div className="text-right">{new Date(f.createdAt).toLocaleDateString()}</div>
+                     <div className="text-right">{new Date(f.createdAt).toLocaleDateString('pt-BR')}</div>
                    </div>
                    <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight truncate">
                      Rel: <span className="text-slate-300">{f.relatorName || 'Conv.'}</span>
@@ -4026,7 +4057,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                  <tbody className="divide-y divide-border-theme/30 text-[11px]">
                    {abortivas.map(a => (
                      <tr key={a.id} className="hover:bg-white/2 transition-colors">
-                       <td className="px-4 py-3 font-mono">{new Date(a.createdAt).toLocaleDateString()}</td>
+                       <td className="px-4 py-3 font-mono">{new Date(a.createdAt).toLocaleDateString('pt-BR')}</td>
                        <td className="px-4 py-3 text-white font-bold">{a.numLancamento}</td>
                        <td className="px-4 py-3 text-text-secondary uppercase">{a.modeloAnv} | {a.preenchidoPor}</td>
                        <td className="px-4 py-3">
@@ -4086,7 +4117,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                    </div>
                    <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
                      <div className="truncate">Mod: <span className="text-slate-300">{a.modeloAnv}</span></div>
-                     <div className="text-right">{new Date(a.createdAt).toLocaleDateString()}</div>
+                     <div className="text-right">{new Date(a.createdAt).toLocaleDateString('pt-BR')}</div>
                    </div>
                  </div>
                  <div className="flex items-center gap-2 pt-3 border-t border-white/5">
@@ -4176,7 +4207,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                   {abastecimentoConfig?.updatedAt && (
                     <div className="mt-6 pt-4 border-t border-military-gold/10">
                       <p className="text-[9px] text-slate-500 uppercase tracking-widest">
-                        Última atualização: <span className="text-slate-300 font-bold">{new Date(abastecimentoConfig.updatedAt).toLocaleString()}</span> {abastecimentoConfig.fileName && <>• <span className="text-white font-mono">{abastecimentoConfig.fileName}</span></>} por <span className="text-military-gold font-bold">{abastecimentoConfig.updatedBy || 'Mestre/SIPAA'}</span>
+                        Última atualização: <span className="text-slate-300 font-bold">{new Date(abastecimentoConfig.updatedAt).toLocaleString('pt-BR')}</span> {abastecimentoConfig.fileName && <>• <span className="text-white font-mono">{abastecimentoConfig.fileName}</span></>} por <span className="text-military-gold font-bold">{abastecimentoConfig.updatedBy || 'Mestre/SIPAA'}</span>
                       </p>
                     </div>
                   )}
@@ -4199,7 +4230,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                             <div className="flex flex-col min-w-0">
                               <span className="text-[10px] text-white font-bold truncate uppercase">{file.name}</span>
                               <span className="text-[8px] text-slate-500 uppercase">
-                                {new Date(file.createdAt).toLocaleDateString()} • {(file.size / 1024 / 1024).toFixed(2)} MB
+                                {new Date(file.createdAt).toLocaleDateString('pt-BR')} • {(file.size / 1024 / 1024).toFixed(2)} MB
                               </span>
                             </div>
                           </div>
@@ -4257,7 +4288,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                       <FileText size={16} className="text-military-gold shrink-0" />
                       <div className="flex flex-col min-w-0">
                         <span className="text-[10px] text-white font-bold truncate uppercase">{a.modeloAnv} | LÇ {a.numLancamento}</span>
-                        <span className="text-[8px] text-slate-500 uppercase">{new Date(a.createdAt).toLocaleDateString()} • {a.motivo}</span>
+                        <span className="text-[8px] text-slate-500 uppercase">{new Date(a.createdAt).toLocaleDateString('pt-BR')} • {a.motivo}</span>
                       </div>
                     </div>
                     <button 
@@ -4388,7 +4419,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                           <div className="flex flex-col min-w-0">
                             <span className="text-[10px] text-white font-bold truncate uppercase">{b.name}</span>
                             <span className="text-[8px] text-slate-500 uppercase">
-                              {b.count} lançamentos • {new Date(b.date).toLocaleDateString()}
+                              {b.count} lançamentos • {new Date(b.date).toLocaleDateString('pt-BR')}
                             </span>
                           </div>
                         </div>
