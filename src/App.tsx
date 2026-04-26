@@ -1563,7 +1563,7 @@ const PARTE_III_DATA = {
   ],
   MATERIAL: [
     { id: "p3_ma_1", text: "A aeronave se encontra com MENOS de 10 HV após inspeção A/TC.", w: { S: 3, N: 0, D: 3 } },
-    { id: "p3_ma_2", text: "A aeronave RFD executar o voo pairado fora do efeito solo no local de pouso.", w: { S: 0, N: 3, D: 3 } },
+    { id: "p3_ma_2", text: "A aeronave ECD executar o voo pairado fora do efeito solo no local de pouso.", w: { S: 0, N: 3, D: 3 } },
     { id: "p3_ma_3", text: "A aeronave já foi pré-voada.", w: { S: 0, N: 1, D: 1 } },
   ],
   MISSAO: [
