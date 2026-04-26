@@ -788,7 +788,7 @@ const generateFgrPDF = (mission: any) => {
       doc.addPage();
     }
     doc.setFontSize(14);
-    doc.text('Medidas Mitigadoras', 20, (doc as any).lastAutoTable.finalY > pageHeight - 40 ? 20 : mitigY);
+    doc.text('Ações mitigadoras', 20, (doc as any).lastAutoTable.finalY > pageHeight - 40 ? 20 : mitigY);
     
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY > pageHeight - 40 ? 25 : mitigY + 5,
@@ -1627,6 +1627,59 @@ const GRAVIDADE_DATA = [
   { id: "g9", text: "Voo Técnico (Mnt)", pts: 1, autoByTipo: "TECNICO" }
 ];
 
+const SUGESTOES_MITIGACAO = {
+  "FATORES CRÍTICOS": [
+    "O PO deverá explicar missão, ameaças, rota, alternativa e critérios de abortagem antes da partida dos motores. Trip questionar pontos de dúvida;",
+    "Realizar pré-voo e externa sem celular, sem conversa paralela e sem interrupção;",
+    "Pilotos e MVs conferindo a execução do checklist;",
+    "Trip alertar quanto à necessidade de seguir os procedimentos previstos e treinados;",
+    "Definir condições para cancelar a missão, como desvio máximo aceitável da rota, limite de descida para evitar formações meteorológicas, quantidade máxima de pessoal e material a ser embarcado, combustível mínimo para manter o voo;",
+    "Buscar contato com Trip do Rec, conversar com outros pilotos e mecânicos ou buscar informações na imagem de satélite;",
+    "Realizar uma ou mais passagens sobre a área e só iniciar a aproximação quando todos os obstáculos forem reconhecidos;",
+    "Ouvir os demais integrantes da Trip, parar a Anv quando solicitado ou arremeter sem hesitar. Discutir pontos críticos apenas quando o voo estiver em segurança;",
+    "Estabelecer critérios para abortar a missão e segui-los fielmente;",
+    "Explicar as circunstâncias do voo ou remover não tripulantes da fonia;",
+    "Trip monitorar se os critérios estabelecidos em briefing estão sendo seguidos;",
+    "Realizar o cálculo de desempenho antes do voo ou, se não for possível, realizá-lo em voo;",
+    "Designar um tripulante para atualizar os cálculos;",
+    "Realizar cheque de potência na região do pouso, se possível;",
+    "Considerar o acendimento de qualquer luz ou condição de emergência como real, até que a Trip concorde que seja pane de indicação;",
+    "Tripulação cobrar o uso do checklist de emergência, caso não ocorra;",
+    "Trip não habilitada IFR: estabelecer critérios para iniciar pouso de precaução. Trip monitorar se os limites de tolerância estão sendo obedecidos;",
+    "Trip IFR: separar as cartas e brifar procedimento em caso de entrada em IMC;",
+    "Decolar somente se as condições indicarem ser possível o voo VMC."
+  ],
+  "INSTRUÇÃO": [
+    "Trip monitorar degradação da consciência situacional e alertar;",
+    "Orientar o aluno uma vez e, caso não haja reação a contento, assumir os comandos e explicar depois, conforme a regra dos dois desafios (2 Challenge Rule);",
+    "Estabelecer funções claras para a Trip, definindo quem voa, quem monitora e qual MV orienta o pouso;",
+    "Manter cabine estéril nas fases críticas, falando somente o essencial para a manobra;",
+    "Considerar aluno com pouca experiência na Anv e ficar em condições de assumir os comandos;",
+    "Definir quem pilota e quem monitora. Em caso de visão de túnel de ambos os pilotos, Trip alertar."
+  ],
+  "IFR": [
+    "Trip alertar quanto à extrapolação dos limites, caso ocorra, e seguir o planejamento;",
+    "Usar dados meteorológicos reais em vez de achismos para previsão de melhora;",
+    "Estabelecer limites para prosseguir ou alternar;",
+    "Conferir por NOTAM a operacionalidade dos auxílios, em vez de confiar apenas em reporte de outras tripulações;",
+    "Estabelecer limites de desvio;",
+    "Designar um membro da Trip para alertar quanto ao combustível mínimo estabelecido;",
+    "Monitorar a pilotagem do outro piloto;",
+    "Confirmar ações do outro piloto em caso de indício de desorientação;",
+    "Monitorar ações do outro piloto e assumir os comandos, se for o caso."
+  ],
+  "OVN": [
+    "Consultar a possibilidade de iluminação residual de outras fontes;",
+    "Monitorar a degradação dos óculos e estabelecer limites para abortar o voo;",
+    "Monitorar indícios de desorientação. Confirmar ações e assumir os comandos, se for o caso;",
+    "Confirmar a compreensão do outro piloto/MV quanto à visualização de obstáculos ou reportes feitos pela Trip;",
+    "Trip não habilitada IFR: estabelecer critérios para abortar o voo. Trip monitorar e alertar proximidade de nuvens;",
+    "Trip IFR: separar as cartas e brifar procedimento em caso de entrada em IMC;",
+    "Decolar somente se as condições indicarem ser possível o voo visual;",
+    "Monitorar ações do outro piloto e assumir os comandos, se for o caso."
+  ]
+};
+
 function RelprevSection({ user, onTabChange }: { user: FirebaseUser | null, onTabChange: (tab: SectionKey) => void }) {
   const [reports, setReports] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -1996,6 +2049,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
   const [p4Selections, setP4Selections] = useState<Record<string, 'S' | 'N' | 'D'>>({});
   const [gravidadeSelections, setGravidadeSelections] = useState<Record<string, boolean>>({});
   const [mitigation, setMitigation] = useState("");
+  const [showMitigationSuggestions, setShowMitigationSuggestions] = useState(false);
 
   const updateStamp = () => setStamp(new Date().toLocaleString("pt-BR"));
 
@@ -2763,10 +2817,63 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
                         </div>
 
                         <div className="space-y-4">
-                           <div>
-                              <label className="text-[10px] font-black uppercase text-text-secondary tracking-widest mb-2 block">Medidas de Mitigação Exigidas</label>
+                           <div className="relative">
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="text-[10px] font-black uppercase text-text-secondary tracking-widest block">Ações mitigadoras</label>
+                                <div className="relative mitigation-selector-container">
+                                  <button 
+                                    onClick={() => setShowMitigationSuggestions(!showMitigationSuggestions)}
+                                    className="px-3 py-1 bg-white/5 border border-white/10 rounded flex items-center gap-2 hover:bg-white/10 transition-all"
+                                  >
+                                    <Plus size={12} className="text-military-gold" />
+                                    <span className="text-[9px] font-black text-white uppercase tracking-widest">Sugestão de Ações Mitigadoras</span>
+                                  </button>
+
+                                  <AnimatePresence>
+                                    {showMitigationSuggestions && (
+                                      <motion.div 
+                                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                        className="absolute bottom-full right-0 mb-2 w-80 max-h-[400px] overflow-y-auto bg-bg-deep border border-accent-gold/20 rounded shadow-2xl z-50 p-4 custom-scrollbar"
+                                      >
+                                        <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                                          <span className="text-[10px] font-black text-accent-gold uppercase tracking-widest">Sugestões de Ações</span>
+                                          <button onClick={() => setShowMitigationSuggestions(false)}>
+                                            <X size={14} className="text-text-secondary" />
+                                          </button>
+                                        </div>
+                                        
+                                        <div className="space-y-6">
+                                          {Object.entries(SUGESTOES_MITIGACAO).map(([category, items]) => (
+                                            <div key={category} className="space-y-2">
+                                              <h4 className="text-[9px] font-black text-text-secondary uppercase tracking-[0.2em] mb-2">{category}</h4>
+                                              <div className="space-y-1">
+                                                {items.map((item, idx) => (
+                                                  <button 
+                                                    key={idx}
+                                                    onClick={() => {
+                                                      const newText = mitigation.trim() 
+                                                        ? `${mitigation.trim()}\n\n• ${item}`
+                                                        : `• ${item}`;
+                                                      setMitigation(newText);
+                                                    }}
+                                                    className="w-full text-left p-2 rounded hover:bg-white/5 text-[11px] text-text-secondary hover:text-white transition-all leading-tight border border-transparent hover:border-white/5"
+                                                  >
+                                                    {item}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              </div>
                               <textarea 
-                                className="input-military w-full h-32 text-sm leading-relaxed p-4"
+                                className="input-military w-full h-40 text-sm leading-relaxed p-4"
                                 placeholder="Descreva as ações para reduzir os riscos identificados..."
                                 value={mitigation}
                                 onChange={(e) => setMitigation(e.target.value)}
