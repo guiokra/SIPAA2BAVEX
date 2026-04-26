@@ -2284,7 +2284,7 @@ function FgrSection({ user, onTabChange, launches }: { user: FirebaseUser | null
                   <optgroup key={date} label={`DATA: ${date}`}>
                     {items.sort((a: any, b: any) => a.num.localeCompare(b.num)).map((l: any) => (
                       <option key={l.id} value={l.id}>
-                        {`${l.num} • ${l.anv} • ${l.p1}${l.mv && l.mv !== '---' ? ` • ${l.mv}` : ''}`}
+                        {`${l.num} • ${l.anv} • ${l.p1} • ${l.p2} • ${l.missao}`}
                       </option>
                     ))}
                   </optgroup>
@@ -2972,7 +2972,7 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
                 <optgroup key={date} label={`DATA: ${date}`}>
                   {items.sort((a: any, b: any) => a.num.localeCompare(b.num)).map((l: any) => (
                     <option key={l.id} value={l.id}>
-                      {`${l.num} • ${l.anv} • ${l.p1}`}
+                      {`${l.num} • ${l.anv} • ${l.p1} • ${l.p2} • ${l.missao}`}
                     </option>
                   ))}
                 </optgroup>
