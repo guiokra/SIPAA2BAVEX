@@ -881,116 +881,207 @@ const MONTHS_MAP: Record<string, string> = {
   JULHO: '07', AGOSTO: '08', SETEMBRO: '09', OUTUBRO: '10', NOVEMBRO: '11', DEZEMBRO: '12' 
 };
 
-async function extractTextFromPdf(file: File) {
+async function processPDVFile(file: File) {
   const arrayBuffer = await file.arrayBuffer();
-  const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-  const pdf = await loadingTask.promise;
-  let fullText = "";
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    fullText += content.items.map((item: any) => item.str).join(" ") + "\n";
-  }
-  return fullText;
-}
-
-function parsePDV(text: string) {
-  const dayRegex = /PLANO\s+DIÁRIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE\s+([A-ZÇÃÕÁÉÍÓÚ]+)\s+DE\s+(\d{4})/gi;
-  const days = [];
-  let matches = [...text.matchAll(dayRegex)];
-
-  matches.forEach((match, index) => {
-    const start = match.index || 0;
-    const end = matches[index + 1] ? matches[index + 1].index : text.length;
-    const block = text.slice(start, end);
-    
-    const dayNum = match[1].padStart(2, '0');
-    const month = MONTHS_MAP[match[2].toUpperCase()] || '??';
-    const dateLabel = `${dayNum}/${month}/${match[3]}`;
-
-    const launchRegex = /(\d{2})\s+([A-Z]{2,3})\s+(\d{4})/g;
-    const launches = [];
-    let lMatch;
-    
-    while ((lMatch = launchRegex.exec(block)) !== null) {
-      const lStart = lMatch.index;
-      const lLine = block.slice(lStart, lStart + 500).split('\n')[0];
-      const parts = lLine.split(/\s+/).filter(p => p.trim().length > 0);
-
-      if (parts.length < 5) continue;
-
-      const num = parts[0];
-      const anv = `${parts[1]} ${parts[2]}`;
-      const p1 = parts[3];
-      const p2 = parts[4];
-
-      let adDestIdx = -1;
-      for (let i = 5; i < parts.length; i++) {
-        // Matches exactly 4 uppercase letters (SBTA, SBSJ, etc)
-        if (/^[A-Z]{4}$/.test(parts[i])) { 
-          adDestIdx = i;
-          break;
-        }
-      }
-
-      const mvStr = adDestIdx > 5 ? parts.slice(5, adDestIdx).join(" ") : "---";
-      const dest = adDestIdx !== -1 ? parts[adDestIdx] : "---";
-
-      // Encontrar a Missão: Geralmente após o POB (TBN)
-      let missaoStr = "---";
-      const tbnIdx = parts.lastIndexOf("TBN");
-      if (tbnIdx !== -1 && tbnIdx < parts.length - 1) {
-        // A missão pode ter espaços (ex: DVI / EMG 2). Paramos ao encontrar "(" (LEG) ou "-"
-        const missionParts = [];
-        for (let i = tbnIdx + 1; i < parts.length; i++) {
-          const p = parts[i];
-          if (p.includes('(') || p === '-') break;
-          missionParts.push(p);
-        }
-        missaoStr = missionParts.join(" ").trim();
-      } else {
-        // Fallback: se não achar TBN, tenta pegar o que sobrou após o EOBT ou DEST
-        const remaining = parts.slice(adDestIdx + 1).filter(p => !/^\d{2}H\d{2}$/i.test(p) && !/^\d+$/.test(p));
-        const missionParts = [];
-        for (const p of remaining) {
-          if (p.includes('(') || p === '-') break;
-          missionParts.push(p);
-        }
-        missaoStr = missionParts.join(" ").trim();
-      }
-
-      let eobt = "---";
-      for (let i = adDestIdx + 1; i < parts.length; i++) {
-        if (/^\d{2}H\d{2}$/i.test(parts[i])) {
-          eobt = parts[i];
-          break;
-        }
-      }
-
-      launches.push({ num, anv, p1, p2, mv: mvStr, missao: missaoStr, dest, eobt });
-    }
-
-    if (launches.length > 0) {
-      days.push({ dateLabel, launches });
-    }
-  });
-  return days;
-}
-
-const normalizePDVDate = (dateStr: string) => {
-  if (!dateStr) return 'Sem Data';
-  const parts = dateStr.toUpperCase().replace('PARA O DIA ', '').split(/\s+/);
-  // Expected: ["14", "DE", "ABRIL", "DE", "2026"]
-  const day = parts[0]?.padStart(2, '0');
-  const monthName = parts[parts.length - 3] || ''; // "ABRIL"
-  const year = parts[parts.length - 1] || ''; // "2026"
-  const month = MONTHS_MAP[monthName] || '??';
+  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   
-  if (day && month !== '??' && year.length === 4) {
-    return `${day}/${month}/${year}`;
+  const dayMap = new Map<string, any[]>();
+  let lastContinuationDay: string | null = null;
+
+  for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+    const page = await pdf.getPage(pageNo);
+    const content = await page.getTextContent();
+    const text = normalizePDVText(content.items.map((i: any) => i.str || '').join(' '));
+    
+    const headers = findPDVHeaders(text);
+    const tableStarts = findAllIndexes(text, /LÇ\s+ANV\s+1P\s+2P\s+MV\s+AD\s+DEST[\s\S]{0,450}?MISS[AÃ]O\s+LEG/g);
+    
+    const eligibleHeaders = headers.filter((h, idx) => {
+      const next = headers[idx + 1]?.index ?? text.length;
+      const section = text.slice(h.index, next);
+      return !/SEM\s+ATIVIDADE\s+A[ÉE]REA/i.test(section);
+    });
+
+    const tableDay = new Map<number, string>();
+    if (tableStarts.length) {
+      for (let i = 0; i < tableStarts.length; i++) {
+        let day = eligibleHeaders[i]?.dateLabel;
+        if (!day) {
+          const nearest = findNearestPreviousHeader(tableStarts[i]!, eligibleHeaders);
+          day = nearest || lastContinuationDay;
+        }
+        if (day) tableDay.set(tableStarts[i]!, day);
+      }
+    }
+
+    const rowMatches = [...text.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+(\d{3,4})\b/g)];
+    for (let r = 0; r < rowMatches.length; r++) {
+      const m = rowMatches[r];
+      const rowStart = m.index! + (m[0].match(/^\s/) ? 1 : 0);
+      let rowEnd = rowMatches[r + 1]?.index ?? text.length;
+      
+      const nextTable = tableStarts.find(t => t > rowStart);
+      const nextHeader = headers.find(h => h.index! > rowStart)?.index;
+      const nextLegend = indexAfter(text, /\bLEGENDAS\b|CRISTIAN\s+FERNANDO/i, rowStart);
+      
+      rowEnd = Math.min(rowEnd, nextTable ?? rowEnd, nextHeader ?? rowEnd, nextLegend ?? rowEnd);
+      const block = text.slice(rowStart, rowEnd);
+      
+      const launch = parseRowBlock(block);
+      if (!launch) continue;
+
+      const previousTable = [...tableStarts].reverse().find(t => t < rowStart);
+      const day = (previousTable !== undefined ? tableDay.get(previousTable) : null) || lastContinuationDay;
+      
+      if (!day) continue;
+      
+      if (!dayMap.has(day)) dayMap.set(day, []);
+      const dayLaunches = dayMap.get(day)!;
+      
+      if (!dayLaunches.some(l => l.num === launch.num && l.anv === launch.anv && l.p1 === launch.p1)) {
+        dayLaunches.push(launch);
+      }
+      
+      lastContinuationDay = day;
+    }
+
+    if (tableStarts.length) {
+      const lastTable = tableStarts[tableStarts.length - 1];
+      const lastDay = tableDay.get(lastTable!);
+      if (lastDay) lastContinuationDay = lastDay;
+    }
   }
-  return dateStr; // Fallback to raw if logic fails
-};
+
+  const results: { dateLabel: string, launches: any[] }[] = [];
+  for (const [dateLabel, launches] of dayMap.entries()) {
+    launches.sort((a, b) => Number(a.num) - Number(b.num));
+    results.push({ dateLabel, launches });
+  }
+
+  return results;
+}
+
+function normalizePDVText(s: string) {
+  return String(s || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+function normalizePDVMission(s: string) {
+  return String(s || '')
+    .replace(/\s*\/\s*/g, ' / ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+function stripAccents(s: string) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function cleanCrew(s: string) {
+  return String(s || '').replace(/[^A-Z]/g, '').toUpperCase();
+}
+
+function isTrigram(s: string) {
+  return /^[A-Z]{3}$/.test(cleanCrew(s));
+}
+
+function isIcao(s: string) {
+  return /^[A-Z]{4}$/.test(String(s || '').replace(/[^A-Z]/g, ''));
+}
+
+function unique(arr: any[]) {
+  return [...new Set(arr.filter(Boolean))];
+}
+
+function findAllIndexes(text: string, re: RegExp) {
+  return [...text.matchAll(re)].map(m => m.index);
+}
+
+function findNearestPreviousHeader(pos: number, headers: any[]) {
+  let day = null;
+  for (const h of headers) {
+    if (h.index !== undefined && h.index < pos) day = h.dateLabel;
+    else break;
+  }
+  return day;
+}
+
+function indexAfter(text: string, re: RegExp, start: number) {
+  const m = re.exec(text.slice(start));
+  return m ? start + m.index : null;
+}
+
+function findPDVHeaders(text: string) {
+  const re = /PLANO\s+DI[AÁ]RIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE\s+([A-ZÇÃÁÉÍÓÚ]+)\s+DE\s+(\d{4})/gi;
+  const headers = [];
+  for (const m of text.matchAll(re)) {
+    const dd = String(parseInt(m[1], 10)).padStart(2, '0');
+    const monthName = stripAccents(m[2].toUpperCase());
+    const mm = MONTHS_MAP[monthName] || '??';
+    if (mm === '??') continue;
+    headers.push({ index: m.index, dateLabel: `${dd}/${mm}/${m[3]}` });
+  }
+  return headers;
+}
+
+function parseRowBlock(block: string) {
+  block = normalizePDVText(block).replace(/\bLEGENDAS\b[\s\S]*$/i, '').replace(/CRISTIAN\s+FERNANDO[\s\S]*$/i, '');
+  const tokens = block.split(' ').filter(Boolean);
+  if (tokens.length < 10) return null;
+  if (!/^\d{2}$/.test(tokens[0]) || tokens[1] !== 'EXB' || !/^\d{3,4}$/.test(tokens[2])) return null;
+
+  const num = tokens[0];
+  const anv = `EXB ${tokens[2]}`;
+  const p1 = cleanCrew(tokens[3]);
+  const p2 = cleanCrew(tokens[4]);
+  if (!isTrigram(p1) || !isTrigram(p2)) return null;
+
+  let i = 5;
+  const mvParts = [];
+  while (i < tokens.length && !isIcao(tokens[i])) {
+    const t = cleanCrew(tokens[i]);
+    if (isTrigram(t)) mvParts.push(t);
+    i++;
+  }
+  if (!mvParts.length || i >= tokens.length) return null;
+  const dest = tokens[i].replace(/[^A-Z0-9]/g, '');
+  if (!isIcao(dest)) return null;
+
+  let tbnIdx = -1;
+  const eobtRegex = /^\d{2}H\d{2}$/i;
+  let eobt = "---";
+
+  for (let j = i + 1; j < tokens.length; j++) {
+    if (tokens[j].replace(/[^A-Z]/g, '') === 'TBN') tbnIdx = j;
+    if (eobt === "---" && eobtRegex.test(tokens[j])) eobt = tokens[j];
+  }
+
+  const missionParts = [];
+  if (tbnIdx !== -1) {
+    for (let j = tbnIdx + 1; j < tokens.length; j++) {
+      let t = tokens[j];
+      if (/^\(/.test(t) || t === '-' || /^LEGENDAS$/i.test(t)) break;
+      if (/^(TRIPULAÇÃO|TRIPULACAO|ANV|SAR|AUX|TEL)$/i.test(stripAccents(t))) break;
+      missionParts.push(t);
+    }
+  } else {
+     const remaining = tokens.slice(i + 1).filter(p => !eobtRegex.test(p) && !/^\d+$/.test(p));
+     for (const p of remaining) {
+       if (p.includes('(') || p === '-') break;
+       missionParts.push(p);
+     }
+  }
+
+  const missao = normalizePDVMission(missionParts.join(' ')) || "---";
+
+  return { num, anv, p1, p2, mv: unique(mvParts).join(' '), dest, missao, eobt };
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<SectionKey>('Inicio');
@@ -4361,8 +4452,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                       if (!file) return;
                       setIsUploading(true);
                       try {
-                        const text = await extractTextFromPdf(file);
-                        const days = parsePDV(text);
+                        const days = await processPDVFile(file);
                         let count = 0;
                         const batchId = `PDV_${Date.now()}`;
                         for (const day of days) {
