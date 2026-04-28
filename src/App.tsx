@@ -1250,9 +1250,13 @@ export default function App() {
             >
               <div className="flex flex-col items-center gap-4 text-center mb-4">
                 <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png" 
-                  alt="2º BAvEx" 
+                  src="https://i.ibb.co/0pjMXVKB/2-bavex.png" 
+                  alt="2º BAvEx Logo" 
                   className="w-16 h-16 object-contain"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.src = "https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png";
+                  }}
                 />
                 <div className="flex justify-between items-center w-full">
                   <h3 className="text-military-gold font-black uppercase text-xs tracking-widest flex items-center gap-2">
@@ -1296,7 +1300,23 @@ export default function App() {
       >
         <div className="p-6 flex items-center gap-3 border-b border-border-theme">
           <div className="w-10 h-10 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30">
-            <ShieldAlert className="text-accent-gold" size={24} />
+            <img 
+              src="https://i.ibb.co/0pjMXVKB/2-bavex.png" 
+              className="w-8 h-8 object-contain" 
+              alt="2º BAvEx Logo" 
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                // Fallback to the original icon if the image fails to load
+                e.currentTarget.style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  const fallback = document.createElement('div');
+                  fallback.className = 'text-accent-gold text-xl font-bold';
+                  fallback.innerText = '2';
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-bold tracking-widest text-accent-gold leading-none">2º BAvEx</span>
@@ -1413,12 +1433,22 @@ function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
       {/* Hero Welcome */}
       <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-[#101826] to-[#0d121d] border border-border-theme p-8 lg:p-10 shadow-2xl">
         <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
-          <ShieldAlert size={160} className="text-accent-gold" />
+          <img 
+            src="https://i.ibb.co/0pjMXVKB/2-bavex.png" 
+            className="w-40 h-40 object-contain" 
+            alt="" 
+            referrerPolicy="no-referrer"
+          />
         </div>
         <div className="relative z-10 max-w-2xl">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 bg-accent-gold/20 flex items-center justify-center rounded-xl border border-accent-gold/30 shadow-2xl">
-              <ShieldAlert className="text-accent-gold" size={32} />
+            <div className="w-16 h-16 bg-accent-gold/20 flex items-center justify-center rounded-xl border border-accent-gold/30 shadow-2xl overflow-hidden">
+              <img 
+                src="https://i.ibb.co/0pjMXVKB/2-bavex.png" 
+                className="w-10 h-10 object-contain" 
+                alt="2º BAvEx Logo" 
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div className="w-[1px] h-12 bg-border-theme" />
             <div>
