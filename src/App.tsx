@@ -1203,10 +1203,6 @@ export default function App() {
       window.open('https://santosdumont.anac.gov.br/menu/r/api/portal_unico_notificacao/selecao-do-tipo-de-evento?clear=103&session=111703245409353', '_blank');
       return;
     }
-    if (tab === 'Normas CAvEx') {
-      window.open('https://drive.google.com/drive/folders/1EDnPJbjEb4dWJYQ_BODhr_HGLUggwtRh', '_blank');
-      return;
-    }
     if (tab === 'Abastecimento') {
       if (abastecimentoConfig?.url) {
         window.open(abastecimentoConfig.url, '_blank');
@@ -3562,22 +3558,32 @@ function NormasSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
     <div className="space-y-8">
        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-slate-800">
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Biblioteca Normativa CAvEx</h2>
-            <p className="text-slate-400 text-sm">Acesso rápido a Portarias, Diretrizes e Manuais.</p>
+            <h2 className="text-2xl font-bold text-white mb-1">Normas Operacionais CAvEx</h2>
+            <p className="text-slate-400 text-sm">Acesso rápido às Normas Operacionais (NO) vigentes.</p>
           </div>
           <div className="relative group">
-             <input className="bg-military-gray border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-sm outline-none focus:border-military-gold w-full md:w-80 group-hover:border-slate-500 transition-all" placeholder="Pesquisar por Título ou Código..." />
+             <input className="bg-military-gray border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-sm outline-none focus:border-military-gold w-full md:w-80 group-hover:border-slate-500 transition-all" placeholder="Pesquisar Norma..." />
              <FileText className="absolute left-3 top-3.5 text-slate-500 group-hover:text-military-gold transition-colors" size={18} />
           </div>
        </div>
 
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <NormaCard title="R-105: Regras do Ar" category="Doutrina" desc="Normas fundamentais de circulação aérea e padronização de tráfego em aeródromos militares." />
-          <NormaCard title="DP-05: Emprego de NVG" category="Operações" desc="Diretrizes para planejamento e execução de missões noturnas com equipamentos de visão." />
-          <NormaCard title="MD-32: Manutenção de Campanha" category="Logística" desc="Instruções para manutenção preventiva em áreas isoladas e bases de desdobramento." />
-          <NormaCard title="SIPAA-01: Manual de Segurança" category="Prevenção" desc="A bíblia da segurança de voo no 2º BAvEx. Procedimentos, reportes e mitigação." />
-          <NormaCard title="CAvEx-PORT: Limites de Vento" category="Técnico" desc="Tabela atualizada de limites de vento para cada modelo de aeronave da frota." />
-          <NormaCard title="INS-14: Gerenciamento Tripulação" category="CRM" desc="Protocolos de comunicação e coordenação de cabine para missões multi-tripuladas." />
+          <NormaCard 
+            title="Norma Operacional 1" 
+            category="Operações" 
+            desc="Instrução e Operações na Aviação do Exército." 
+            url="https://drive.google.com/uc?export=download&id=1i5SO0RbSeX_pZwXUdF-KDpR7V83Zktpr"
+          />
+          <NormaCard title="Norma Operacional 3" category="Operações" desc="Padronização de Manobras e Procedimentos." />
+          <NormaCard title="Norma Operacional 4" category="Operações" desc="Emprego de Armamento e Tiro Aéreo." />
+          <NormaCard title="Norma Operacional 5" category="Operações" desc="Operações Aeromóveis e Cargas Externas." />
+          <NormaCard title="Norma Operacional 6" category="Operações" desc="Procedimentos Noturnos e OVN." />
+          <NormaCard title="Norma Operacional 7" category="Operações" desc="Busca e Salvamento (SAR) e Emergências." />
+          <NormaCard title="Norma Operacional 8" category="Operações" desc="Transporte Aéreo Logístico." />
+          <NormaCard title="Norma Operacional 9" category="Operações" desc="Operações em Áreas Confinadas e Montanha." />
+          <NormaCard title="Norma Operacional 11" category="Operações" desc="Instrução de Voo Básico e Avançado." />
+          <NormaCard title="Norma Operacional 12" category="Operações" desc="Meteorologia e Planejamento de Voo." />
+          <NormaCard title="Norma Operacional 14" category="Operações" desc="Gestão de Segurança e Gerenciamento de Risco." />
        </div>
     </div>
   );
@@ -5253,7 +5259,7 @@ function FaunaItem({ date, species, local }: any) {
   );
 }
 
-function NormaCard({ title, category, desc }: any) {
+function NormaCard({ title, category, desc, url }: any) {
    return (
     <div className="card-military h-full flex flex-col group hover:border-military-gold transition-all">
        <div className="mb-4">
@@ -5261,6 +5267,12 @@ function NormaCard({ title, category, desc }: any) {
           <h3 className="text-lg font-black text-white mt-2 group-hover:text-military-gold transition-colors italic tracking-tight">{title}</h3>
        </div>
        <p className="text-xs text-slate-400 leading-relaxed mb-6 flex-1">{desc}</p>
+       <button 
+         className="w-full py-2 bg-white/5 border border-white/10 rounded text-[10px] font-black uppercase tracking-widest text-white hover:bg-military-gold hover:text-military-gray transition-all"
+         onClick={() => window.open(url || '#', '_blank')}
+       >
+         Visualizar Norma
+       </button>
     </div>
    );
 }
