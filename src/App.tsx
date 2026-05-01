@@ -1203,14 +1203,6 @@ export default function App() {
       window.open('https://santosdumont.anac.gov.br/menu/r/api/portal_unico_notificacao/selecao-do-tipo-de-evento?clear=103&session=111703245409353', '_blank');
       return;
     }
-    if (tab === 'Abastecimento') {
-      if (abastecimentoConfig?.url) {
-        window.open(abastecimentoConfig.url, '_blank');
-      } else {
-        alert('Nenhum guia de abastecimento encontrado no sistema.');
-      }
-      return;
-    }
     if (tab === 'Admin' && !isAdminAuthenticated) {
       setIsAdminModalOpen(true);
       return;
@@ -3260,18 +3252,23 @@ function AbortivaSection({ user, launches }: { user: FirebaseUser | null, launch
 
 function MapaRiscoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
-    <div className="space-y-8">
-       <div>
-          <h2 className="text-2xl font-bold text-white mb-1">Mapa de Risco Operacional</h2>
-          <p className="text-slate-400">Visualização de ameaças e perigos atuais no setor.</p>
-        </div>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+       <div className="pb-4 border-b border-slate-800">
+          <h2 className="text-2xl font-bold text-white mb-1">Mapa de Risco</h2>
+          <p className="text-slate-400 text-sm">Acesso ao mapa de risco atualizado das operações.</p>
+       </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <RiscoCard type="critical" title="Presença de Drones" area="Setor Leste (Setor de Testes)" desc="Aumento de avistamentos de drones civis não autorizados em área de aproximação final." mitig="Notificar controle local e manter vigilância redobrada." />
-          <RiscoCard type="warning" title="Linhas de Transmissão" area="Taubaté - São José" desc="Nova estrutura de alta tensão instalada sem balizamento definitivo." mitig="Consultar NOTAM e evitar sobrevoo abaixo de 500ft AGU." />
-          <RiscoCard type="info" title="Obra na Taxivaria" area="Hangar 2" desc="Movimentação de máquinas e pessoal pesado na taxivaria paralela ao meio-dia." mitig="Seguir orientações do fiscal de pátio." />
-          <RiscoCard type="warning" title="Fauna: Urubus" area="Cabeceira 18" desc="Maior concentração de aves no período matutino devido a aterro próximo." mitig="Evitar decolagens de alta performance conforme horário." />
-        </div>
+       <div className="flex justify-center mt-12">
+          <div className="w-full max-w-md">
+            <NormaCard 
+              title="Mapa de Risco CAvEx" 
+              category="Segurança" 
+              desc="Documento oficial contendo o mapeamento de riscos operacionais da jurisdição do CAvEx." 
+              url="https://drive.google.com/uc?export=download&id=1qHaITGvMXPuhoRLHPDV3tkkfjQDZdBYZ"
+              buttonText="BAIXAR MAPA DE RISCO"
+            />
+          </div>
+       </div>
     </div>
   );
 }
@@ -3341,97 +3338,41 @@ function PosAcidenteSection({ onTabChange }: { onTabChange: (tab: SectionKey) =>
   );
 }
 
-function AbastecimentoSection({ onTabChange, abastecimentoFiles }: { onTabChange: (tab: SectionKey) => void, abastecimentoFiles: any[] }) {
+function AbastecimentoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Acervo de Abastecimento</h2>
-          <p className="text-military-gold font-bold text-xs uppercase tracking-[0.2em] mt-1">
-            Repositório de Documentos Oficiais 2º BAvEx
-          </p>
-        </div>
-        
-        <button 
-          onClick={() => {
-            const doc = generateAbastecimentoPDF();
-            window.open(doc.output('bloburl'), '_blank');
-          }}
-          className="btn-military px-6 py-3 text-[10px] uppercase font-black tracking-widest flex items-center gap-2"
-        >
-          <BookOpen size={16} />
-          Gerar Guia Padrão (Contingência)
-        </button>
-      </div>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+       <div className="pb-4 border-b border-slate-800">
+          <h2 className="text-2xl font-bold text-white mb-1">Abastecimento</h2>
+          <p className="text-slate-400 text-sm">Informações e procedimentos para abastecimento de aeronaves.</p>
+       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {abastecimentoFiles.length === 0 ? (
-          <div className="col-span-full card-military p-12 flex flex-col items-center justify-center text-center space-y-4 border-dashed border-white/10">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-slate-500">
-              <FileSearch size={32} />
-            </div>
-            <p className="text-slate-400 text-xs uppercase font-bold tracking-widest">Nenhum documento dinâmico disponível no momento.</p>
+       <div className="flex justify-center mt-12">
+          <div className="w-full max-w-md">
+            <NormaCard 
+              title="Locais e Procedimentos" 
+              category="Logística" 
+              desc="Guia completo com os pontos de abastecimento homologados e os procedimentos de segurança exigidos." 
+              url="https://drive.google.com/uc?export=download&id=1hLLjEOoihQiwq_pruy6nhEbm5Gd-vkTw"
+              buttonText="VER LOCAIS DE ABASTECIMENTO"
+            />
           </div>
-        ) : (
-          abastecimentoFiles.map((file) => (
-            <motion.div 
-              key={file.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card-military flex flex-col group hover:border-military-gold transition-all"
-            >
-              <div className="p-5 flex-1 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="p-3 rounded-lg bg-military-gold/10 text-military-gold group-hover:bg-military-gold group-hover:text-military-black transition-all">
-                    <FileText size={24} />
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-tighter">
-                    {new Date(file.createdAt).toLocaleDateString('pt-BR')}
-                  </span>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-black text-white group-hover:text-military-gold transition-colors line-clamp-2 uppercase tracking-tight leading-tight">
-                    {file.name}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-2">
-                     <span className="text-[8px] font-black text-military-gold bg-military-gold/10 px-2 py-0.5 rounded uppercase tracking-widest">PDF</span>
-                     <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 bg-white/5 border-t border-white/5 flex gap-2">
-                <button 
-                  onClick={() => window.open(file.url, '_blank')}
-                  className="flex-1 px-4 py-2.5 bg-military-gold text-military-black font-black text-[9px] uppercase tracking-widest rounded hover:bg-military-gold-dark transition-all flex items-center justify-center gap-2"
-                >
-                  <Eye size={14} /> Visualizar
-                </button>
-                <a 
-                  href={file.url}
-                  download={file.name}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex-1 px-4 py-2.5 bg-white/10 text-white font-black text-[9px] uppercase tracking-widest rounded hover:bg-white/20 transition-all flex items-center justify-center gap-2"
-                >
-                  <Download size={14} /> Baixar
-                </a>
-              </div>
-            </motion.div>
-          ))
-        )}
-      </div>
-
-      <div className="card-military p-4 border-blue-500/10 bg-blue-500/5 flex items-center gap-3">
-        <AlertCircle className="text-blue-400 shrink-0" size={16} />
-        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-tight">
-          Atenção: Os documentos listados nesta seção são de caráter oficial e para uso exclusivo da aviação do exército.
-        </p>
-      </div>
+       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function MeteoSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
@@ -3570,74 +3511,62 @@ function NormasSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <NormaCard 
             title="Norma Operacional 1" 
-            category="SIPAA" 
-            desc="Segurança de Voo" 
+            category="SEGURANÇA DE VOO" 
             url="https://drive.google.com/uc?export=download&id=1i5SO0RbSeX_pZwXUdF-KDpR7V83Zktpr"
           />
           <NormaCard 
             title="Norma Operacional 3" 
-            category="Operações" 
-            desc="Aeródromo de TBE e Áreas de Instrução" 
+            category="AERÓDROMO DE TBE E ÁREAS DE INSTRUÇÃO" 
             url="https://drive.google.com/uc?export=download&id=1FCPinzpqh4LaGWpEWPPwCbA4AOPiwjsF"
           />
           <NormaCard 
             title="Norma Operacional 4" 
-            category="Operações" 
-            desc="Transportes Especiais" 
+            category="TRANSPORTES ESPECIAIS" 
             url="https://drive.google.com/uc?export=download&id=1zonhjXC1P92fyGytOWMj9Coxj3p8b_Ay"
           />
           <NormaCard 
             title="Norma Operacional 5" 
-            category="Doutrina" 
-            desc="Níveis Operacionais, Requisitos e Funções para Tripulantes" 
+            category="NÍVEIS OPERACIONAIS, REQUISITOS E FUNÇÕES PARA TRIPULANTES" 
             url="https://drive.google.com/uc?export=download&id=1ofKNRn-b0iBC-PJNoqnfk5QJ586Gezoh"
           />
           <NormaCard 
             title="Norma Operacional 6" 
-            category="IFR" 
-            desc="Voo por Instrumento" 
+            category="VOO POR INSTRUMENTO" 
             url="https://drive.google.com/uc?export=download&id=1zQHrMfGR4GCZLMCnqP456vD77rzhl9d0"
           />
           <NormaCard 
             title="Norma Operacional 7" 
-            category="Operações" 
-            desc="Códigos de Identificação de Missões de Voo" 
+            category="CÓDIGOS DE IDENTIFICAÇÃO DE MISSÕES DE VOO" 
             url="https://drive.google.com/uc?export=download&id=1zuqHwZhDwHtgWb93ABrAhqn5EnkhC8at"
           />
           <NormaCard 
             title="Norma Operacional 8" 
-            category="Operações" 
-            desc="Conselho de Voo" 
+            category="CONSELHO DE VOO" 
             url="https://drive.google.com/uc?export=download&id=1tManea_uOI4k_r4mTL2y3nDwR-xMTWtw"
           />
           <NormaCard 
             title="Norma Operacional 9" 
-            category="Mnt" 
-            desc="Voos Técnicos" 
+            category="VOOS TÉCNICOS" 
             url="https://drive.google.com/uc?export=download&id=1l91octhJG7tiyyaciaoMyWPWk8VaIVFr"
           />
           <NormaCard 
             title="Norma Operacional 11" 
-            category="OVN" 
-            desc="Voo com Óculos de Visão Noturna" 
+            category="VOO COM ÓCULOS DE VISÃO NOTURNA" 
             url="https://drive.google.com/uc?export=download&id=1qwWffNhDDl60JBNhvgvVxbtPPxPjfJgL"
           />
           <NormaCard 
             title="Norma Operacional 12" 
-            category="Logística" 
-            desc="Abastecimento de Aeronaves" 
+            category="ABASTECIMENTO DE AERONAVES" 
             url="https://drive.google.com/uc?export=download&id=1Di39GNdHF77NHIIqXQjMg_SJgK57WWsP"
           />
           <NormaCard 
             title="Norma Operacional 13" 
-            category="Solo" 
-            desc="Tratoramento e Tracionamento de Aeronaves" 
+            category="TRATORAMENTO E TRACIONAMENTO DE AERONAVES" 
             url="https://drive.google.com/uc?export=download&id=1_8UTQXD-9j-6sh508PYOyxh0e9FOg16s"
           />
           <NormaCard 
             title="Norma Operacional 14" 
-            category="Solo" 
-            desc="Ancoragem de Aeronaves" 
+            category="ANCORAGEM DE AERONAVES" 
             url="https://drive.google.com/uc?export=download&id=1rK_BgUljBDIwQ2FNjJZsVNLomimAH-RG"
           />
        </div>
@@ -5315,19 +5244,23 @@ function FaunaItem({ date, species, local }: any) {
   );
 }
 
-function NormaCard({ title, category, desc, url }: any) {
+function NormaCard({ title, category, desc, url, buttonText = "Visualizar Norma" }: any) {
    return (
     <div className="card-military h-full flex flex-col group hover:border-military-gold transition-all">
        <div className="mb-4">
           <span className="px-2 py-0.5 bg-military-blue text-white text-[9px] font-black uppercase tracking-widest rounded">{category}</span>
           <h3 className="text-lg font-black text-white mt-2 group-hover:text-military-gold transition-colors italic tracking-tight">{title}</h3>
        </div>
-       <p className="text-xs text-slate-400 leading-relaxed mb-6 flex-1">{desc}</p>
+       {desc ? (
+         <p className="text-xs text-slate-400 leading-relaxed mb-6 flex-1">{desc}</p>
+       ) : (
+         <div className="flex-1 mb-4" />
+       )}
        <button 
-         className="w-full py-2 bg-white/5 border border-white/10 rounded text-[10px] font-black uppercase tracking-widest text-white hover:bg-military-gold hover:text-military-gray transition-all"
-         onClick={() => window.open(url || '#', '_blank')}
+          className="w-full py-2 bg-white/5 border border-white/10 rounded text-[10px] font-black uppercase tracking-widest text-white hover:bg-military-gold hover:text-military-gray transition-all"
+          onClick={() => window.open(url || '#', '_blank')}
        >
-         Visualizar Norma
+          {buttonText}
        </button>
     </div>
    );
