@@ -1982,11 +1982,6 @@ export default function App() {
     { id: "FGR", name: "FGR", icon: ShieldCheck },
     { id: "Abortiva", name: "Abortiva", icon: Zap },
     { id: "Mapa de Risco", name: "Mapa de Risco", icon: MapIcon },
-    {
-      id: "Portal Único de Notificação",
-      name: "Portal Único de Notificação",
-      icon: Bell,
-    },
     { id: "Abastecimento", name: "Abastecimento", icon: Droplets },
     { id: "Normas CAvEx", name: "Normas CAvEx", icon: Gavel },
   ];
@@ -2194,10 +2189,13 @@ export default function App() {
                 <Menu size={18} />
               </button>
             )}
-            <div className="status-badge flex items-center gap-2 text-[12px] font-semibold text-[#27ae60] uppercase tracking-wider">
-              <div className="status-dot w-2 h-2 bg-[#27ae60] rounded-full shadow-[0_0_8px_#27ae60]" />
-              Operações: Normal (VMC)
-            </div>
+            <button
+              onClick={() => handleTabChange("Admin")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[10px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black transition-all"
+            >
+              <Lock size={12} />
+              <span className="hidden sm:inline">Portal Administrativo</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-6 text-[12px] text-text-secondary">
@@ -2209,11 +2207,6 @@ export default function App() {
               })}{" "}
               Z
             </span>
-            <div className="h-4 w-[1px] bg-border-theme hidden sm:block" />
-            <div className="relative p-1.5 hover:bg-white/5 rounded transition-colors cursor-pointer">
-              <Bell size={16} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-bg-panel" />
-            </div>
           </div>
         </header>
 
@@ -2438,28 +2431,6 @@ function InicioSection({
           color="orange"
           onClick={() => onTabChange("Abortiva")}
         />
-      </div>
-
-      {/* Info Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card-military flex flex-col items-start h-full text-left">
-          <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">
-            RELPREV Ativos
-          </span>
-          <div className="text-[32px] font-bold text-white mb-1">14</div>
-          <span className="text-[10px] text-text-secondary tracking-tight">
-            +2 nas últimas 24 horas
-          </span>
-        </div>
-        <div className="card-military flex flex-col items-start h-full text-left">
-          <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">
-            FGR Gerados
-          </span>
-          <div className="text-[32px] font-bold text-white mb-1">08</div>
-          <span className="text-[10px] text-text-secondary tracking-tight">
-            Missões planejadas p/ hoje
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -6073,12 +6044,6 @@ function AdminSection({
           Abortivas
         </button>
         <button
-          onClick={() => setSelectedView("config")}
-          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "config" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
-        >
-          Configurações
-        </button>
-        <button
           onClick={() => setSelectedView("pdv")}
           className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "pdv" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
         >
@@ -6694,220 +6659,7 @@ function AdminSection({
         </div>
       )}
 
-      {selectedView === "config" && (
-        <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="card-military p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Settings className="text-military-gold" size={20} />
-              <h3 className="font-black text-white uppercase text-[10px] tracking-widest">
-                Configurações de Documentos
-              </h3>
-            </div>
-
-            <div className="space-y-4">
-              <div className="p-4 bg-military-gold/5 border border-military-gold/20 rounded-lg text-left">
-                <h4 className="text-xs font-bold text-military-gold uppercase mb-2 tracking-tight">
-                  Guia de Abastecimento
-                </h4>
-                <p className="text-[10px] text-slate-400 mb-6 uppercase leading-relaxed">
-                  Substitua o arquivo PDF padrão. Quando um arquivo for enviado
-                  aqui, ele terá prioridade e será aberto automaticamente quando
-                  o usuário clicar em "Abastecimento".
-                </p>
-
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    id="abastecimento-upload"
-                    disabled={isUploading}
-                  />
-                  <label
-                    htmlFor="abastecimento-upload"
-                    className={`btn-military py-3 px-8 text-[10px] cursor-pointer inline-flex items-center gap-3 transition-all ${isUploading ? "opacity-50 cursor-not-allowed" : "hover:scale-105 active:scale-95"}`}
-                  >
-                    {isUploading ? (
-                      <>
-                        <Loader2
-                          size={16}
-                          className="text-military-gold animate-spin"
-                        />
-                        <span className="animate-pulse">PROCESSANDO...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus size={16} className="text-military-gold" />
-                        Escolher e Enviar PDF
-                      </>
-                    )}
-                  </label>
-                </div>
-
-                {abastecimentoConfig?.updatedAt && (
-                  <div className="mt-6 pt-4 border-t border-military-gold/10">
-                    <p className="text-[9px] text-slate-500 uppercase tracking-widest">
-                      Última atualização:{" "}
-                      <span className="text-slate-300 font-bold">
-                        {new Date(abastecimentoConfig.updatedAt).toLocaleString(
-                          "pt-BR",
-                        )}
-                      </span>{" "}
-                      {abastecimentoConfig.fileName && (
-                        <>
-                          •{" "}
-                          <span className="text-white font-mono">
-                            {abastecimentoConfig.fileName}
-                          </span>
-                        </>
-                      )}{" "}
-                      por{" "}
-                      <span className="text-military-gold font-bold">
-                        {abastecimentoConfig.updatedBy || "Mestre/SIPAA"}
-                      </span>
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 bg-white/5 border border-white/10 rounded-lg mt-4 text-left">
-                <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
-                  <Droplets size={14} className="text-military-gold" />
-                  Arquivos no Acervo ({abastecimentoFiles.length})
-                </h4>
-
-                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                  {abastecimentoFiles.length === 0 ? (
-                    <p className="text-[10px] text-slate-500 italic uppercase py-4">
-                      Nenhum arquivo no acervo.
-                    </p>
-                  ) : (
-                    abastecimentoFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center justify-between p-3 bg-military-black/30 border border-white/5 rounded hover:border-military-gold/30 transition-all group"
-                      >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <FileText
-                            size={16}
-                            className="text-military-gold shrink-0"
-                          />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-[10px] text-white font-bold truncate uppercase">
-                              {file.name}
-                            </span>
-                            <span className="text-[8px] text-slate-500 uppercase">
-                              {new Date(file.createdAt).toLocaleDateString(
-                                "pt-BR",
-                              )}{" "}
-                              • {(file.size / 1024 / 1024).toFixed(2)} MB
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => window.open(file.url, "_blank")}
-                            className="p-1.5 text-slate-400 hover:text-military-gold transition-colors"
-                            title="Visualizar"
-                          >
-                            <Eye size={14} />
-                          </button>
-                          <button
-                            onClick={() =>
-                              confirmDelete("documentos_abastecimento", file.id)
-                            }
-                            className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
-                            title="Excluir"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card-military p-6 border-blue-500/10 bg-blue-500/5 text-left">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="text-blue-400 shrink-0" size={18} />
-              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider leading-relaxed">
-                Aviso: Certifique-se de que o arquivo está no formato PDF e não
-                está corrompido antes do envio. O upload de arquivos grandes
-                pode levar alguns segundos dependendo da conexão.
-              </p>
-            </div>
-          </div>
-
-          <div className="card-military p-6 text-left">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Zap className="text-military-gold" size={20} />
-                <h3 className="font-black text-white uppercase text-[10px] tracking-widest">
-                  Abortivas Recebidas
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedView("abortivas")}
-                className="text-[9px] font-black text-military-gold uppercase tracking-[0.2em] hover:text-white transition-colors"
-              >
-                Ver Lista Completa →
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {abortivas.slice(0, 5).map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between p-3 bg-military-black/30 border border-white/5 rounded"
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <FileText
-                      size={16}
-                      className="text-military-gold shrink-0"
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[10px] text-white font-bold truncate uppercase">
-                        {a.modeloAnv} | LÇ {a.numLancamento}
-                      </span>
-                      <span className="text-[8px] text-slate-500 uppercase">
-                        {new Date(a.createdAt).toLocaleDateString("pt-BR")} •{" "}
-                        {a.motivo}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (a.pdfUrl) {
-                        window.open(a.pdfUrl, "_blank");
-                      } else {
-                        const docPdf = generateAbortivaPDF(a);
-                        docPdf.save(`Abortiva_${a.numLancamento}.pdf`);
-                      }
-                    }}
-                    className="p-1.5 text-military-gold hover:text-white transition-colors"
-                    title={a.pdfUrl ? "Abrir PDF Oficial" : "Baixar PDF"}
-                  >
-                    {a.pdfUrl ? (
-                      <ExternalLink size={14} />
-                    ) : (
-                      <Download size={14} />
-                    )}
-                  </button>
-                </div>
-              ))}
-              {abortivas.length === 0 && (
-                <p className="text-[10px] text-slate-500 italic uppercase py-4">
-                  Nenhuma abortiva registrada.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* selectedView config removed */}
 
       {selectedView === "pdv" && (
         <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
