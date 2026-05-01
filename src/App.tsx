@@ -16,6 +16,7 @@ import {
   Lock,
   Menu,
   X,
+  ChevronLeft,
   ChevronRight,
   LogOut,
   User,
@@ -874,7 +875,7 @@ const generateRelprevPDF = (report: any) => {
   return doc;
 };
 
-type SectionKey = 'Inicio' | 'RELPREV' | 'FGR' | 'Abortiva' | 'Mapa de Risco' | 'Portal Notificação' | 'Ações Pós-Acidente' | 'Abastecimento' | 'Memento Meteo' | 'Reporte Fauna' | 'Normas CAvEx' | 'Planeje seu Voo' | 'Admin';
+type SectionKey = 'Inicio' | 'RELPREV' | 'FGR' | 'Abortiva' | 'Mapa de Risco' | 'Portal Único de Notificação' | 'Abastecimento' | 'Normas CAvEx' | 'Admin';
 
 const MONTHS_MAP: Record<string, string> = { 
   JANEIRO: '01', FEVEREIRO: '02', MARÇO: '03', MARCO: '03', ABRIL: '04', MAIO: '05', JUNHO: '06', 
@@ -1185,21 +1186,17 @@ export default function App() {
 
   const navItems = [
     { id: 'Inicio', name: 'Início', icon: Home },
-    { id: 'RELPREV', name: 'RELPREV', icon: FileSearch },
+    { id: 'RELPREV', name: 'PREENCHIMENTO DE RELPREV', icon: FileSearch },
     { id: 'FGR', name: 'FGR', icon: ShieldCheck },
     { id: 'Abortiva', name: 'Abortiva', icon: Zap },
     { id: 'Mapa de Risco', name: 'Mapa de Risco', icon: MapIcon },
-    { id: 'Portal Notificação', name: 'Portal Notificação', icon: Bell },
-    { id: 'Ações Pós-Acidente', name: 'Ações Pós-Acidente', icon: AlertTriangle },
+    { id: 'Portal Único de Notificação', name: 'Portal Único de Notificação', icon: Bell },
     { id: 'Abastecimento', name: 'Abastecimento', icon: Droplets },
-    { id: 'Memento Meteo', name: 'Memento Meteo', icon: CloudSun },
-    { id: 'Reporte Fauna', name: 'Reporte Fauna', icon: Bird },
     { id: 'Normas CAvEx', name: 'Normas CAvEx', icon: Gavel },
-    { id: 'Planeje seu Voo', name: 'Planeje seu Voo', icon: Compass },
   ];
 
   const handleTabChange = (tab: any) => {
-    if (tab === 'Portal Notificação') {
+    if (tab === 'Portal Único de Notificação') {
       window.open('https://santosdumont.anac.gov.br/menu/r/api/portal_unico_notificacao/selecao-do-tipo-de-evento?clear=103&session=111703245409353', '_blank');
       return;
     }
@@ -1327,14 +1324,18 @@ export default function App() {
                 <button
                   key={item.id}
                   onClick={() => handleTabChange(item.id)}
-                  className={`w-full flex items-center gap-3 px-6 py-2.5 transition-all duration-200 group relative text-[13px] font-medium border-l-[3px] ${
+                  className={`w-full flex items-center gap-4 px-6 py-3 transition-all duration-200 group relative border-l-[3px] ${
                     isActive 
                       ? 'bg-accent-gold/10 text-accent-gold border-l-accent-gold' 
                       : 'text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent'
                   }`}
                 >
-                  <Icon size={16} className={isActive ? 'text-accent-gold' : 'text-text-secondary group-hover:text-white'} />
-                  <span>{item.name}</span>
+                  <div className="flex-shrink-0 w-5 flex justify-center">
+                    <Icon size={16} className={isActive ? 'text-accent-gold' : 'text-text-secondary group-hover:text-white'} />
+                  </div>
+                  <span className="text-[13px] font-medium text-left leading-tight block flex-1">
+                    {item.name}
+                  </span>
                 </button>
               );
             })}
@@ -1345,14 +1346,16 @@ export default function App() {
         <div className="px-4 py-4 border-t border-border-theme space-y-4">
           <button
             onClick={() => handleTabChange('Admin')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest ${
               activeTab === 'Admin'
                 ? 'bg-accent-gold text-bg-deep shadow-lg shadow-accent-gold/10'
                 : 'text-accent-gold border border-accent-gold/20 hover:bg-accent-gold/10'
             }`}
           >
-            {isAdminAuthenticated ? <Unlock size={12} /> : <Lock size={12} />}
-            <span>Área Administrativa</span>
+            <div className="flex-shrink-0 w-4 flex justify-center">
+              {isAdminAuthenticated ? <Unlock size={12} /> : <Lock size={12} />}
+            </div>
+            <span className="text-left flex-1">Área Administrativa</span>
           </button>
         </div>
       </motion.aside>
@@ -1414,6 +1417,97 @@ export default function App() {
 }
 
 // --- SECTIONS ---
+
+const CAROUSEL_IMAGES = [
+  "https://i.postimg.cc/pySxKC0N/1.png",
+  "https://i.postimg.cc/F16m0pPv/2.png",
+  "https://i.postimg.cc/RqY9wdPM/3.png",
+  "https://i.postimg.cc/Cd2Yb7vS/4.png",
+  "https://i.postimg.cc/qgF02wm0/5.png",
+  "https://i.postimg.cc/PN7h1y6f/6.png"
+];
+
+function ImageCarousel() {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + CAROUSEL_IMAGES.length) % CAROUSEL_IMAGES.length);
+  };
+
+  return (
+    <div className="relative w-full h-[400px] lg:h-[500px] overflow-hidden rounded-lg group border border-border-theme bg-[#0a0f18] select-none">
+      {/* Blurred Background */}
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={`bg-${CAROUSEL_IMAGES[currentIndex]}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.3 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8 }}
+          className="absolute inset-0 z-0 bg-center bg-cover blur-2xl scale-110"
+          style={{ backgroundImage: `url(${CAROUSEL_IMAGES[currentIndex]})` }}
+        />
+      </AnimatePresence>
+
+      {/* Main Content */}
+      <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-4">
+        {/* Active Image Container */}
+        <div className="relative w-full max-w-4xl h-[75%] flex items-center justify-center">
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={CAROUSEL_IMAGES[currentIndex]}
+              src={CAROUSEL_IMAGES[currentIndex]}
+              initial={{ opacity: 0, scale: 0.95, x: 20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 1.05, x: -20 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              referrerPolicy="no-referrer"
+            />
+          </AnimatePresence>
+
+          {/* Navigation Arrows */}
+          <button
+            onClick={handlePrev}
+            className="absolute left-4 p-2 rounded-full bg-black/40 text-white border border-white/10 hover:bg-black/60 transition-all opacity-0 group-hover:opacity-100 z-20"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <button
+            onClick={handleNext}
+            className="absolute right-4 p-2 rounded-full bg-black/40 text-white border border-white/10 hover:bg-black/60 transition-all opacity-0 group-hover:opacity-100 z-20"
+          >
+            <ChevronRight size={24} />
+          </button>
+        </div>
+
+        {/* Thumbnails */}
+        <div className="flex gap-2 mt-6 overflow-x-auto pb-2 scrollbar-none max-w-full px-4">
+          {CAROUSEL_IMAGES.map((img, idx) => (
+            <button
+              key={`thumb-${idx}`}
+              onClick={() => setCurrentIndex(idx)}
+              className={`relative flex-shrink-0 w-20 h-12 rounded overflow-hidden border-2 transition-all ${
+                currentIndex === idx ? 'border-accent-gold scale-105 shadow-lg' : 'border-white/10 opacity-40 grayscale hover:opacity-100 hover:grayscale-0'
+              }`}
+            >
+              <img 
+                src={img} 
+                className="w-full h-full object-cover" 
+                alt={`Thumbnail ${idx + 1}`} 
+                referrerPolicy="no-referrer"
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void }) {
   return (
@@ -1480,6 +1574,8 @@ function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
         <div className="absolute -bottom-12 -right-12 h-64 w-64 bg-accent-gold/5 rounded-full blur-3xl" />
       </div>
 
+      <ImageCarousel />
+
       {/* Grid Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <QuickCard 
@@ -1503,42 +1599,19 @@ function InicioSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
           color="orange"
           onClick={() => onTabChange('Abortiva')}
         />
-        <QuickCard 
-          icon={AlertTriangle} 
-          title="Checklist Emergência" 
-          desc="Protocolos de resposta rápida." 
-          color="blue"
-          onClick={() => onTabChange('Ações Pós-Acidente')}
-        />
-        <QuickCard 
-          icon={Navigation} 
-          title="METAR / TAF" 
-          desc="Consulte meteorologia atual." 
-          color="blue"
-          onClick={() => onTabChange('Memento Meteo')}
-        />
       </div>
 
       {/* Info Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card-military flex flex-col items-start h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card-military flex flex-col items-start h-full text-left">
           <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">RELPREV Ativos</span>
           <div className="text-[32px] font-bold text-white mb-1">14</div>
           <span className="text-[10px] text-text-secondary tracking-tight">+2 nas últimas 24 horas</span>
         </div>
-        <div className="card-military flex flex-col items-start h-full">
+        <div className="card-military flex flex-col items-start h-full text-left">
           <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">FGR Gerados</span>
           <div className="text-[32px] font-bold text-white mb-1">08</div>
           <span className="text-[10px] text-text-secondary tracking-tight">Missões planejadas p/ hoje</span>
-        </div>
-        <div className="card-military flex flex-col items-start h-full bg-green-500/5 border-green-500/20">
-          <span className="text-[10px] font-bold uppercase text-text-secondary tracking-widest mb-4">Risco Operacional Atual</span>
-          <div className="w-full flex items-center justify-center p-2 rounded bg-green-500/20 text-green-500 font-bold uppercase text-xs border border-green-500/30 mb-4">
-            Baixo
-          </div>
-          <p className="text-[11px] text-text-secondary leading-tight">
-            Condições meteorológicas favoráveis. Manutenções preventivas em dia. Nível de fadiga controlado.
-          </p>
         </div>
       </div>
     </div>
@@ -5315,13 +5388,9 @@ const sectionComponents: Record<string, FC<any>> = {
   FGR: FgrSection,
   Abortiva: AbortivaSection,
   'Mapa de Risco': MapaRiscoSection,
-  'Portal Notificação': NotificacaoSection,
-  'Ações Pós-Acidente': PosAcidenteSection,
+  'Portal Único de Notificação': NotificacaoSection,
   Abastecimento: AbastecimentoSection,
-  'Memento Meteo': MeteoSection,
-  'Reporte Fauna': FaunaSection,
   'Normas CAvEx': NormasSection,
-  'Planeje seu Voo': PlanejamentoSection,
   Admin: AdminSection
 };
 
