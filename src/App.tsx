@@ -3570,20 +3570,76 @@ function NormasSection({ onTabChange }: { onTabChange: (tab: SectionKey) => void
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <NormaCard 
             title="Norma Operacional 1" 
-            category="Operações" 
-            desc="Instrução e Operações na Aviação do Exército." 
+            category="SIPAA" 
+            desc="Segurança de Voo" 
             url="https://drive.google.com/uc?export=download&id=1i5SO0RbSeX_pZwXUdF-KDpR7V83Zktpr"
           />
-          <NormaCard title="Norma Operacional 3" category="Operações" desc="Padronização de Manobras e Procedimentos." />
-          <NormaCard title="Norma Operacional 4" category="Operações" desc="Emprego de Armamento e Tiro Aéreo." />
-          <NormaCard title="Norma Operacional 5" category="Operações" desc="Operações Aeromóveis e Cargas Externas." />
-          <NormaCard title="Norma Operacional 6" category="Operações" desc="Procedimentos Noturnos e OVN." />
-          <NormaCard title="Norma Operacional 7" category="Operações" desc="Busca e Salvamento (SAR) e Emergências." />
-          <NormaCard title="Norma Operacional 8" category="Operações" desc="Transporte Aéreo Logístico." />
-          <NormaCard title="Norma Operacional 9" category="Operações" desc="Operações em Áreas Confinadas e Montanha." />
-          <NormaCard title="Norma Operacional 11" category="Operações" desc="Instrução de Voo Básico e Avançado." />
-          <NormaCard title="Norma Operacional 12" category="Operações" desc="Meteorologia e Planejamento de Voo." />
-          <NormaCard title="Norma Operacional 14" category="Operações" desc="Gestão de Segurança e Gerenciamento de Risco." />
+          <NormaCard 
+            title="Norma Operacional 3" 
+            category="Operações" 
+            desc="Aeródromo de TBE e Áreas de Instrução" 
+            url="https://drive.google.com/uc?export=download&id=1FCPinzpqh4LaGWpEWPPwCbA4AOPiwjsF"
+          />
+          <NormaCard 
+            title="Norma Operacional 4" 
+            category="Operações" 
+            desc="Transportes Especiais" 
+            url="https://drive.google.com/uc?export=download&id=1zonhjXC1P92fyGytOWMj9Coxj3p8b_Ay"
+          />
+          <NormaCard 
+            title="Norma Operacional 5" 
+            category="Doutrina" 
+            desc="Níveis Operacionais, Requisitos e Funções para Tripulantes" 
+            url="https://drive.google.com/uc?export=download&id=1ofKNRn-b0iBC-PJNoqnfk5QJ586Gezoh"
+          />
+          <NormaCard 
+            title="Norma Operacional 6" 
+            category="IFR" 
+            desc="Voo por Instrumento" 
+            url="https://drive.google.com/uc?export=download&id=1zQHrMfGR4GCZLMCnqP456vD77rzhl9d0"
+          />
+          <NormaCard 
+            title="Norma Operacional 7" 
+            category="Operações" 
+            desc="Códigos de Identificação de Missões de Voo" 
+            url="https://drive.google.com/uc?export=download&id=1zuqHwZhDwHtgWb93ABrAhqn5EnkhC8at"
+          />
+          <NormaCard 
+            title="Norma Operacional 8" 
+            category="Operações" 
+            desc="Conselho de Voo" 
+            url="https://drive.google.com/uc?export=download&id=1tManea_uOI4k_r4mTL2y3nDwR-xMTWtw"
+          />
+          <NormaCard 
+            title="Norma Operacional 9" 
+            category="Mnt" 
+            desc="Voos Técnicos" 
+            url="https://drive.google.com/uc?export=download&id=1l91octhJG7tiyyaciaoMyWPWk8VaIVFr"
+          />
+          <NormaCard 
+            title="Norma Operacional 11" 
+            category="OVN" 
+            desc="Voo com Óculos de Visão Noturna" 
+            url="https://drive.google.com/uc?export=download&id=1qwWffNhDDl60JBNhvgvVxbtPPxPjfJgL"
+          />
+          <NormaCard 
+            title="Norma Operacional 12" 
+            category="Logística" 
+            desc="Abastecimento de Aeronaves" 
+            url="https://drive.google.com/uc?export=download&id=1Di39GNdHF77NHIIqXQjMg_SJgK57WWsP"
+          />
+          <NormaCard 
+            title="Norma Operacional 13" 
+            category="Solo" 
+            desc="Tratoramento e Tracionamento de Aeronaves" 
+            url="https://drive.google.com/uc?export=download&id=1_8UTQXD-9j-6sh508PYOyxh0e9FOg16s"
+          />
+          <NormaCard 
+            title="Norma Operacional 14" 
+            category="Solo" 
+            desc="Ancoragem de Aeronaves" 
+            url="https://drive.google.com/uc?export=download&id=1rK_BgUljBDIwQ2FNjJZsVNLomimAH-RG"
+          />
        </div>
     </div>
   );
