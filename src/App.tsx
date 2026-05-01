@@ -87,6 +87,8 @@ import {
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 // --- Utilities ---
 const compressImage = (base64Str: string, maxWidth = 800, maxHeight = 600): Promise<string> => {
@@ -3907,6 +3909,53 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
     }
   };
 
+  const handleDeleteAllFGRs = async () => {
+    if (fgrs.length === 0) return;
+    if (!window.confirm(`ATENÇÃO: Você está prestes a apagar PERMANENTEMENTE ${fgrs.length} registros de FGR. Esta ação NÃO PODE ser desfeita. Confirmar?`)) return;
+
+    setDbStatus('CONNECTING');
+    try {
+      const batch = writeBatch(db);
+      fgrs.forEach(f => {
+        batch.delete(doc(db, 'fgrMissions', f.id));
+      });
+      await batch.commit();
+      alert('Todos os registros de FGR foram excluídos com sucesso.');
+    } catch (error: any) {
+      console.error('Erro ao excluir todos os FGRs:', error);
+      alert('Erro ao excluir: ' + (error.message || 'Erro de conexão'));
+    } finally {
+      setDbStatus('CONNECTED');
+    }
+  };
+
+  const handleDownloadAllFGRs = async () => {
+    if (fgrs.length === 0) return;
+    
+    try {
+      setIsUploading(true);
+      const zip = new JSZip();
+      
+      fgrs.forEach(f => {
+        const docPdf = generateFgrPDF(f);
+        const pdfBlob = docPdf.output('blob');
+        const dateStr = f.createdAt ? new Date(f.createdAt).toLocaleDateString('pt-BR').replace(/\//g, '-') : 'SemData';
+        // Limpar nome da missão para nome de arquivo válido
+        const missionSafe = (f.missao || 'FGR').replace(/[/\\?%*:|"<>]/g, '-');
+        const filename = `${dateStr}_${missionSafe}.pdf`;
+        zip.file(filename, pdfBlob);
+      });
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `FGR_COLETIVO_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.zip`);
+    } catch (error) {
+      console.error('Erro ao gerar ZIP:', error);
+      alert('Erro ao baixar arquivos coletivos. Tente novamente.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const confirmDelete = (collectionName: string, id: string) => {
     setDeleteId(id);
     setDeleteColl(collectionName);
@@ -4228,6 +4277,31 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
 
        {selectedView === 'fgrs' && (
          <div className="space-y-4">
+           {/* Header with Bulk Actions */}
+           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2 px-2">
+             <h3 className="text-xs font-black text-white uppercase tracking-widest">Auditoria de FGR</h3>
+             <div className="flex flex-wrap items-center gap-2">
+               {fgrs.length > 0 && (
+                 <>
+                   <button 
+                     onClick={handleDownloadAllFGRs}
+                     disabled={isUploading}
+                     className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[9px] font-black uppercase tracking-tighter hover:bg-military-gold hover:text-military-black transition-all disabled:opacity-50"
+                   >
+                     {isUploading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                     Baixar Todos ({fgrs.length})
+                   </button>
+                   <button 
+                     onClick={handleDeleteAllFGRs}
+                     className="flex items-center gap-2 px-3 py-1.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-black uppercase tracking-tighter hover:bg-red-500 hover:text-white transition-all"
+                   >
+                     <Trash2 size={12} /> Excluir Todos
+                   </button>
+                 </>
+               )}
+             </div>
+           </div>
+
            {/* Desktop Table - Only on large screens */}
            <div className="hidden xl:block card-military overflow-hidden">
              <div className="overflow-x-auto no-scrollbar">
@@ -4274,7 +4348,7 @@ function AdminSection({ user, onTabChange, abastecimentoConfig, abastecimentoFil
                          <button 
                            onClick={() => {
                              const docPdf = generateFgrPDF(f);
-                             docPdf.save(`FGR_${f.missao || 'Voo'}.pdf`);
+                             docPdf.save(`${f.createdAt ? new Date(f.createdAt).toLocaleDateString('pt-BR').replace(/\//g, '-') : 'SemData'}_${(f.missao || 'FGR').replace(/[/\\?%*:|"<>]/g, '-')}.pdf`);
                            }}
                            className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
                            title="Baixar PDF Original"
