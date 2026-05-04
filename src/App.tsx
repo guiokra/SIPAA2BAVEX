@@ -2382,19 +2382,27 @@ function InicioSection({
             "A segurança de voo é uma responsabilidade de todos nós. Previna-se,
             reporte e garanta a integridade de nossa missão."
           </div>
-          <div className="flex flex-wrap gap-4 mt-8">
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-4 mt-8">
             <button
               onClick={() => onTabChange("RELPREV")}
-              className="btn-military shadow-lg shadow-accent-gold/10"
+              className="btn-military shadow-lg shadow-accent-gold/10 w-full sm:w-auto flex items-center justify-center gap-2"
             >
               <FileSearch size={18} />
               RELPREV
             </button>
             <button
               onClick={() => onTabChange("FGR")}
-              className="px-6 py-2 border border-border-theme rounded-sm text-text-secondary hover:text-white hover:bg-white/5 transition-all text-sm font-semibold uppercase tracking-widest"
+              className="px-6 py-3 border border-border-theme rounded-sm text-text-secondary hover:text-white hover:bg-white/5 transition-all text-sm font-semibold uppercase tracking-widest w-full sm:w-auto flex items-center justify-center gap-2"
             >
+              <ShieldCheck size={18} />
               FGR
+            </button>
+            <button
+              onClick={() => onTabChange("Abortiva")}
+              className="px-6 py-3 border border-orange-500/30 bg-orange-500/5 rounded-sm text-orange-400 hover:text-white hover:bg-orange-500/10 transition-all text-sm font-semibold uppercase tracking-widest w-full sm:w-auto flex items-center justify-center gap-2"
+            >
+              <Zap size={18} />
+              ABORTIVA
             </button>
           </div>
         </div>
