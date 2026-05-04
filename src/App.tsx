@@ -6629,15 +6629,6 @@ function AdminSection({
                     <Eye size={14} /> {a.pdfUrl ? "VER PDF" : "VER"}
                   </button>
                   <button
-                    onClick={() => {
-                      const docPdf = generateAbortivaPDF(a);
-                      docPdf.save(`Abortiva_${a.numLancamento}.pdf`);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-white/5 text-slate-300 text-[10px] font-black uppercase tracking-wider border border-white/10"
-                  >
-                    <Download size={14} /> BAIXAR
-                  </button>
-                  <button
                     onClick={() => confirmDelete("abortivas", a.id)}
                     className="w-10 h-9 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20"
                   >
@@ -6655,8 +6646,6 @@ function AdminSection({
           )}
         </div>
       )}
-
-      {/* selectedView config removed */}
 
       {selectedView === "pdv" && (
         <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -6677,7 +6666,7 @@ function AdminSection({
                 tornará disponíveis para auto-preenchimento no formulário FGR.
               </p>
 
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 <input
                   type="file"
                   accept=".pdf"
@@ -6716,7 +6705,7 @@ function AdminSection({
                 />
                 <label
                   htmlFor="pdv-upload"
-                  className={`btn-military py-3 px-8 text-[10px] cursor-pointer inline-flex items-center gap-3 transition-all ${isUploading ? "opacity-50 cursor-not-allowed" : "hover:scale-105 active:scale-95"}`}
+                  className={`btn-military py-3 px-6 text-[10px] cursor-pointer flex items-center justify-center gap-3 transition-all ${isUploading ? "opacity-50 cursor-not-allowed" : "hover:scale-105 active:scale-95"}`}
                 >
                   {isUploading ? (
                     <Loader2
@@ -6737,7 +6726,7 @@ function AdminSection({
                     setManualDate("");
                     setIsManualModalOpen(true);
                   }}
-                  className="btn-military py-3 px-8 text-[10px] inline-flex items-center gap-3 transition-all hover:scale-105 active:scale-95"
+                  className="btn-military py-3 px-6 text-[10px] flex items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95"
                 >
                   <Plus size={16} className="text-military-black" />
                   <span className="font-black text-military-black">
@@ -6873,7 +6862,7 @@ function AdminSection({
                                 key={l.id}
                                 className="flex items-center justify-between p-2.5 bg-white/2 border border-white/5 rounded hover:border-military-gold/20 transition-all group overflow-hidden"
                               >
-                                <div className="flex items-center gap-6 sm:gap-10 min-w-0 flex-1">
+                                <div className="flex items-center gap-6 sm:gap-10 min-w-0 flex-1 overflow-x-auto custom-scrollbar pb-1">
                                   <div className="flex items-center gap-3 shrink-0">
                                     {hasFgr && (
                                       <span className="flex items-center gap-0.5 text-[8px] font-black bg-green-500/20 text-green-500 border border-green-500/30 px-1 py-0.5 rounded uppercase tracking-tighter">
@@ -6889,8 +6878,8 @@ function AdminSection({
                                       LÇ {l.num}
                                     </span>
                                   </div>
-                                  <div className="flex flex-col sm:flex-row sm:items-center gap-6 min-w-0">
-                                    <span className="text-[10px] text-white font-black whitespace-nowrap uppercase tracking-tighter">
+                                  <div className="flex flex-row items-center gap-6 min-w-0">
+                                    <span className="text-[10px] text-white font-black whitespace-nowrap uppercase tracking-tighter shrink-0">
                                       {l.anv}
                                     </span>
                                     <div className="flex items-center gap-4 sm:gap-6 text-[10px] text-slate-500 uppercase tracking-tighter font-bold">
@@ -6898,7 +6887,7 @@ function AdminSection({
                                       <span className="shrink-0">{l.p2}</span>
                                       <span className="shrink-0">{l.mv}</span>
                                       <span className="shrink-0">{l.dest}</span>
-                                      <span className="truncate">
+                                      <span className="whitespace-nowrap shrink-0">
                                         {l.missao}
                                       </span>
                                     </div>
