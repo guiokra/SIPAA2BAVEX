@@ -1616,7 +1616,7 @@ async function processPDVFile(file: File) {
     const headers = findPDVHeaders(originalText);
     const tableStarts = findAllIndexes(
       originalText,
-      /LÇ\s+ANV\s+1P\s+2P\s+MV\s+AD\s+DEST[\s\S]{0,450}?MISS[AÃ]O\s+LEG/g,
+      /LÇ\s+ANV\s+1P\s+2P\s+MV\s+AD\s+DEST[\s\S]{0,550}?MISS[AÃ]O\s+LEG/g,
     );
 
     const eligibleHeaders = headers.filter((h, idx) => {
@@ -1678,8 +1678,7 @@ async function processPDVFile(file: File) {
       if (!dayMap.has(day)) dayMap.set(day, []);
       const dayLaunches = dayMap.get(day)!;
 
-      const displayKey = launch.display;
-      if (!dayLaunches.some((l) => l.display === displayKey)) {
+      if (!dayLaunches.some((l) => l.uniqueKey === launch.uniqueKey)) {
         dayLaunches.push(launch);
       }
 
@@ -1809,19 +1808,26 @@ function parseLaunchBlock(block: string) {
   const dest = tokens[i].replace(/[^A-Z0-9]/g, "");
   if (!isIcao(dest)) return null;
 
-  let tbn = -1;
+  let pob = -1;
   for (let j = i + 1; j < tokens.length; j++) {
-    if (tokens[j].replace(/[^A-Z]/g, "") === "TBN") tbn = j;
+    const t = tokens[j].replace(/[^A-Z]/g, "");
+    if (t === "TBN" || t === "ASD") pob = j;
   }
-  if (tbn < 0 || tbn + 1 >= tokens.length) return null;
+  if (pob < 0 || pob + 1 >= tokens.length) return null;
 
   const missionParts = [];
-  for (let j = tbn + 1; j < tokens.length; j++) {
-    let t = tokens[j];
-    if (/^\(/.test(t) || t === "-" || /^LEGENDAS$/i.test(t)) break;
-    if (/^(TRIPULAÇÃO|TRIPULACAO|ANV|SAR|AUX|TEL)$/i.test(stripAccents(t)))
+  for (let j = pob + 1; j < tokens.length; j++) {
+    const raw = tokens[j];
+    const ascii = stripAccents(raw)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Z0-9/-]/g, "");
+    if (/^\(/.test(raw) || raw === "-" || /^LEGENDAS$/i.test(raw)) break;
+    if (
+      /^(TRIPULACAO|ANV|SAR|AUX|TEL|MINISTERIO|EXERCITO|PLANO)$/.test(ascii)
+    )
       break;
-    missionParts.push(t);
+    missionParts.push(raw);
   }
   const missao = normalizePDVMission(missionParts.join(" "));
   if (!missao) return null;
@@ -1837,6 +1843,7 @@ function parseLaunchBlock(block: string) {
     dest,
     missao,
     display,
+    uniqueKey: `${num}|${anv}|${p1}|${p2}|${unique(mvParts).join(" ")}|${dest}|${missao}`,
   };
 }
 
