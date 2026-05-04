@@ -1605,20 +1605,23 @@ async function processPDVFile(file: File) {
 
   for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
     const page = await pdf.getPage(pageNo);
-    const content = await page.getTextContent();
-    const text = normalizePDVText(
+    const content = await page.getTextContent({
+      normalizeWhitespace: true,
+      disableCombineTextItems: false,
+    } as any);
+    const originalText = normalizePDVText(
       content.items.map((i: any) => i.str || "").join(" "),
     );
 
-    const headers = findPDVHeaders(text);
+    const headers = findPDVHeaders(originalText);
     const tableStarts = findAllIndexes(
-      text,
+      originalText,
       /LÇ\s+ANV\s+1P\s+2P\s+MV\s+AD\s+DEST[\s\S]{0,450}?MISS[AÃ]O\s+LEG/g,
     );
 
     const eligibleHeaders = headers.filter((h, idx) => {
-      const next = headers[idx + 1]?.index ?? text.length;
-      const section = text.slice(h.index, next);
+      const next = headers[idx + 1]?.index ?? originalText.length;
+      const section = originalText.slice(h.index, next);
       return !/SEM\s+ATIVIDADE\s+A[ÉE]REA/i.test(section);
     });
 
@@ -1638,17 +1641,17 @@ async function processPDVFile(file: File) {
     }
 
     const rowMatches = [
-      ...text.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+(\d{3,4})\b/g),
+      ...originalText.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+(\d{3,4})\b/g),
     ];
     for (let r = 0; r < rowMatches.length; r++) {
       const m = rowMatches[r];
       const rowStart = m.index! + (m[0].match(/^\s/) ? 1 : 0);
-      let rowEnd = rowMatches[r + 1]?.index ?? text.length;
+      let rowEnd = rowMatches[r + 1]?.index ?? originalText.length;
 
       const nextTable = tableStarts.find((t) => t > rowStart);
       const nextHeader = headers.find((h) => h.index! > rowStart)?.index;
       const nextLegend = indexAfter(
-        text,
+        originalText,
         /\bLEGENDAS\b|CRISTIAN\s+FERNANDO/i,
         rowStart,
       );
@@ -1659,9 +1662,8 @@ async function processPDVFile(file: File) {
         nextHeader ?? rowEnd,
         nextLegend ?? rowEnd,
       );
-      const block = text.slice(rowStart, rowEnd);
-
-      const launch = parseRowBlock(block);
+      const block = originalText.slice(rowStart, rowEnd);
+      const launch = parseLaunchBlock(block);
       if (!launch) continue;
 
       const previousTable = [...tableStarts]
@@ -1676,12 +1678,8 @@ async function processPDVFile(file: File) {
       if (!dayMap.has(day)) dayMap.set(day, []);
       const dayLaunches = dayMap.get(day)!;
 
-      if (
-        !dayLaunches.some(
-          (l) =>
-            l.num === launch.num && l.anv === launch.anv && l.p1 === launch.p1,
-        )
-      ) {
+      const displayKey = launch.display;
+      if (!dayLaunches.some((l) => l.display === displayKey)) {
         dayLaunches.push(launch);
       }
 
@@ -1697,7 +1695,10 @@ async function processPDVFile(file: File) {
 
   const results: { dateLabel: string; launches: any[] }[] = [];
   for (const [dateLabel, launches] of dayMap.entries()) {
-    launches.sort((a, b) => Number(a.num) - Number(b.num));
+    launches.sort(
+      (a, b) =>
+        Number(a.num) - Number(b.num) || a.display.localeCompare(b.display),
+    );
     results.push({ dateLabel, launches });
   }
 
@@ -1778,7 +1779,7 @@ function findPDVHeaders(text: string) {
   return headers;
 }
 
-function parseRowBlock(block: string) {
+function parseLaunchBlock(block: string) {
   block = normalizePDVText(block)
     .replace(/\bLEGENDAS\b[\s\S]*$/i, "")
     .replace(/CRISTIAN\s+FERNANDO[\s\S]*$/i, "");
@@ -1808,35 +1809,24 @@ function parseRowBlock(block: string) {
   const dest = tokens[i].replace(/[^A-Z0-9]/g, "");
   if (!isIcao(dest)) return null;
 
-  let tbnIdx = -1;
-  const eobtRegex = /^\d{2}H\d{2}$/i;
-  let eobt = "---";
-
+  let tbn = -1;
   for (let j = i + 1; j < tokens.length; j++) {
-    if (tokens[j].replace(/[^A-Z]/g, "") === "TBN") tbnIdx = j;
-    if (eobt === "---" && eobtRegex.test(tokens[j])) eobt = tokens[j];
+    if (tokens[j].replace(/[^A-Z]/g, "") === "TBN") tbn = j;
   }
+  if (tbn < 0 || tbn + 1 >= tokens.length) return null;
 
   const missionParts = [];
-  if (tbnIdx !== -1) {
-    for (let j = tbnIdx + 1; j < tokens.length; j++) {
-      let t = tokens[j];
-      if (/^\(/.test(t) || t === "-" || /^LEGENDAS$/i.test(t)) break;
-      if (/^(TRIPULAÇÃO|TRIPULACAO|ANV|SAR|AUX|TEL)$/i.test(stripAccents(t)))
-        break;
-      missionParts.push(t);
-    }
-  } else {
-    const remaining = tokens
-      .slice(i + 1)
-      .filter((p) => !eobtRegex.test(p) && !/^\d+$/.test(p));
-    for (const p of remaining) {
-      if (p.includes("(") || p === "-") break;
-      missionParts.push(p);
-    }
+  for (let j = tbn + 1; j < tokens.length; j++) {
+    let t = tokens[j];
+    if (/^\(/.test(t) || t === "-" || /^LEGENDAS$/i.test(t)) break;
+    if (/^(TRIPULAÇÃO|TRIPULACAO|ANV|SAR|AUX|TEL)$/i.test(stripAccents(t)))
+      break;
+    missionParts.push(t);
   }
+  const missao = normalizePDVMission(missionParts.join(" "));
+  if (!missao) return null;
 
-  const missao = normalizePDVMission(missionParts.join(" ")) || "---";
+  const display = `LÇ ${num} - ${anv} - ${p1} - ${p2} - ${unique(mvParts).join(" ")} - ${dest} - ${missao}`;
 
   return {
     num,
@@ -1846,7 +1836,7 @@ function parseRowBlock(block: string) {
     mv: unique(mvParts).join(" "),
     dest,
     missao,
-    eobt,
+    display,
   };
 }
 
