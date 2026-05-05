@@ -3724,7 +3724,13 @@ function FgrSection({
                     return acc;
                   }, {}),
                 )
-                  .sort((a, b) => b[0].localeCompare(a[0]))
+                  .sort((a, b) => {
+                    const toSortable = (s: string) => {
+                      const p = s.split("/");
+                      return p.length === 3 ? p[2] + p[1] + p[0] : s;
+                    };
+                    return toSortable(b[0]).localeCompare(toSortable(a[0]));
+                  })
                   .map(([date, items]: [string, any]) => (
                     <optgroup
                       key={date}
@@ -4791,7 +4797,13 @@ function AbortivaSection({
                     return acc;
                   }, {}),
                 )
-                  .sort((a, b) => b[0].localeCompare(a[0]))
+                  .sort((a, b) => {
+                    const toSortable = (s: string) => {
+                      const p = s.split("/");
+                      return p.length === 3 ? p[2] + p[1] + p[0] : s;
+                    };
+                    return toSortable(b[0]).localeCompare(toSortable(a[0]));
+                  })
                   .map(([date, items]: [string, any]) => (
                     <optgroup
                       key={date}
@@ -6961,7 +6973,13 @@ function AdminSection({
                     return acc;
                   }, {}),
                 )
-                  .sort((a, b) => b[0].localeCompare(a[0]))
+                  .sort((a, b) => {
+                    const toSortable = (s: string) => {
+                      const p = s.split("/");
+                      return p.length === 3 ? p[2] + p[1] + p[0] : s;
+                    };
+                    return toSortable(b[0]).localeCompare(toSortable(a[0]));
+                  })
                   .map(([date, items]: [string, any]) => (
                     <div key={date} className="space-y-2">
                       <div className="flex items-center gap-2 border-b border-white/5 pb-1">
