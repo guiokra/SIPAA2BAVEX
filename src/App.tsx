@@ -51,6 +51,7 @@ import {
   ExternalLink,
   Unlock,
   Edit,
+  Link2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -5691,6 +5692,9 @@ function AdminSection({
   const [editingLaunch, setEditingLaunch] = useState<any | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualDate, setManualDate] = useState("");
+  const [isLinkFgrModalOpen, setIsLinkFgrModalOpen] = useState(false);
+  const [launchToLink, setLaunchToLink] = useState<any>(null);
+  const [fgrSearchTerm, setFgrSearchTerm] = useState("");
 
   const handleDateMask = (val: string) => {
     let clean = val.replace(/\D/g, "");
@@ -6976,7 +6980,8 @@ function AdminSection({
                             const launchDateISO = l.dateLabel
                               ? l.dateLabel.split("/").reverse().join("-")
                               : "";
-                            const hasFgr = fgrs.some(
+                            const isLinked = !!l.linkedFgrId;
+                            const hasFgr = isLinked || fgrs.some(
                               (f) =>
                                 f.data === launchDateISO &&
                                 (f.missao?.includes(`LÇ ${l.num}`) ||
@@ -6996,7 +7001,8 @@ function AdminSection({
                                 <div className="flex items-center gap-6 sm:gap-10 min-w-0 flex-1 overflow-x-auto custom-scrollbar pb-1">
                                   <div className="flex items-center gap-3 shrink-0">
                                     {hasFgr && (
-                                      <span className="flex items-center gap-0.5 text-[8px] font-black bg-green-500/20 text-green-500 border border-green-500/30 px-1 py-0.5 rounded uppercase tracking-tighter">
+                                      <span className={`flex items-center gap-1 text-[8px] font-black ${isLinked ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-green-500/20 text-green-500 border-green-500/30'} px-1.5 py-0.5 rounded uppercase tracking-tighter`}>
+                                        {isLinked && <Link2 size={8} className="shrink-0" />}
                                         FGR
                                       </span>
                                     )}
@@ -7025,6 +7031,16 @@ function AdminSection({
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => {
+                                      setLaunchToLink(l);
+                                      setIsLinkFgrModalOpen(true);
+                                    }}
+                                    className="p-1.5 text-slate-600 hover:text-blue-400 transition-colors"
+                                    title="Linkar FGR"
+                                  >
+                                    <Link2 size={12} />
+                                  </button>
                                   <button
                                     onClick={() => {
                                       setEditingLaunch(l);
@@ -7456,6 +7472,148 @@ function AdminSection({
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Link FGR Modal */}
+      <AnimatePresence>
+        {isLinkFgrModalOpen && launchToLink && (
+          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="card-military max-w-lg w-full p-8 space-y-6 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
+                    <Link2 size={20} />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter leading-none">
+                      Linkar FGR ao Lançamento
+                    </h3>
+                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-1">
+                      LÇ {launchToLink.num} • {launchToLink.dateLabel}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsLinkFgrModalOpen(false)}
+                  className="text-slate-500 hover:text-white p-2"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="PESQUISAR POR MISSÃO, PILOTO OU DATA..."
+                    value={fgrSearchTerm}
+                    onChange={(e) => setFgrSearchTerm(e.target.value)}
+                    className="input-military w-full h-10 pl-10 text-[10px] placeholder:text-slate-700"
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {fgrs
+                    .filter((f) => {
+                      const searchStr =
+                        `${f.missao} ${f.p1} ${f.data} ${f.anv}`.toLowerCase();
+                      return searchStr.includes(fgrSearchTerm.toLowerCase());
+                    })
+                    .sort((a, b) => b.data.localeCompare(a.data))
+                    .map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={async () => {
+                          try {
+                            await updateDoc(
+                              doc(db, "Lancamentos", launchToLink.id),
+                              {
+                                linkedFgrId: f.id,
+                              },
+                            );
+                            setIsLinkFgrModalOpen(false);
+                            setLaunchToLink(null);
+                          } catch (error) {
+                            handleFirestoreError(
+                              error,
+                              OperationType.UPDATE,
+                              "Lancamentos",
+                            );
+                          }
+                        }}
+                        className={`w-full p-4 rounded-lg border text-left transition-all group ${
+                          launchToLink.linkedFgrId === f.id
+                            ? "bg-blue-500/10 border-blue-500/40"
+                            : "bg-white/2 border-white/10 hover:border-blue-500/30"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-[10px] font-black text-white uppercase truncate pr-4">
+                            {f.missao || "Sem Missão"}
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-bold whitespace-nowrap shrink-0">
+                            {f.data.split("-").reverse().join("/")}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[9px] text-slate-500 uppercase font-black">
+                          <span className="text-military-gold">
+                            {f.anv}
+                          </span>
+                          <span>{f.p1}</span>
+                        </div>
+                        {launchToLink.linkedFgrId === f.id && (
+                          <div className="mt-2 flex items-center gap-1.5 text-[8px] font-black text-blue-400 uppercase">
+                            <Check size={10} /> JÁ LINKADO
+                          </div>
+                        )}
+                      </button>
+                    ))}
+
+                  {fgrs.length === 0 && (
+                    <p className="text-center py-8 text-[10px] text-slate-500 italic uppercase">
+                      Nenhum FGR disponível.
+                    </p>
+                  )}
+                </div>
+
+                {launchToLink.linkedFgrId && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await updateDoc(
+                          doc(db, "Lancamentos", launchToLink.id),
+                          {
+                            linkedFgrId: null,
+                          },
+                        );
+                        setIsLinkFgrModalOpen(false);
+                        setLaunchToLink(null);
+                      } catch (error) {
+                        handleFirestoreError(
+                          error,
+                          OperationType.UPDATE,
+                          "Lancamentos",
+                        );
+                      }
+                    }}
+                    className="w-full py-3 rounded border border-red-500/30 text-red-400 text-[10px] font-black uppercase hover:bg-red-500/5 transition-all mt-2"
+                  >
+                    Remover Link Atual
+                  </button>
+                )}
+              </div>
             </motion.div>
           </div>
         )}
