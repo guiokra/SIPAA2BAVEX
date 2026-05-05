@@ -2722,7 +2722,7 @@ const PARTE_IV_DATA = {
     },
     {
       id: "p4_if_5",
-      text: "ADEP foi realizada a partir de um aeródromo homologado EPC.",
+      text: "A DEP foi realizada a partir de um aeródromo homologado IFR.",
       w: { S: 0, N: 2, D: 2 },
     },
   ],
