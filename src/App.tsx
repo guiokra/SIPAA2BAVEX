@@ -5681,12 +5681,13 @@ function AdminSection({
   launches: any[];
   setLaunches: (l: any[]) => void;
 }) {
-  const [stats, setStats] = useState({ relprevs: 0, fgrs: 0, abortivas: 0 });
+  const [stats, setStats] = useState({ relprevs: 0, fgrs: 0, abortivas: 0, trash: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
   const [fgrs, setFgrs] = useState<any[]>([]);
   const [abortivas, setAbortivas] = useState<any[]>([]);
+  const [trashItems, setTrashItems] = useState<any[]>([]);
   const [selectedView, setSelectedView] = useState<
-    "stats" | "relprevs" | "fgrs" | "abortivas" | "config" | "pdv"
+    "stats" | "relprevs" | "fgrs" | "abortivas" | "config" | "pdv" | "trash"
   >("stats");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
@@ -5752,6 +5753,10 @@ function AdminSection({
       collection(db, "abortivas"),
       orderBy("createdAt", "desc"),
     );
+    const qTrash = query(
+      collection(db, "trash"),
+      orderBy("deletedAt", "desc"),
+    );
 
     const unsubRelprev = onSnapshot(
       qRelprev,
@@ -5791,10 +5796,22 @@ function AdminSection({
       },
     );
 
+    const unsubTrash = onSnapshot(
+      qTrash,
+      (snap) => {
+        setStats((prev) => ({ ...prev, trash: snap.size }));
+        setTrashItems(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => {
+        console.error("Erro no listener de Trash:", err);
+      },
+    );
+
     return () => {
       unsubRelprev();
       unsubFgr();
       unsubAbortivas();
+      unsubTrash();
     };
   }, [user]);
 
@@ -5844,12 +5861,85 @@ function AdminSection({
     if (!deleteId || !deleteColl) return;
 
     try {
+      // Soft deletion for main entities
+      if (
+        ["relprevReports", "fgrMissions", "abortivas"].includes(deleteColl)
+      ) {
+        let itemData: any = null;
+        let typeLabel = "";
+
+        if (deleteColl === "relprevReports") {
+          itemData = relprevs.find((r) => r.id === deleteId);
+          typeLabel = "RELPREV";
+        } else if (deleteColl === "fgrMissions") {
+          itemData = fgrs.find((f) => f.id === deleteId);
+          typeLabel = "FGR";
+        } else if (deleteColl === "abortivas") {
+          itemData = abortivas.find((a) => a.id === deleteId);
+          typeLabel = "ABORTIVA";
+        }
+
+        if (itemData) {
+          const { id, ...cleanData } = itemData;
+          await addDoc(collection(db, "trash"), {
+            originalId: deleteId,
+            originalCollection: deleteColl,
+            data: cleanData,
+            type: typeLabel,
+            deletedAt: new Date().toISOString(),
+            deletedBy: user?.email || "anonymous",
+          });
+        }
+      }
+
       await deleteDoc(doc(db, deleteColl, deleteId));
       setDeleteId(null);
       setDeleteColl(null);
     } catch (error) {
       console.error("Erro ao excluir:", error);
       alert("Erro ao excluir registro. Verifique a conexão.");
+    }
+  };
+
+  const recoverTrashItem = async (item: any) => {
+    try {
+      setDbStatus("CONNECTING");
+      await setDoc(doc(db, item.originalCollection, item.originalId), item.data);
+      await deleteDoc(doc(db, "trash", item.id));
+      alert("Registro recuperado com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao recuperar:", error);
+      alert("Falha ao recuperar: " + error.message);
+    } finally {
+      setDbStatus("CONNECTED");
+    }
+  };
+
+  const deleteTrashItemPermanently = async (id: string) => {
+    if (!window.confirm("Deseja EXCLUIR PERMANENTEMENTE este registro?")) return;
+    try {
+      await deleteDoc(doc(db, "trash", id));
+    } catch (error: any) {
+      alert("Erro ao excluir: " + error.message);
+    }
+  };
+
+  const clearTrash = async () => {
+    if (trashItems.length === 0) return;
+    if (!window.confirm(`Deseja limpar DEFINITIVAMENTE todos os ${trashItems.length} itens da lixeira?`)) return;
+
+    try {
+      setDbStatus("CONNECTING");
+      const batch = writeBatch(db);
+      trashItems.forEach(item => {
+        batch.delete(doc(db, "trash", item.id));
+      });
+      await batch.commit();
+      alert("Lixeira limpa com sucesso!");
+    } catch (error: any) {
+      alert("Erro ao limpar lixeira: " + error.message);
+    } finally {
+      setDbStatus("CONNECTED");
     }
   };
 
@@ -6193,6 +6283,13 @@ function AdminSection({
         >
           Extrator PDV
         </button>
+        <button
+          onClick={() => setSelectedView("trash")}
+          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "trash" ? "bg-red-500 text-white" : "text-slate-400 hover:text-red-400 flex items-center gap-1.5"}`}
+        >
+          <Trash2 size={10} />
+          Lixeira {stats.trash > 0 && `(${stats.trash})`}
+        </button>
       </div>
 
       {lastError && (
@@ -6236,7 +6333,12 @@ function AdminSection({
               value={stats.fgrs.toString()}
               trend="TOTAL"
             />
-            <AdminStat label="Mapa" value="ATIVO" trend="ATUALIZADO" />
+            <AdminStat
+              label="Lixeira"
+              value={stats.trash.toString()}
+              trend={stats.trash > 0 ? "OCUPADA" : "VAZIA"}
+              onClick={() => setSelectedView("trash")}
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
@@ -7097,6 +7199,118 @@ function AdminSection({
           </div>
         </div>
       )}
+      {selectedView === "trash" && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-red-500/10 p-4 rounded border border-red-500/20">
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <Trash2 size={16} className="text-red-500" />
+                Lixeira do Sistema
+              </h3>
+              <p className="text-[10px] text-red-400 font-bold uppercase mt-1">
+                {trashItems.length} itens aguardando exclusão permanente ou recuperação
+              </p>
+            </div>
+            {trashItems.length > 0 && (
+              <button
+                onClick={clearTrash}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase rounded transition-all flex items-center gap-2 shadow-lg shadow-red-600/20"
+              >
+                <Trash2 size={12} />
+                Limpar Lixeira
+              </button>
+            )}
+          </div>
+
+          <div className="card-military overflow-hidden">
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-white/5 text-[10px] uppercase text-slate-500 font-black">
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3">Identificação</th>
+                    <th className="px-4 py-3">Deletado em</th>
+                    <th className="px-4 py-3">Por</th>
+                    <th className="px-4 py-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/2 text-[11px]">
+                  {trashItems.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-12 text-center text-slate-500 uppercase font-black text-[10px] italic"
+                      >
+                        Lixeira vazia
+                      </td>
+                    </tr>
+                  ) : (
+                    trashItems.map((item) => {
+                      const data = item.data;
+                      let label = "Registro Desconhecido";
+                      if (item.type === "RELPREV")
+                        label = data.codigo || "RELPREV";
+                      if (item.type === "FGR") label = data.missao || "Missão FGR";
+                      if (item.type === "ABORTIVA")
+                        label = `${data.modeloAnv} - LÇ ${data.numLancamento}`;
+
+                      return (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-white/2 transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                item.type === "RELPREV"
+                                  ? "bg-orange-500/20 text-orange-400"
+                                  : item.type === "FGR"
+                                    ? "bg-blue-500/20 text-blue-400"
+                                    : "bg-purple-500/20 text-purple-400"
+                              }`}
+                            >
+                              {item.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-white font-bold truncate max-w-[200px]">
+                            {label}
+                          </td>
+                          <td className="px-4 py-3 text-slate-400 font-mono">
+                            {new Date(item.deletedAt).toLocaleString("pt-BR")}
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 text-[10px]">
+                            {item.deletedBy}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => recoverTrashItem(item)}
+                                className="px-3 py-1.5 bg-green-600/10 text-green-500 hover:bg-green-600/20 rounded text-[9px] font-black uppercase transition-all"
+                                title="Recuperar"
+                              >
+                                Recuperar
+                              </button>
+                              <button
+                                onClick={() =>
+                                  deleteTrashItemPermanently(item.id)
+                                }
+                                className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
+                                title="Excluir Permanentemente"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Batch Delete Confirmation Modal */}
       <AnimatePresence>
         {batchDeleteTarget && (
@@ -7169,11 +7383,11 @@ function AdminSection({
               </div>
               <div className="space-y-2">
                 <h3 className="text-lg font-black text-white uppercase tracking-tight">
-                  Confirmar Exclusão
+                  Mover para Lixeira
                 </h3>
                 <p className="text-xs text-text-secondary">
-                  Deseja realmente apagar este registro? Esta ação não pode ser
-                  desfeita.
+                  Deseja realmente mover este registro para a lixeira?
+                  Ele poderá ser recuperado posteriormente se necessário.
                 </p>
               </div>
               <div className="flex gap-3">
@@ -7910,9 +8124,12 @@ function AdminAction({ title, desc, icon: Icon, onClick }: any) {
   );
 }
 
-function AdminStat({ label, value, trend }: any) {
+function AdminStat({ label, value, trend, onClick }: any) {
   return (
-    <div className="card-military bg-military-gray border-slate-700 hover:border-slate-500 transition-colors cursor-default">
+    <div
+      onClick={onClick}
+      className={`card-military bg-military-gray border-slate-700 hover:border-slate-500 transition-colors ${onClick ? "cursor-pointer hover:border-military-gold shadow-lg shadow-military-gold/5" : "cursor-default"}`}
+    >
       <span className="text-[9px] text-slate-500 uppercase font-black tracking-[0.15em]">
         {label}
       </span>

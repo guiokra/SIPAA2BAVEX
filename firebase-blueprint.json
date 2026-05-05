@@ -79,6 +79,20 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "dataVoo", "numLancamento", "modeloAnv", "motivo", "preenchidoPor", "createdAt"]
+    },
+    "TrashItem": {
+      "title": "TrashItem",
+      "description": "Um registro deletado aguardando recuperação ou exclusão permanente",
+      "type": "object",
+      "properties": {
+        "originalId": { "type": "string" },
+        "originalCollection": { "type": "string" },
+        "data": { "type": "object", "description": "Os dados originais do documento" },
+        "type": { "type": "string", "description": "Tipo do registro (RELPREV, FGR, ABORTIVA)" },
+        "deletedAt": { "type": "string", "format": "date-time" },
+        "deletedBy": { "type": "string" }
+      },
+      "required": ["originalId", "originalCollection", "data", "type", "deletedAt", "deletedBy"]
     }
   },
   "firestore": {
@@ -97,6 +111,10 @@
     "/abortivas/{abortivaId}": {
       "schema": "Abortiva",
       "description": "Relatos de abortiva de voo"
+    },
+    "/trash/{trashId}": {
+      "schema": "TrashItem",
+      "description": "Itens deletados para possível recuperação"
     },
     "/config/abastecimento": {
       "schema": {
