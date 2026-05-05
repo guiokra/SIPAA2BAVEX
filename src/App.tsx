@@ -2801,55 +2801,64 @@ const GRAVIDADE_DATA = [
 ];
 
 const SUGESTOES_MITIGACAO = {
-  "FATORES CRÍTICOS": [
-    "O PO deverá explicar missão, ameaças, rota, alternativa e critérios de abortagem antes da partida dos motores. Trip questionar pontos de dúvida;",
-    "Realizar pré-voo e externa sem celular, sem conversa paralela e sem interrupção;",
-    "Pilotos e MVs conferindo a execução do checklist;",
-    "Trip alertar quanto à necessidade de seguir os procedimentos previstos e treinados;",
-    "Definir condições para cancelar a missão, como desvio máximo aceitável da rota, limite de descida para evitar formações meteorológicas, quantidade máxima de pessoal e material a ser embarcado, combustível mínimo para manter o voo;",
-    "Buscar contato com Trip do Rec, conversar com outros pilotos e mecânicos ou buscar informações na imagem de satélite;",
-    "Realizar uma ou mais passagens sobre a área e só iniciar a aproximação quando todos os obstáculos forem reconhecidos;",
-    "Ouvir os demais integrantes da Trip, parar a Anv quando solicitado ou arremeter sem hesitar. Discutir pontos críticos apenas quando o voo estiver em segurança;",
-    "Estabelecer critérios para abortar a missão e segui-los fielmente;",
-    "Explicar as circunstâncias do voo ou remover não tripulantes da fonia;",
-    "Trip monitorar se os critérios estabelecidos em briefing estão sendo seguidos;",
-    "Realizar o cálculo de desempenho antes do voo ou, se não for possível, realizá-lo em voo;",
-    "Designar um tripulante para atualizar os cálculos;",
-    "Realizar cheque de potência na região do pouso, se possível;",
-    "Considerar o acendimento de qualquer luz ou condição de emergência como real, até que a Trip concorde que seja pane de indicação;",
-    "Tripulação cobrar o uso do checklist de emergência, caso não ocorra;",
-    "Trip não habilitada IFR: estabelecer critérios para iniciar pouso de precaução. Trip monitorar se os limites de tolerância estão sendo obedecidos;",
-    "Trip IFR: separar as cartas e brifar procedimento em caso de entrada em IMC;",
-    "Decolar somente se as condições indicarem ser possível o voo VMC.",
+  "RECURSOS HUMANOS": [
+    "Baixa experiência ou longo período sem voar de pilotos, MVs ou mecânicos: a) Identificar no briefing os tripulantes com menor experiência ou há mais tempo sem voar e combinar atenção reforçada, apoio dos mais experientes e conferência cruzada nas fases críticas.",
+    "CRM não realizado nos últimos 24 meses: a) Reforçar no briefing que qualquer tripulante deve informar dúvidas, desvios, riscos percebidos ou necessidade de arremetida, sem aguardar ordem do comandante.",
+    "Briefing da missão ou briefing de segurança incompleto: a) Revisar com toda a tripulação a missão, rota, riscos principais, funções de cada integrante, critérios de abortagem e conduta de segurança para os envolvidos.",
   ],
-  INSTRUÇÃO: [
-    "Trip monitorar degradação da consciência situacional e alertar;",
-    "Orientar o aluno uma vez e, caso não haja reação a contento, assumir os comandos e explicar depois, conforme a regra dos dois desafios (2 Challenge Rule);",
-    "Estabelecer funções claras para a Trip, definindo quem voa, quem monitora e qual MV orienta o pouso;",
-    "Manter cabine estéril nas fases críticas, falando somente o essencial para a manobra;",
-    "Considerar aluno com pouca experiência na Anv e ficar em condições de assumir os comandos;",
-    "Definir quem pilota e quem monitora. Em caso de visão de túnel de ambos os pilotos, Trip alertar.",
+  METEOROLOGIA: [
+    "Local de pouso/decolagem não reconhecido ou não homologado: a) Brifar as informações disponíveis sobre o local, definir eixo de aproximação/decolagem, obstáculos prováveis, área de escape e condição mínima para prosseguir com o pouso.",
+    "Presença de pássaros na região de voo: a) Alertar a tripulação sobre o risco de colisão com aves e combinar vigilância externa reforçada, principalmente na aproximação, decolagem e baixa altura.",
+    "Informações de voo indisponíveis ou publicações desatualizadas: a) Confirmar antes do voo as informações disponíveis de NOTAM, meteorologia, cartas e publicações, destacando o que estiver indisponível ou incerto para decisão da tripulação.",
+    "Previsão de tempo significativo em rota: a) Brifar as áreas de mau tempo previstas, rota alternativa, limite para desvio, ponto de retorno e condição mínima para manter o voo com segurança.",
+    "Infraestrutura de apoio incerta no destino ou na rota: a) Confirmar no briefing qual apoio estará disponível, como comunicação, segurança da área, abastecimento, evacuação e alternativa caso o apoio não esteja presente.",
+  ],
+  MATERIAL: [
+    "Aeronave com menos de 10 HV após inspeção A/TC: a) Revisar no briefing os serviços recentes e reforçar atenção a parâmetros, luzes, ruídos, vibrações e qualquer indicação anormal durante o voo.",
+    "Aeronave com possibilidade de executar pairado fora do efeito solo no local de pouso: a) Confirmar no briefing o cálculo de desempenho, peso da aeronave, combustível previsto e margem de potência para o local da operação.",
+    "Aeronave já pré-voada: a) Confirmar no briefing quem realizou o pré-voo, se houve discrepâncias e quais itens críticos deverão ser reconferidos pela tripulação.",
+  ],
+  MISSÃO: [
+    "Tempo inadequado para planejamento e preparação: a) Revisar no briefing apenas os pontos críticos da missão e adiar a partida caso rota, meteorologia, combustível, desempenho ou alternativa não estejam claros.",
+    "Voo superior a 3 HV contínuas ou operação superior a 5 dias: a) Brifar risco de fadiga, dividir tarefas, prever revezamento dos comandos e definir ponto para reavaliar o prosseguimento da missão.",
+    "Mais de 05 repetições da mesma manobra: a) Definir no briefing limite de repetições por série, pausa para reavaliação e interrupção da manobra em caso de queda de desempenho ou atenção.",
+    "Voo com autoridade de bordo: a) Reforçar no briefing que a presença de autoridade não altera mínimos, critérios de abortagem, decisão técnica ou autoridade da tripulação.",
+    "Tempo insuficiente para cumprir a missão com imprevistos: a) Definir no briefing o horário ou condição limite para reduzir, interromper, retornar ou alternar a missão.",
+    "MV não embarcado no voo: a) Brifar quais funções do MV ficarão sem cobertura, redistribuir a vigilância externa entre pilotos e limitar manobras que dependam de apoio visual externo.",
+  ],
+  ORGANIZAÇÃO: [
+    "Pressões externas para execução da missão: a) Reforçar no briefing que mínimos, limitações, critérios de abortagem e decisão técnica da tripulação não serão alterados por pressão externa.",
+    "Tripulação sem padronização recente de manobras e procedimentos da U.A.: a) Revisar no briefing a sequência da manobra, responsabilidades, callouts, limites operacionais e condição para interromper a execução.",
+    "Baixa participação em reuniões de Segurança de Voo da OM: a) Relembrar no briefing ocorrências recentes, alertas de segurança e recomendações aplicáveis ao tipo de missão.",
+    "Integrantes de unidades aéreas diferentes: a) Alinhar no briefing as diferenças de padronização entre as U.A., definindo fonia, sinais, responsabilidades, sequência da manobra e critérios de interrupção.",
   ],
   IFR: [
-    "Trip alertar quanto à extrapolação dos limites, caso ocorra, e seguir o planejamento;",
-    "Usar dados meteorológicos reais em vez de achismos para previsão de melhora;",
-    "Estabelecer limites para prosseguir ou alternar;",
-    "Conferir por NOTAM a operacionalidade dos auxílios, em vez de confiar apenas em reporte de outras tripulações;",
-    "Estabelecer limites de desvio;",
-    "Designar um membro da Trip para alertar quanto ao combustível mínimo estabelecido;",
-    "Monitorar a pilotagem do outro piloto;",
-    "Confirmar ações do outro piloto em caso de indício de desorientação;",
-    "Monitorar ações do outro piloto e assumir os comandos, se for o caso.",
+    "Voo acima de 10.000 ft: a) Brifar risco de hipóxia, tempo previsto acima de 10.000 ft, sinais de alerta e conduta caso algum tripulante apresente sintomas.",
+    "Nivelamento abaixo dos obstáculos previstos na rota: a) Revisar no briefing a altitude mínima segura da rota, obstáculos críticos e nível mínimo que deverá ser mantido em cada trecho.",
+    "Briefing meteorológico não realizado por especialista: a) Revisar a meteorologia disponível com a tripulação, destacando teto, visibilidade, formações, congelamento, vento, alternativa e tendência de piora.",
+    "Piloto sem voo IFR nos últimos 30 dias: a) Identificar o piloto com menor prática IFR recente e reforçar divisão de tarefas, conferência cruzada e monitoramento de altitude, proa e razão de descida.",
+    "DEP a partir de aeródromo não homologado IFR: a) Brifar obstáculos, condições meteorológicas, rota inicial, alternativa de retorno e ponto limite para cancelar ou manter o prosseguimento IFR.",
+  ],
+  TÉCNICO: [
+    "Primeiro giro e/ou voo após inspeção: a) Brifar os itens inspecionados e manter atenção reforçada a parâmetros, luzes, ruídos, vibrações e vazamentos.",
+    "Primeiro voo após troca de componentes vitais: a) Brifar quais componentes foram trocados, possíveis sintomas de mau funcionamento e conduta em caso de indicação anormal.",
+    "Autonomia mínima de 40 minutos: a) Confirmar combustível, tempo de voo previsto, alternativa e ponto limite para retorno ou pouso.",
+    "OS afetas às intervenções não verificadas ou não fechadas: a) Confirmar com a manutenção a situação das OS, serviços executados, pendências e liberação da aeronave.",
+    "Quebra na sequência dos serviços de manutenção: a) Brifar quais serviços sofreram interrupção, quais itens foram reconferidos e quais exigem atenção especial no voo.",
+  ],
+  INSTRUÇÃO: [
+    "Haverá hot-seat: a) Brifar o momento da troca em voo, a sequência de transferência dos comandos e a confirmação verbal obrigatória de quem está com a aeronave.",
+    "Voo com piloto aluno ou piloto em formação IFR/OVN: a) Brifar quais fases serão executadas pelo aluno e em quais situações o instrutor deverá assumir ou orientar imediatamente.",
+    "Voo de treinamento de emergências simuladas, IFR ou OVN: a) Brifar quais panes, procedimentos ou perfis serão treinados e definir altura, velocidade, configuração e parâmetros mínimos para manter a segurança.",
+    "Primeiro voo de Habilitação Técnica de tripulante no modelo: a) Brifar as principais diferenças do modelo, tarefas que serão executadas pela primeira vez e pontos em que o instrutor fará conferência verbal obrigatória.",
   ],
   OVN: [
-    "Consultar a possibilidade de iluminação residual de outras fontes;",
-    "Monitorar a degradação dos óculos e estabelecer limites para abortar o voo;",
-    "Monitorar indícios de desorientação. Confirmar ações e assumir os comandos, se for o caso;",
-    "Confirmar a compreensão do outro piloto/MV quanto à visualização de obstáculos ou reportes feitos pela Trip;",
-    "Trip não habilitada IFR: estabelecer critérios para abortar o voo. Trip monitorar e alertar proximidade de nuvens;",
-    "Trip IFR: separar as cartas e brifar procedimento em caso de entrada em IMC;",
-    "Decolar somente se as condições indicarem ser possível o voo visual;",
-    "Monitorar ações do outro piloto e assumir os comandos, se for o caso.",
+    "Voo na noite de nível 4 ou 5: a) Brifar referências visuais previstas, áreas de baixa luminosidade, risco de desorientação e altitude mínima a ser mantida.",
+    "Voo em área urbana: a) Brifar obstáculos iluminados e não iluminados, fios, torres, tráfego, áreas de pouso de emergência e restrições de sobrevoo.",
+    "Reconhecimento fora das áreas de instrução da Av Ex: a) Revisar no briefing imagens, cartas, obstáculos, relevo, iluminação, rotas de entrada/saída e pontos de referência da área.",
+    "Dispositivo de iluminação individual incompatível com o voo OVN: a) Conferir antes do voo se lanternas, luzes e equipamentos individuais são compatíveis com OVN e não prejudicam a visão noturna.",
+    "Presença de neblina e/ou precipitação: a) Brifar risco de perda de referências visuais, degradação dos óculos, redução de contraste e critérios para desviar, retornar ou interromper.",
+    "Mais de 30 dias sem voar OVN: a) Identificar tripulantes há mais tempo sem voar OVN e reforçar conferência cruzada, callouts e atenção nas fases críticas.",
   ],
 };
 
@@ -4474,14 +4483,33 @@ function FgrSection({
                                           <button
                                             key={idx}
                                             onClick={() => {
+                                              // Extract the part after "a) ", "b) ", etc.
+                                              const actionMatch = item.match(/[a-z]\)\s*(.*)/i);
+                                              const extractedAction = actionMatch ? actionMatch[1] : item;
+                                              
                                               const newText = mitigation.trim()
-                                                ? `${mitigation.trim()}\n\n• ${item}`
-                                                : `• ${item}`;
+                                                ? `${mitigation.trim()}\n\n• ${extractedAction}`
+                                                : `• ${extractedAction}`;
                                               setMitigation(newText);
                                             }}
-                                            className="w-full text-left p-2 rounded hover:bg-white/5 text-[11px] text-text-secondary hover:text-white transition-all leading-tight border border-transparent hover:border-white/5"
+                                            className="w-full text-left p-3 rounded bg-white/2 hover:bg-white/5 transition-all leading-tight border border-white/5 hover:border-military-gold/30 mb-2 group/item"
                                           >
-                                            {item}
+                                            {(() => {
+                                              const parts = item.split(/:\s*([a-z]\)\s*.*)/i);
+                                              if (parts.length >= 2) {
+                                                return (
+                                                  <div className="flex flex-col gap-1.5">
+                                                    <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover/item:text-military-gold transition-colors">
+                                                      {parts[0]}
+                                                    </span>
+                                                    <span className="text-[10px] text-text-secondary leading-normal pl-2 border-l border-military-gold/20 italic">
+                                                      {parts[1]}
+                                                    </span>
+                                                  </div>
+                                                );
+                                              }
+                                              return <span className="text-[11px] text-text-secondary group-hover/item:text-white">{item}</span>;
+                                            })()}
                                           </button>
                                         ))}
                                       </div>
