@@ -2382,27 +2382,74 @@ function InicioSection({
             "A segurança de voo é uma responsabilidade de todos nós. Previna-se,
             reporte e garanta a integridade de nossa missão."
           </div>
-          <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-4 mt-8">
+          <div className="grid grid-cols-1 gap-4 mt-10 w-full max-w-lg">
             <button
               onClick={() => onTabChange("RELPREV")}
-              className="btn-military shadow-lg shadow-accent-gold/10 w-full sm:w-auto flex items-center justify-center gap-2"
+              className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
             >
-              <FileSearch size={18} />
-              RELPREV
+              <div className="flex items-center gap-5">
+                <div className="w-12 h-12 rounded-full bg-military-black/10 flex items-center justify-center">
+                  <FileSearch size={28} className="text-military-black" />
+                </div>
+                <div className="text-left">
+                  <span className="block font-black text-military-black text-lg tracking-widest leading-none">
+                    RELPREV
+                  </span>
+                  <span className="text-[10px] text-military-black/60 font-bold uppercase tracking-tighter mt-1 block">
+                    Relatório de Prevenção
+                  </span>
+                </div>
+              </div>
+              <ChevronRight
+                size={24}
+                className="text-military-black/30 group-hover:translate-x-1 transition-transform"
+              />
             </button>
+
             <button
               onClick={() => onTabChange("FGR")}
-              className="px-6 py-3 border border-border-theme rounded-sm text-text-secondary hover:text-white hover:bg-white/5 transition-all text-sm font-semibold uppercase tracking-widest w-full sm:w-auto flex items-center justify-center gap-2"
+              className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
             >
-              <ShieldCheck size={18} />
-              FGR
+              <div className="flex items-center gap-5">
+                <div className="w-12 h-12 rounded-full bg-military-black/10 flex items-center justify-center">
+                  <ShieldCheck size={28} className="text-military-black" />
+                </div>
+                <div className="text-left">
+                  <span className="block font-black text-military-black text-lg tracking-widest leading-none">
+                    FGR
+                  </span>
+                  <span className="text-[10px] text-military-black/60 font-bold uppercase tracking-tighter mt-1 block">
+                    Gerenciamento de Risco
+                  </span>
+                </div>
+              </div>
+              <ChevronRight
+                size={24}
+                className="text-military-black/30 group-hover:translate-x-1 transition-transform"
+              />
             </button>
+
             <button
               onClick={() => onTabChange("Abortiva")}
-              className="px-6 py-3 border border-orange-500/30 bg-orange-500/5 rounded-sm text-orange-400 hover:text-white hover:bg-orange-500/10 transition-all text-sm font-semibold uppercase tracking-widest w-full sm:w-auto flex items-center justify-center gap-2"
+              className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
             >
-              <Zap size={18} />
-              ABORTIVA
+              <div className="flex items-center gap-5">
+                <div className="w-12 h-12 rounded-full bg-military-black/10 flex items-center justify-center">
+                  <Zap size={28} className="text-military-black" />
+                </div>
+                <div className="text-left">
+                  <span className="block font-black text-military-black text-lg tracking-widest leading-none">
+                    ABORTIVA
+                  </span>
+                  <span className="text-[10px] text-military-black/60 font-bold uppercase tracking-tighter mt-1 block">
+                    Interrupção de Missão
+                  </span>
+                </div>
+              </div>
+              <ChevronRight
+                size={24}
+                className="text-military-black/30 group-hover:translate-x-1 transition-transform"
+              />
             </button>
           </div>
         </div>
@@ -3627,18 +3674,38 @@ function FgrSection({
             Gerenciamento completo estruturado no banco de dados SIPAA.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          {launches.length > 0 && (
-            <div className="flex flex-col gap-1 min-w-[240px]">
-              <label className="text-[9px] font-black text-military-gold uppercase tracking-widest pl-1">
-                Auto-Preencher via PDV
-              </label>
+        <div className="bg-bg-sidebar border border-border-theme px-4 py-2 rounded flex items-center gap-3 h-fit">
+          <span className="text-[10px] text-text-secondary font-bold uppercase tracking-widest">
+            Sincronizado:
+          </span>
+          <span className="text-[10px] text-accent-gold font-mono">
+            {stamp}
+          </span>
+        </div>
+      </div>
+
+      {launches.length > 0 && (
+        <div className="card-military p-5 border-2 border-military-gold bg-military-gold/10 shadow-[0_0_15px_rgba(197,160,89,0.15)] animate-in fade-in slide-in-from-top-2 duration-500">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-black text-military-gold uppercase tracking-[0.25em] flex items-center gap-2 mb-1">
+              <span className="w-2.5 h-2.5 bg-military-gold rounded-full shadow-[0_0_10px_#c5a059]" />
+              ESCOLHA SEU LANÇAMENTO PARA PREENCHIMENTO AUTO
+            </label>
+            <div className="relative">
               <select
                 value={selectedLaunchId}
                 onChange={(e) => handleLaunchSelect(e.target.value)}
-                className="bg-bg-sidebar border border-accent-gold/30 text-white text-[9px] font-bold uppercase rounded px-2 py-1.5 outline-none focus:border-accent-gold transition-colors cursor-pointer"
+                className="w-full bg-slate-900 border-2 border-military-gold text-white text-xs font-black uppercase rounded-lg px-4 py-3.5 outline-none focus:ring-2 focus:ring-accent-gold/40 transition-all cursor-pointer appearance-none"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23c5a059' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 1rem center",
+                  backgroundSize: "1.25rem",
+                }}
               >
-                <option value="">SELECIONAR...</option>
+                <option value="" className="text-slate-400">
+                  -- TOQUE PARA SELECIONAR SEU LANÇAMENTO --
+                </option>
                 {Object.entries(
                   launches.reduce((acc: any, curr: any) => {
                     const groupKey = curr.dateLabel || "Sem Data";
@@ -3649,11 +3716,19 @@ function FgrSection({
                 )
                   .sort((a, b) => b[0].localeCompare(a[0]))
                   .map(([date, items]: [string, any]) => (
-                    <optgroup key={date} label={`DATA: ${date}`}>
+                    <optgroup
+                      key={date}
+                      label={`🗓️ DATA: ${date}`}
+                      className="bg-slate-800 text-military-gold font-black uppercase"
+                    >
                       {items
                         .sort((a: any, b: any) => a.num.localeCompare(b.num))
                         .map((l: any) => (
-                          <option key={l.id} value={l.id}>
+                          <option
+                            key={l.id}
+                            value={l.id}
+                            className="bg-slate-900 text-white"
+                          >
                             {`${l.num} • ${l.anv} • ${l.p1} • ${l.p2} • ${l.missao}`}
                           </option>
                         ))}
@@ -3661,20 +3736,16 @@ function FgrSection({
                   ))}
               </select>
             </div>
-          )}
-          <div className="bg-bg-sidebar border border-border-theme px-4 py-2 rounded flex items-center gap-3 h-fit mt-auto">
-            <span className="text-[10px] text-text-secondary font-bold uppercase tracking-widest">
-              Sincronizado:
-            </span>
-            <span className="text-[10px] text-accent-gold font-mono">
-              {stamp}
-            </span>
+            <p className="text-[10px] text-military-gold font-bold uppercase mt-2 pl-1 bg-military-gold/10 py-1 rounded inline-block w-fit px-3">
+              ★ Selecione para carregar os dados automaticamente
+            </p>
           </div>
         </div>
-      </div>
+      )}
 
       <>
         {/* Form Content - (Parte I) */}
+
         <div className="card-military p-0 overflow-hidden text-left">
           <div className="bg-white/5 px-6 py-3 border-b border-border-theme flex items-center justify-between">
             <span className="text-[10px] font-black uppercase text-accent-gold tracking-[0.2em]">
@@ -4650,51 +4721,75 @@ function AbortivaSection({
 
   return (
     <div className="space-y-6 pb-20 text-left">
-      <div>
-        <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">
-          Abortiva de Voo
-        </h2>
-        <p className="text-text-secondary text-sm">
-          Relate interrupções de missões planejadas.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">
+            Abortiva de Voo
+          </h2>
+          <p className="text-text-secondary text-sm">
+            Relate interrupções de missões planejadas.
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        {launches.length > 0 && (
-          <div className="flex flex-col gap-1 min-w-[240px]">
-            <label className="text-[9px] font-black text-military-gold uppercase tracking-widest pl-1">
-              Auto-Preencher via PDV
+      {launches.length > 0 && (
+        <div className="card-military p-5 border-2 border-orange-500 bg-orange-500/10 shadow-[0_0_15px_rgba(249,115,22,0.15)] animate-in fade-in slide-in-from-top-2 duration-500">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-black text-orange-400 uppercase tracking-[0.25em] flex items-center gap-2 mb-1">
+              <span className="w-2.5 h-2.5 bg-orange-500 rounded-full shadow-[0_0_10px_#f97316]" />
+              ESCOLHA SEU LANÇAMENTO (ABORTIVA)
             </label>
-            <select
-              value={selectedLaunchId}
-              onChange={(e) => handleLaunchSelectAbortiva(e.target.value)}
-              className="bg-bg-sidebar border border-accent-gold/30 text-white text-[9px] font-bold uppercase rounded px-2 py-1.5 outline-none focus:border-accent-gold transition-colors cursor-pointer"
-            >
-              <option value="">SELECIONAR...</option>
-              {Object.entries(
-                launches.reduce((acc: any, curr: any) => {
-                  const groupKey = curr.dateLabel || "Sem Data";
-                  if (!acc[groupKey]) acc[groupKey] = [];
-                  acc[groupKey].push(curr);
-                  return acc;
-                }, {}),
-              )
-                .sort((a, b) => b[0].localeCompare(a[0]))
-                .map(([date, items]: [string, any]) => (
-                  <optgroup key={date} label={`DATA: ${date}`}>
-                    {items
-                      .sort((a: any, b: any) => a.num.localeCompare(b.num))
-                      .map((l: any) => (
-                        <option key={l.id} value={l.id}>
-                          {`${l.num} • ${l.anv} • ${l.p1} • ${l.p2} • ${l.missao}`}
-                        </option>
-                      ))}
-                  </optgroup>
-                ))}
-            </select>
+            <div className="relative">
+              <select
+                value={selectedLaunchId}
+                onChange={(e) => handleLaunchSelectAbortiva(e.target.value)}
+                className="w-full bg-slate-900 border-2 border-orange-500 text-white text-xs font-black uppercase rounded-lg px-4 py-3.5 outline-none focus:ring-2 focus:ring-orange-500/40 transition-all cursor-pointer appearance-none"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23f97316' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 1rem center",
+                  backgroundSize: "1.25rem",
+                }}
+              >
+                <option value="" className="text-slate-400">
+                  -- TOQUE PARA SELECIONAR SEU LANÇAMENTO --
+                </option>
+                {Object.entries(
+                  launches.reduce((acc: any, curr: any) => {
+                    const groupKey = curr.dateLabel || "Sem Data";
+                    if (!acc[groupKey]) acc[groupKey] = [];
+                    acc[groupKey].push(curr);
+                    return acc;
+                  }, {}),
+                )
+                  .sort((a, b) => b[0].localeCompare(a[0]))
+                  .map(([date, items]: [string, any]) => (
+                    <optgroup
+                      key={date}
+                      label={`🗓️ DATA: ${date}`}
+                      className="bg-slate-800 text-orange-400 font-black uppercase"
+                    >
+                      {items
+                        .sort((a: any, b: any) => a.num.localeCompare(b.num))
+                        .map((l: any) => (
+                          <option
+                            key={l.id}
+                            value={l.id}
+                            className="bg-slate-900 text-white"
+                          >
+                            {`${l.num} • ${l.anv} • ${l.p1} • ${l.p2} • ${l.missao}`}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))}
+              </select>
+            </div>
+            <p className="text-[10px] text-orange-400 font-bold uppercase mt-2 pl-1 bg-orange-500/10 py-1 rounded inline-block w-fit px-3">
+              ★ Selecione para carregar os dados automaticamente
+            </p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="card-military p-0 overflow-hidden max-w-2xl">
         <div className="bg-white/5 px-6 py-3 border-b border-border-theme">
