@@ -1332,7 +1332,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
       p1: launchData?.p1 || a.tripulacao || a.p1 || a.preenchidoPor || "---",
       p2: launchData?.p2 || a.p2 || "",
       missao: launchData?.mv || a.mv || a.missao || a.motivo || "S/M",
-      date: formatDate(parseOperationalDate(a.createdAt || a.dataVoo)),
+      date: formatDate(parseOperationalDate(a.dataVoo)),
       id: a.id
     };
   };
@@ -7539,9 +7539,7 @@ function AdminSection({
                       className="hover:bg-white/2 transition-colors"
                     >
                       <td className="px-4 py-3 font-mono">
-                        {a.createdAt 
-                          ? new Date(a.createdAt).toLocaleDateString("pt-BR")
-                          : (a.dataVoo ? a.dataVoo.split("-").reverse().join("/") : "---")}
+                        {a.dataVoo ? a.dataVoo.split("-").reverse().join("/") : "---"}
                       </td>
                       <td className="px-4 py-3 text-white font-bold">
                         {a.numLancamento}
@@ -7624,9 +7622,7 @@ function AdminSection({
                       Mod: <span className="text-slate-300">{a.modeloAnv}</span>
                     </div>
                     <div className="text-right">
-                      {a.createdAt 
-                        ? new Date(a.createdAt).toLocaleDateString("pt-BR")
-                        : (a.dataVoo ? a.dataVoo.split("-").reverse().join("/") : "---")}
+                      {a.dataVoo ? a.dataVoo.split("-").reverse().join("/") : "---"}
                     </div>
                   </div>
                 </div>
