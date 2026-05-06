@@ -52,6 +52,8 @@ import {
   Unlock,
   Edit,
   Link2,
+  Lightbulb,
+  MessageSquarePlus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -1579,7 +1581,8 @@ type SectionKey =
   | "Portal Único de Notificação"
   | "Abastecimento"
   | "Normas CAvEx"
-  | "Admin";
+  | "Admin"
+  | "Sugestoes";
 
 const MONTHS_MAP: Record<string, string> = {
   JANEIRO: "01",
@@ -1982,6 +1985,7 @@ export default function App() {
     { id: "Mapa de Risco", name: "Mapa de Risco", icon: MapIcon },
     { id: "Abastecimento", name: "Abastecimento", icon: Droplets },
     { id: "Normas CAvEx", name: "Normas CAvEx", icon: Gavel },
+    { id: "Sugestoes", name: "Sugestões", icon: MessageSquarePlus },
   ];
 
   const handleTabChange = (tab: any) => {
@@ -2483,6 +2487,13 @@ function InicioSection({
           desc="Relato de interrupção de missão."
           color="orange"
           onClick={() => onTabChange("Abortiva")}
+        />
+        <QuickCard
+          icon={Lightbulb}
+          title="Sugestões"
+          desc="Sugira sugestões para o aplicativo da SIPAA."
+          color="gold"
+          onClick={() => onTabChange("Sugestoes")}
         />
       </div>
     </div>
@@ -5686,8 +5697,16 @@ function AdminSection({
   const [fgrs, setFgrs] = useState<any[]>([]);
   const [abortivas, setAbortivas] = useState<any[]>([]);
   const [trashItems, setTrashItems] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [selectedView, setSelectedView] = useState<
-    "stats" | "relprevs" | "fgrs" | "abortivas" | "config" | "pdv" | "trash"
+    | "stats"
+    | "relprevs"
+    | "fgrs"
+    | "abortivas"
+    | "config"
+    | "pdv"
+    | "trash"
+    | "suggestions"
   >("stats");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
@@ -5757,6 +5776,10 @@ function AdminSection({
       collection(db, "trash"),
       orderBy("deletedAt", "desc"),
     );
+    const qSuggestions = query(
+      collection(db, "suggestions"),
+      orderBy("createdAt", "desc"),
+    );
 
     const unsubRelprev = onSnapshot(
       qRelprev,
@@ -5807,11 +5830,22 @@ function AdminSection({
       },
     );
 
+    const unsubSuggestions = onSnapshot(
+      qSuggestions,
+      (snap) => {
+        setSuggestions(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => {
+        console.error("Erro no listener de Sugestoes:", err);
+      },
+    );
+
     return () => {
       unsubRelprev();
       unsubFgr();
       unsubAbortivas();
       unsubTrash();
+      unsubSuggestions();
     };
   }, [user]);
 
@@ -5863,7 +5897,7 @@ function AdminSection({
     try {
       // Soft deletion for main entities
       if (
-        ["relprevReports", "fgrMissions", "abortivas"].includes(deleteColl)
+        ["relprevReports", "fgrMissions", "abortivas", "suggestions"].includes(deleteColl)
       ) {
         let itemData: any = null;
         let typeLabel = "";
@@ -5877,6 +5911,9 @@ function AdminSection({
         } else if (deleteColl === "abortivas") {
           itemData = abortivas.find((a) => a.id === deleteId);
           typeLabel = "ABORTIVA";
+        } else if (deleteColl === "suggestions") {
+          itemData = suggestions.find((s) => s.id === deleteId);
+          typeLabel = "SUGESTÃO";
         }
 
         if (itemData) {
@@ -5895,6 +5932,7 @@ function AdminSection({
       await deleteDoc(doc(db, deleteColl, deleteId));
       setDeleteId(null);
       setDeleteColl(null);
+      alert("Registro movido para a lixeira com sucesso!");
     } catch (error) {
       console.error("Erro ao excluir:", error);
       alert("Erro ao excluir registro. Verifique a conexão.");
@@ -5918,9 +5956,13 @@ function AdminSection({
   const deleteTrashItemPermanently = async (id: string) => {
     if (!window.confirm("Deseja EXCLUIR PERMANENTEMENTE este registro?")) return;
     try {
+      setDbStatus("CONNECTING");
       await deleteDoc(doc(db, "trash", id));
+      alert("Item excluído definitivamente com sucesso!");
     } catch (error: any) {
       alert("Erro ao excluir: " + error.message);
+    } finally {
+      setDbStatus("CONNECTED");
     }
   };
 
@@ -5941,6 +5983,11 @@ function AdminSection({
     } finally {
       setDbStatus("CONNECTED");
     }
+  };
+
+  const deleteSuggestion = async (id: string) => {
+    setDeleteId(id);
+    setDeleteColl("suggestions");
   };
 
   const handleSaveManualLaunch = async (e: React.FormEvent) => {
@@ -6290,6 +6337,13 @@ function AdminSection({
           <Trash2 size={10} />
           Lixeira {stats.trash > 0 && `(${stats.trash})`}
         </button>
+        <button
+          onClick={() => setSelectedView("suggestions")}
+          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "suggestions" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white flex items-center gap-1.5"}`}
+        >
+          <Lightbulb size={10} />
+          Sugestões {suggestions.length > 0 && `(${suggestions.length})`}
+        </button>
       </div>
 
       {lastError && (
@@ -6317,7 +6371,7 @@ function AdminSection({
 
       {selectedView === "stats" && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
             <AdminStat
               label="Relatos"
               value={stats.relprevs.toString()}
@@ -6332,6 +6386,12 @@ function AdminSection({
               label="FGR"
               value={stats.fgrs.toString()}
               trend="TOTAL"
+            />
+            <AdminStat
+              label="Sugestões"
+              value={suggestions.length.toString()}
+              trend={suggestions.length > 0 ? "PENDENTES" : "NENHUMA"}
+              onClick={() => setSelectedView("suggestions")}
             />
             <AdminStat
               label="Lixeira"
@@ -7253,6 +7313,10 @@ function AdminSection({
                       if (item.type === "FGR") label = data.missao || "Missão FGR";
                       if (item.type === "ABORTIVA")
                         label = `${data.modeloAnv} - LÇ ${data.numLancamento}`;
+                      if (item.type === "SUGESTÃO")
+                        label =
+                          data.text?.substring(0, 40) +
+                          (data.text?.length > 40 ? "..." : "");
 
                       return (
                         <tr
@@ -7266,7 +7330,9 @@ function AdminSection({
                                   ? "bg-orange-500/20 text-orange-400"
                                   : item.type === "FGR"
                                     ? "bg-blue-500/20 text-blue-400"
-                                    : "bg-purple-500/20 text-purple-400"
+                                    : item.type === "SUGESTÃO"
+                                      ? "bg-yellow-500/20 text-yellow-400"
+                                      : "bg-purple-500/20 text-purple-400"
                               }`}
                             >
                               {item.type}
@@ -7308,6 +7374,60 @@ function AdminSection({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+      {selectedView === "suggestions" && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-military-gold/10 p-4 rounded border border-military-gold/20">
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <Lightbulb size={16} className="text-military-gold" />
+                Sugestões de Melhorias Recebidas
+              </h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                {suggestions.length} sugestões de melhorias pendentes
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {suggestions.length === 0 ? (
+              <div className="card-military p-12 text-center text-slate-500 uppercase font-black text-[10px] italic">
+                Nenhuma sugestão recebida até o momento.
+              </div>
+            ) : (
+              suggestions.map((s) => (
+                <div key={s.id} className="card-military p-6 relative group overflow-hidden">
+                  <div className="absolute top-4 right-4 z-20 flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        deleteSuggestion(s.id);
+                      }}
+                      className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-all rounded-lg cursor-pointer bg-military-black border border-white/5 shadow-xl"
+                      title="Excluir Sugestão"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3 mb-1">
+                      <div className="w-8 h-8 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold border border-military-gold/20">
+                        <Lightbulb size={14} />
+                      </div>
+                      <p className="text-[9px] text-slate-500 font-mono italic">
+                        {new Date(s.createdAt).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                    <div className="text-text-secondary text-base leading-relaxed bg-white/2 p-5 rounded-xl border border-white/5 whitespace-pre-wrap font-medium">
+                      {s.text}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -8144,6 +8264,108 @@ function AdminStat({ label, value, trend, onClick }: any) {
   );
 }
 
+function SugestoesSection() {
+  const [suggestion, setSuggestion] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suggestion.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "suggestions"), {
+        text: suggestion.trim(),
+        submittedBy: auth.currentUser?.email || auth.currentUser?.uid || "Anônimo",
+        createdAt: new Date().toISOString(),
+      });
+      setSubmitted(true);
+      setSuggestion("");
+    } catch (error) {
+      console.error("Erro ao enviar sugestão:", error);
+      alert("Erro ao enviar sua sugestão. Tente novamente mais tarde.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-8">
+      <div className="text-center space-y-4">
+        <div className="w-16 h-16 bg-military-gold/10 rounded-2xl flex items-center justify-center text-military-gold mx-auto border border-military-gold/20 shadow-2xl">
+          <Lightbulb size={32} />
+        </div>
+        <h2 className="text-3xl font-black text-white uppercase tracking-tighter">
+          Sugestões de Melhorias
+        </h2>
+        <p className="text-text-secondary max-w-lg mx-auto">
+          Sua opinião é fundamental para evoluirmos o App da SIPAA. Sugira novas funcionalidades, relate dificuldades ou proponha mudanças.
+        </p>
+      </div>
+
+      <div className="card-military p-8">
+        {submitted ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-12 space-y-6"
+          >
+            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-green-500 mx-auto border border-green-500/30">
+              <Check size={40} />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-white uppercase">Obrigado!</h3>
+              <p className="text-slate-400 text-sm">
+                Sua sugestão foi enviada com sucesso para a equipe administrativa.
+              </p>
+            </div>
+            <button
+              onClick={() => setSubmitted(false)}
+              className="text-military-gold font-black uppercase text-[10px] tracking-widest hover:underline"
+            >
+              Enviar outra sugestão
+            </button>
+          </motion.div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <MessageSquarePlus size={12} /> Descreva sua sugestão
+              </label>
+              <textarea
+                value={suggestion}
+                onChange={(e) => setSuggestion(e.target.value)}
+                placeholder="Ex: Gostaria de uma área para acompanhar meus últimos relatos..."
+                className="w-full bg-military-black border border-white/10 rounded-lg p-5 text-white focus:border-military-gold outline-none transition-all min-h-[200px] text-sm leading-relaxed placeholder:text-slate-700 italic"
+                disabled={isSubmitting}
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={isSubmitting || !suggestion.trim()}
+              className="btn-military w-full py-4 text-xs flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  ENVIANDO...
+                </>
+              ) : (
+                <>
+                  <Send size={16} />
+                  ENVIAR SUGESTÃO
+                </>
+              )}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const sectionComponents: Record<string, FC<any>> = {
   Inicio: InicioSection,
   RELPREV: RelprevSection,
@@ -8154,4 +8376,5 @@ const sectionComponents: Record<string, FC<any>> = {
   Abastecimento: AbastecimentoSection,
   "Normas CAvEx": NormasSection,
   Admin: AdminSection,
+  Sugestoes: SugestoesSection,
 };

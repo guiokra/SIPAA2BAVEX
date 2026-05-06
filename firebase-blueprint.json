@@ -88,7 +88,7 @@
         "originalId": { "type": "string" },
         "originalCollection": { "type": "string" },
         "data": { "type": "object", "description": "Os dados originais do documento" },
-        "type": { "type": "string", "description": "Tipo do registro (RELPREV, FGR, ABORTIVA)" },
+        "type": { "type": "string", "description": "Tipo do registro (RELPREV, FGR, ABORTIVA, SUGESTÃO)" },
         "deletedAt": { "type": "string", "format": "date-time" },
         "deletedBy": { "type": "string" }
       },
@@ -115,6 +115,20 @@
     "/trash/{trashId}": {
       "schema": "TrashItem",
       "description": "Itens deletados para possível recuperação"
+    },
+    "/suggestions/{suggestionId}": {
+      "schema": {
+        "title": "Suggestion",
+        "description": "Sugestões de melhorias enviadas pelos usuários",
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "Conteúdo da sugestão" },
+          "submittedBy": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["text", "createdAt"]
+      },
+      "description": "Sugestões de melhorias do aplicativo"
     },
     "/config/abastecimento": {
       "schema": {
