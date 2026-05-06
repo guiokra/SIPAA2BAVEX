@@ -94,6 +94,14 @@ import {
   uploadBytesResumable,
   uploadString,
 } from "firebase/storage";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import JSZip from "jszip";
@@ -1114,6 +1122,214 @@ function getRiskClass(r: number, tipoVoo: string = "REGULAR") {
     responsavel: "Cmt OM",
   };
 }
+const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abortivas: any[], launches: any[] }) => {
+  const [targetMonth, setTargetMonth] = useState(new Date().getMonth());
+  const [targetYear, setTargetYear] = useState(new Date().getFullYear());
+
+  const filteredFgrs = fgrs.filter((f: any) => {
+    const d = new Date(f.createdAt);
+    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+  });
+
+  const filteredAbortivas = abortivas.filter((a: any) => {
+    const d = new Date(a.createdAt);
+    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+  });
+
+  const filteredLaunches = launches.filter((l: any) => {
+    const d = new Date(l.createdAt);
+    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+  });
+
+  // Calculate Risk Distribution
+  const riskData = [
+    { name: "Baixo", value: 0, color: "#22c55e" },
+    { name: "Médio", value: 0, color: "#eab308" },
+    { name: "Alto", value: 0, color: "#ef4444" },
+  ];
+
+  filteredFgrs.forEach((f: any) => {
+    const r = getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label;
+    if (r === "Baixo") riskData[0].value++;
+    else if (r === "Médio") riskData[1].value++;
+    else riskData[2].value++;
+  });
+
+  // Calculate Abortiva Motives
+  const abortivaData = [
+    { name: "DOS", value: 0, color: "#3b82f6" },
+    { name: "DFM", value: 0, color: "#8b5cf6" },
+    { name: "DCP", value: 0, color: "#ec4899" },
+    { name: "DCM", value: 0, color: "#f97316" },
+  ];
+
+  filteredAbortivas.forEach((a: any) => {
+    const idx = abortivaData.findIndex(item => item.name === a.motivo);
+    if (idx !== -1) abortivaData[idx].value++;
+  });
+
+  // Overview Data (Operational Panorama)
+  const totalLaunches = filteredLaunches.length;
+  const fgrCount = filteredFgrs.length;
+  const abortivaCount = filteredAbortivas.length;
+
+  const overviewData = [
+    { name: "FGRs Efetuados", value: fgrCount, color: "#ffd700" },
+    { name: "Abortivas", value: abortivaCount, color: "#f87171" },
+    { name: "Demais Lançamentos", value: Math.max(0, totalLaunches - fgrCount - abortivaCount), color: "#475569" },
+  ];
+
+  const monthNames = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-military-black/60 p-4 border border-white/5 rounded-lg gap-4">
+        <div>
+          <h4 className="text-white font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <LayoutDashboard size={14} className="text-military-gold" />
+            Estatísticas Mensais
+          </h4>
+          <p className="text-slate-500 text-[10px] font-bold uppercase mt-1">
+            Periodo: <span className="text-military-gold">{monthNames[targetMonth]} / {targetYear}</span>
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <select 
+            value={targetMonth} 
+            onChange={(e) => setTargetMonth(parseInt(e.target.value))}
+            className="bg-slate-900/50 text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded border border-white/10 outline-none focus:border-military-gold/50"
+          >
+            {monthNames.map((m, i) => <option key={i} value={i}>{m}</option>)}
+          </select>
+          <select 
+            value={targetYear} 
+            onChange={(e) => setTargetYear(parseInt(e.target.value))}
+            className="bg-slate-900/50 text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded border border-white/10 outline-none focus:border-military-gold/50"
+          >
+            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Chart 1: Panorama Operacional */}
+        <div className="card-military p-6 flex flex-col h-[380px]">
+          <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Panorama Operacional</h5>
+          <div className="flex-1 min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={overviewData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {overviewData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '10px', textTransform: 'uppercase' }}
+                  itemStyle={{ color: '#fff', padding: '2px 0' }}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  align="center"
+                  iconType="circle" 
+                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', paddingTop: '20px' }} 
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-center mt-2">
+            <span className="text-[20px] font-black text-white">{totalLaunches}</span>
+            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Lançamentos Totais</p>
+          </div>
+        </div>
+
+        {/* Chart 2: FGRs por Risco */}
+        <div className="card-military p-6 flex flex-col h-[380px]">
+          <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Risco dos FGRs</h5>
+          <div className="flex-1 min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={riskData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={85}
+                  dataKey="value"
+                  labelLine={false}
+                  label={({ percent }) => percent > 0 ? `${(percent * 100).toFixed(0)}%` : ''}
+                >
+                  {riskData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip 
+                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '10px' }}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  align="center"
+                  iconType="rect" 
+                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '20px' }} 
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-center mt-2">
+            <span className="text-[20px] font-black text-white">{fgrCount}</span>
+            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">FGRs Preenchidos</p>
+          </div>
+        </div>
+
+        {/* Chart 3: Motivos de Abortiva */}
+        <div className="card-military p-6 flex flex-col h-[380px]">
+          <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Motivos de Abortiva</h5>
+          <div className="flex-1 min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={abortivaData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={85}
+                  dataKey="value"
+                  label={({ name, value }) => value > 0 ? name : ''}
+                >
+                  {abortivaData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip 
+                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '10px' }}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  align="center"
+                  iconType="circle" 
+                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '20px' }} 
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-center mt-2">
+            <span className="text-[20px] font-black text-white">{abortivaCount}</span>
+            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Total Abortivas</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const generateAbortivaPDF = (abort: any) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -6414,6 +6630,12 @@ function AdminSection({
 
       {selectedView === "stats" && (
         <div className="space-y-6">
+          <AdminStatsDashboard 
+            fgrs={fgrs} 
+            abortivas={abortivas} 
+            launches={launches} 
+          />
+
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
             <AdminStat
               label="Relatos"
