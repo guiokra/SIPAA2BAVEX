@@ -1228,16 +1228,24 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     }
   };
 
-  const mapFgrToItem = (f: any) => ({
-    type: 'FGR',
-    num: f.numLancamento || "S/N",
-    anv: f.aeronave || f.modeloAnv || "S/A",
-    p1: f.trigramaTrip || f.preenchidoPor || "---",
-    p2: "",
-    missao: f.missao || "S/M",
-    date: formatDate(parseOperationalDate(f.data)),
-    id: f.id
-  });
+  const mapFgrToItem = (f: any) => {
+    // If numLancamento is missing, check if missao field contains "LÇ XX"
+    let launchNum = f.numLancamento || "S/N";
+    if (launchNum === "S/N" && f.missao && f.missao.startsWith("LÇ ")) {
+      launchNum = f.missao.replace("LÇ ", "");
+    }
+
+    return {
+      type: 'FGR',
+      num: launchNum,
+      anv: f.aeronave || f.modeloAnv || "S/A",
+      p1: f.trigramaTrip || f.preenchidoPor || "---",
+      p2: "",
+      missao: f.mv || f.missao || "S/M",
+      date: formatDate(parseOperationalDate(f.data)),
+      id: f.id
+    };
+  };
 
   const mapAbortivaToItem = (a: any) => ({
     type: 'ABORTIVA',
@@ -1392,7 +1400,11 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
                         <span className="font-black text-accent-gold">LÇ {item.num}</span>
-                        <span className="font-mono text-slate-500 text-[8px]">{item.date}</span>
+                        <div className="flex flex-col items-center">
+                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-white/10 px-2 py-0.5 rounded shadow-sm border border-white/5 font-mono">
+                             {item.date}
+                           </span>
+                        </div>
                         <span className="font-black text-white">{item.anv}</span>
                       </div>
                       <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
@@ -1470,7 +1482,11 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
                         <span className="font-black text-accent-gold">LÇ {item.num}</span>
-                        <span className="font-mono text-slate-500 text-[8px]">{item.date}</span>
+                        <div className="flex flex-col items-center">
+                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-white/10 px-2 py-0.5 rounded shadow-sm border border-white/5 font-mono">
+                             {item.date}
+                           </span>
+                        </div>
                         <span className="font-black text-white">{item.anv}</span>
                       </div>
                       <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
@@ -1546,7 +1562,11 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
                         <span className="font-black text-accent-gold">LÇ {item.num}</span>
-                        <span className="font-mono text-slate-500 text-[8px]">{item.date}</span>
+                        <div className="flex flex-col items-center">
+                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-white/10 px-2 py-0.5 rounded shadow-sm border border-white/5 font-mono">
+                             {item.date}
+                           </span>
+                        </div>
                         <span className="font-black text-white">{item.anv}</span>
                       </div>
                       <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
