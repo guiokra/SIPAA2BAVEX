@@ -1105,10 +1105,10 @@ function getRiskClass(r: number, tipoVoo: string = "REGULAR") {
   if (r < thresholds[2]) {
     return {
       label: "Alto",
-      color: "text-orange-500",
-      bg: "bg-orange-500/10",
-      border: "border-orange-500/30",
-      hex: [249, 115, 22],
+      color: "text-red-500",
+      bg: "bg-red-500/10",
+      border: "border-red-500/30",
+      hex: [239, 68, 68],
       decisao: "Ajustar antes da missão (*)",
       responsavel: "Cmt OM",
     };
@@ -1116,9 +1116,9 @@ function getRiskClass(r: number, tipoVoo: string = "REGULAR") {
   return {
     label: "Muito Alto",
     color: "text-red-500",
-    bg: "bg-red-500/10",
-    border: "border-red-500/30",
-    hex: [239, 68, 68],
+    bg: "bg-red-500/20",
+    border: "border-red-500/40",
+    hex: [185, 28, 28],
     decisao: "Adiar e replanejar (*)",
     responsavel: "Cmt OM",
   };
@@ -6555,6 +6555,53 @@ function AdminSection({
     }
   };
 
+  const handleDownloadAllAbortivas = async () => {
+    if (abortivas.length === 0) return;
+
+    try {
+      setIsUploading(true);
+      const zip = new JSZip();
+      const nameCounts: Record<string, number> = {};
+
+      abortivas.forEach((a) => {
+        const docPdf = generateAbortivaPDF(a);
+        const pdfBlob = docPdf.output("blob");
+
+        // Data do lançamento
+        let dateStr = "SemData";
+        if (a.createdAt) {
+          dateStr = new Date(a.createdAt)
+            .toLocaleDateString("pt-BR")
+            .replace(/\//g, "-");
+        }
+
+        const missionSafe = (a.numLancamento || "Abortiva").replace(/[/\\?%*:|"<>]/g, "-");
+        let filenameBase = `${dateStr}_${missionSafe}`;
+
+        if (nameCounts[filenameBase] === undefined) {
+          nameCounts[filenameBase] = 1;
+        } else {
+          nameCounts[filenameBase]++;
+          filenameBase += `_${nameCounts[filenameBase]}`;
+        }
+
+        const filename = `${filenameBase}.pdf`;
+        zip.file(filename, pdfBlob);
+      });
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(
+        content,
+        `ABORTIVAS_COLETIVAS_${new Date().toLocaleDateString("pt-BR").replace(/\//g, "-")}.zip`,
+      );
+    } catch (error) {
+      console.error("Erro ao gerar ZIP de abortivas:", error);
+      alert("Erro ao baixar abortivas. Tente novamente.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleDeleteAllFGRs = async () => {
     if (fgrs.length === 0) return;
     if (
@@ -7165,13 +7212,9 @@ function AdminSection({
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest ${
-                            f.scores.riskMax > 100
-                              ? "bg-red-500/20 text-red-500"
-                              : "bg-green-500/20 text-green-500"
-                          }`}
+                          className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest ${getRiskClass(f.scores.riskMax, f.tipoVoo).bg} ${getRiskClass(f.scores.riskMax, f.tipoVoo).color}`}
                         >
-                          {f.scores.riskMax} pts
+                          {f.scores.riskMax} pts - {getRiskClass(f.scores.riskMax, f.tipoVoo).label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
@@ -7247,13 +7290,9 @@ function AdminSection({
                       {f.missao}
                     </span>
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${
-                        f.scores.riskMax > 100
-                          ? "bg-red-500/20 text-red-500"
-                          : "bg-green-500/20 text-green-500"
-                      }`}
+                      className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${getRiskClass(f.scores.riskMax, f.tipoVoo).bg} ${getRiskClass(f.scores.riskMax, f.tipoVoo).color}`}
                     >
-                      {f.scores.riskMax} PTS
+                      {f.scores.riskMax} PTS - {getRiskClass(f.scores.riskMax, f.tipoVoo).label.toUpperCase()}
                     </span>
                   </div>
                   <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
@@ -7304,19 +7343,35 @@ function AdminSection({
 
       {selectedView === "abortivas" && (
         <div className="space-y-4">
-          {/* Header with Clear All Button */}
-          <div className="flex justify-between items-center mb-2 px-2">
+          {/* Header with Bulk Actions */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2 px-2">
             <h3 className="text-xs font-black text-white uppercase tracking-widest">
               Acervo de Abortivas
             </h3>
-            {abortivas.length > 0 && (
-              <button
-                onClick={handleDeleteAllAbortivas}
-                className="flex items-center gap-2 px-3 py-1.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-black uppercase tracking-tighter hover:bg-red-500 hover:text-white transition-all"
-              >
-                <Trash2 size={12} /> Limpar Acervo ({abortivas.length})
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {abortivas.length > 0 && (
+                <>
+                  <button
+                    onClick={handleDownloadAllAbortivas}
+                    disabled={isUploading}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[9px] font-black uppercase tracking-tighter hover:bg-military-gold hover:text-military-black transition-all disabled:opacity-50"
+                  >
+                    {isUploading ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Download size={12} />
+                    )}
+                    Baixar Todas ({abortivas.length})
+                  </button>
+                  <button
+                    onClick={handleDeleteAllAbortivas}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-black uppercase tracking-tighter hover:bg-red-500 hover:text-white transition-all"
+                  >
+                    <Trash2 size={12} /> Excluir Todas
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Desktop Table - Only on large screens */}
