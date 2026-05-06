@@ -1134,12 +1134,17 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     if (!dateStr) return null;
     if (dateStr.includes("-")) {
       const parts = dateStr.split("-");
+      // Handle YYYY-MM-DD
       if (parts[0].length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+      // Handle DD-MM-YYYY
       if (parts[2].length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
     }
     if (dateStr.includes("/")) {
-      const [d, m, y] = dateStr.split("/");
-      return new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 12, 0, 0);
+      const parts = dateStr.split("/");
+      // Handle DD/MM/YYYY
+      if (parts[2]?.length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+      // Handle YYYY/MM/DD
+      if (parts[0]?.length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
     }
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return null;
@@ -1294,39 +1299,73 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     }
   };
 
-  const mapFgrToItem = (f: any) => {
+  const mapFgrToItem = (f: any, specificLaunch?: any) => {
     const risk = getRiskClass(f.scores?.riskMax || 0, f.tipoVoo);
+    // If we have a specific launch (from PDV), use its data for perfect sync
+    const launchData = specificLaunch || launches.find(l => l.linkedFgrId === f.id);
+    
     return {
       type: 'FGR',
-      num: getFgrLaunchNums(f),
-      anv: f.aeronave || f.modeloAnv || "S/A",
-      p1: f.trigramaTrip || f.preenchidoPor || "---",
-      p2: "",
-      missao: f.mv || f.missao || "S/M",
-      date: formatDate(parseOperationalDate(f.data)),
+      num: launchData ? extractLaunchNum(launchData) : getFgrLaunchNums(f),
+      anv: launchData?.anv || f.aeronave || f.modeloAnv || "S/A",
+      p1: launchData?.p1 || f.trigramaTrip || f.preenchidoPor || "---",
+      p2: launchData?.p2 || "",
+      missao: launchData?.mv || f.mv || f.missao || "S/M",
+      date: formatDate(parseOperationalDate(launchData?.dateLabel ? launchData.dateLabel.split("/").reverse().join("-") : f.data)),
       id: f.id,
       riskColor: risk.color,
       riskBg: risk.bg
     };
   };
 
-  const mapAbortivaToItem = (a: any) => ({
-    type: 'ABORTIVA',
-    num: extractLaunchNum(a),
-    anv: a.aeronave || "S/A",
-    p1: a.p1 || "---",
-    p2: a.p2 || "",
-    missao: a.motivo || "S/M",
-    date: formatDate(parseOperationalDate(a.dataVoo)),
-    id: a.id
-  });
+  const mapAbortivaToItem = (a: any, specificLaunch?: any) => {
+    // Try to find the PDV launch this abortiva belongs to
+    const launchData = specificLaunch || launches.find(l => 
+      (l.num && a.numLancamento === l.num && (l.dateLabel ? l.dateLabel.split("/").reverse().join("-") === a.dataVoo : true)) || 
+      (l.id === a.pdvLaunchId)
+    );
+
+    return {
+      type: 'ABORTIVA',
+      num: launchData ? extractLaunchNum(launchData) : extractLaunchNum(a),
+      anv: launchData?.anv || a.modeloAnv || a.aeronave || "S/A",
+      p1: launchData?.p1 || a.tripulacao || a.p1 || a.preenchidoPor || "---",
+      p2: launchData?.p2 || a.p2 || "",
+      missao: launchData?.mv || a.mv || a.missao || a.motivo || "S/M",
+      date: formatDate(parseOperationalDate(launchData?.dateLabel ? launchData.dateLabel.split("/").reverse().join("-") : a.dataVoo)),
+      id: a.id
+    };
+  };
 
   const getCategoryItems = () => {
     if (selectedCategory === "FGRs Efetuados") {
-      return filteredFgrs.map(mapFgrToItem);
+      const items: any[] = [];
+      filteredFgrs.forEach(f => {
+        const linked = launches.filter(l => l.linkedFgrId === f.id);
+        if (linked.length > 0) {
+          linked.forEach(l => items.push(mapFgrToItem(f, l)));
+        } else {
+          items.push(mapFgrToItem(f));
+        }
+      });
+      return items;
     }
     if (selectedCategory === "Abortivas") {
-      return filteredAbortivas.map(mapAbortivaToItem);
+      const items: any[] = [];
+      filteredAbortivas.forEach(a => {
+        const linked = launches.filter(l => l.id === a.pdvLaunchId || (l.num && l.num === a.numLancamento));
+        if (linked.length > 0) {
+          linked.filter(l => {
+            const lDate = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
+            return !a.dataVoo || lDate === a.dataVoo;
+          }).forEach(l => items.push(mapAbortivaToItem(a, l)));
+          
+          if (items.length === 0) items.push(mapAbortivaToItem(a));
+        } else {
+          items.push(mapAbortivaToItem(a));
+        }
+      });
+      return items;
     }
     if (selectedCategory === "Demais Lançamentos") {
       return filteredLaunches
@@ -1337,8 +1376,8 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           anv: l.anv || "S/A",
           p1: l.p1 || "---",
           p2: l.p2 || "",
-          missao: l.missao || "S/M",
-          date: formatDate(parseOperationalDate(l.dateLabel)),
+          missao: l.mv || "S/M",
+          date: formatDate(parseOperationalDate(l.dateLabel?.split("/").reverse().join("-"))),
           id: l.id
         }));
     }
@@ -1347,16 +1386,39 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
 
   const getRiskItems = () => {
     if (!selectedRiskCategory) return [];
-    return filteredFgrs
+    const items: any[] = [];
+    filteredFgrs
       .filter(f => getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label === selectedRiskCategory)
-      .map(mapFgrToItem);
+      .forEach(f => {
+        const linked = launches.filter(l => l.linkedFgrId === f.id);
+        if (linked.length > 0) {
+          linked.forEach(l => items.push(mapFgrToItem(f, l)));
+        } else {
+          items.push(mapFgrToItem(f));
+        }
+      });
+    return items;
   };
 
   const getMotiveItems = () => {
     if (!selectedMotiveCategory) return [];
-    return filteredAbortivas
+    const items: any[] = [];
+    filteredAbortivas
       .filter(a => a.motivo === selectedMotiveCategory)
-      .map(mapAbortivaToItem);
+      .forEach(a => {
+        const linked = launches.filter(l => l.id === a.pdvLaunchId || (l.num && l.num === a.numLancamento));
+        if (linked.length > 0) {
+          linked.filter(l => {
+            const lDate = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
+            return !a.dataVoo || lDate === a.dataVoo;
+          }).forEach(l => items.push(mapAbortivaToItem(a, l)));
+          
+          if (items.length === 0) items.push(mapAbortivaToItem(a));
+        } else {
+          items.push(mapAbortivaToItem(a));
+        }
+      });
+    return items;
   };
 
   const drillDownItems = getCategoryItems();
@@ -1573,22 +1635,25 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Motivos de Abortiva</h5>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart margin={{ top: 0, right: 50, left: 50, bottom: 0 }}>
                 <Pie
                   data={abortivaData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={85}
+                  outerRadius={70}
+                  innerRadius={50}
+                  paddingAngle={5}
                   dataKey="value"
+                  labelLine={{ stroke: 'rgba(255,255,255,0.3)', strokeWidth: 1 }}
                   label={({ name, value }) => value > 0 ? name : ''}
                   onClick={handleMotiveClick}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', outline: 'none' }}
                 >
                   {abortivaData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={entry.color} 
-                      stroke={selectedMotiveCategory === entry.name ? '#fff' : 'none'}
+                      stroke={selectedMotiveCategory === entry.name ? '#fff' : 'rgba(255,255,255,0.1)'}
                       strokeWidth={2}
                     />
                   ))}
@@ -1600,7 +1665,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   verticalAlign="bottom" 
                   align="center"
                   iconType="circle" 
-                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '10px' }} 
+                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '20px' }} 
                   onClick={(e: any) => handleMotiveClick(e.payload)}
                 />
               </PieChart>
