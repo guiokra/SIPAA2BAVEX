@@ -7290,7 +7290,6 @@ function AdminSection({
                     <th className="px-4 py-3">Tipo</th>
                     <th className="px-4 py-3">Identificação</th>
                     <th className="px-4 py-3">Deletado em</th>
-                    <th className="px-4 py-3">Por</th>
                     <th className="px-4 py-3 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -7298,7 +7297,7 @@ function AdminSection({
                   {trashItems.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={4}
                         className="px-4 py-12 text-center text-slate-500 uppercase font-black text-[10px] italic"
                       >
                         Lixeira vazia
@@ -7343,9 +7342,6 @@ function AdminSection({
                           </td>
                           <td className="px-4 py-3 text-slate-400 font-mono">
                             {new Date(item.deletedAt).toLocaleString("pt-BR")}
-                          </td>
-                          <td className="px-4 py-3 text-slate-500 text-[10px]">
-                            {item.type === "SUGESTÃO" ? "---" : item.deletedBy}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
