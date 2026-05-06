@@ -135,6 +135,21 @@ const compressImage = (
   });
 };
 
+const openPDFSafely = (pdfUrl: string) => {
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
+  if (isIOS) {
+    window.location.href = pdfUrl;
+  } else {
+    const win = window.open(pdfUrl, "_blank");
+    if (!win || win.closed || typeof win.closed === "undefined") {
+      // Se bloqueado, usa redirect como fallback
+      window.location.href = pdfUrl;
+    }
+  }
+};
+
 const openBase64InNewTab = (base64Data: string) => {
   try {
     const parts = base64Data.split(",");
@@ -148,7 +163,7 @@ const openBase64InNewTab = (base64Data: string) => {
     const byteArray = new Uint8Array(byteNumbers);
     const blob = new Blob([byteArray], { type: contentType });
     const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
+    openPDFSafely(url);
   } catch (e) {
     console.error("Erro ao abrir anexo:", e);
     // Fallback: tenta abrir diretamente se for seguro ou avisa
@@ -2960,6 +2975,25 @@ function RelprevSection({
 
     setIsSaving(true);
     try {
+      const createdAt = new Date().toISOString();
+      const codigo = `${new Date().getFullYear()}-${String(reports.length + 1).padStart(3, "0")}`;
+
+      const payloadBase = {
+        ...formData,
+        codigo,
+        images,
+        extraFiles,
+        status: isDraft ? "RASCUNHO" : "ENVIADO",
+        createdAt,
+      };
+
+      // Abrir PDF imediatamente para garantir o user gesture ANTES de qualquer await
+      if (!isDraft) {
+        const doc = generateRelprevPDF(payloadBase);
+        const docBlob = doc.output("blob");
+        openPDFSafely(URL.createObjectURL(docBlob));
+      }
+
       let activeUserUid = user?.uid;
       if (!activeUserUid) {
         try {
@@ -2971,23 +3005,12 @@ function RelprevSection({
         }
       }
 
-      const codigo = `${new Date().getFullYear()}-${String(reports.length + 1).padStart(3, "0")}`;
-      const payload = {
-        ...formData,
-        codigo,
-        images,
-        extraFiles,
-        status: isDraft ? "RASCUNHO" : "ENVIADO",
+      const finalPayload = {
+        ...payloadBase,
         uid: activeUserUid,
-        createdAt: new Date().toISOString(),
       };
 
-      await addDoc(collection(db, "relprevReports"), payload);
-
-      if (!isDraft) {
-        const doc = generateRelprevPDF(payload);
-        window.open(doc.output("bloburl"), "_blank");
-      }
+      await addDoc(collection(db, "relprevReports"), finalPayload);
 
       // Reset
       setFormData({
@@ -3598,8 +3621,38 @@ function FgrSection({
       );
       return;
     }
+
     setIsSaving(true);
     try {
+      const createdAt = new Date().toISOString();
+      const scores = {
+        tgMin,
+        tgMax,
+        gravTotal,
+        riskMin,
+        riskMax,
+      };
+
+      const basePayload = {
+        ...finalMissionData,
+        perfisVoo,
+        p2Selections: finalP2Selections,
+        p3Selections: finalP3Selections,
+        p4Selections: finalP4Selections,
+        gravidadeSelections,
+        mitigation,
+        scores,
+        relatorName:
+          user?.displayName || finalMissionData.preenchidoPor || "Convidado",
+        createdAt,
+      };
+
+      // Abrir PDF imediatamente para garantir o user gesture (especialmente iOS)
+      // Fazemos isso antes de qualquer await (signInAnonymously ou addDoc)
+      const docPdf = generateFgrPDF(basePayload);
+      const docBlob = docPdf.output("blob");
+      openPDFSafely(URL.createObjectURL(docBlob));
+
       let activeUserUid = user?.uid;
       if (!activeUserUid) {
         try {
@@ -3610,27 +3663,9 @@ function FgrSection({
         }
       }
 
-      const scores = {
-        tgMin,
-        tgMax,
-        gravTotal,
-        riskMin,
-        riskMax,
-      };
-
       const missionPayload = {
-        ...finalMissionData,
-        perfisVoo,
-        p2Selections: finalP2Selections,
-        p3Selections: finalP3Selections,
-        p4Selections: finalP4Selections,
-        gravidadeSelections,
-        mitigation,
-        scores,
+        ...basePayload,
         uid: activeUserUid,
-        relatorName:
-          user?.displayName || finalMissionData.preenchidoPor || "Convidado",
-        createdAt: new Date().toISOString(),
       };
 
       const docRef = await addDoc(
@@ -3638,23 +3673,17 @@ function FgrSection({
         missionPayload,
       );
 
-      // Abrir PDF imediatamente após o sucesso do salvamento para conferência
-      const docPdf = generateFgrPDF(missionPayload);
-      const blob = docPdf.output("blob");
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-
       setIsSaving(false);
       alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
       resetAll();
 
-      // Upload do PDF em background (Não bloqueia o UI)
+      // Upload do PDF em background
       (async () => {
         try {
           const fileName = `fgr_${finalMissionData.missao.replace(/\s+/g, "_")}_${Date.now()}.pdf`;
           const storageRef = ref(storage, `fgr_pdfs/${fileName}`);
 
-          const uploadTask = await uploadBytes(storageRef, blob);
+          const uploadTask = await uploadBytes(storageRef, docBlob);
           const pdfUrl = await getDownloadURL(uploadTask.ref);
 
           await setDoc(
