@@ -139,12 +139,19 @@ const openPDFSafely = (pdfUrl: string) => {
   const isIOS =
     /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
-  if (isIOS) {
-    window.location.href = pdfUrl;
-  } else {
-    const win = window.open(pdfUrl, "_blank");
-    if (!win || win.closed || typeof win.closed === "undefined") {
-      // Se bloqueado, usa redirect como fallback
+  // Tenta abrir em nova aba primeiro (melhor para não perder o estado do app)
+  const win = window.open(pdfUrl, "_blank");
+
+  if (!win || win.closed || typeof win.closed === "undefined") {
+    // Se o popup for bloqueado ou se estivermos no iOS e o window.open falhar
+    if (isIOS) {
+      // No iOS, se window.open falhar, usamos o redirecionamento
+      // Mas avisamos ou atrasamos levemente para permitir processos em background
+      setTimeout(() => {
+        window.location.href = pdfUrl;
+      }, 500);
+    } else {
+      // Fallback para outros dispositivos
       window.location.href = pdfUrl;
     }
   }
@@ -2987,11 +2994,12 @@ function RelprevSection({
         createdAt,
       };
 
-      // Abrir PDF imediatamente para garantir o user gesture ANTES de qualquer await
+      // Preparamos o PDF
+      let pdfBlobUrl = "";
       if (!isDraft) {
         const doc = generateRelprevPDF(payloadBase);
         const docBlob = doc.output("blob");
-        openPDFSafely(URL.createObjectURL(docBlob));
+        pdfBlobUrl = URL.createObjectURL(docBlob);
       }
 
       let activeUserUid = user?.uid;
@@ -3010,7 +3018,13 @@ function RelprevSection({
         uid: activeUserUid,
       };
 
+      // Primeiro enviamos ao banco para garantir que os dados cheguem
       await addDoc(collection(db, "relprevReports"), finalPayload);
+
+      // Agora abrimos o PDF (o gesto do usuário ainda deve ser válido aqui se o addDoc for rápido)
+      if (!isDraft && pdfBlobUrl) {
+        openPDFSafely(pdfBlobUrl);
+      }
 
       // Reset
       setFormData({
@@ -3647,11 +3661,10 @@ function FgrSection({
         createdAt,
       };
 
-      // Abrir PDF imediatamente para garantir o user gesture (especialmente iOS)
-      // Fazemos isso antes de qualquer await (signInAnonymously ou addDoc)
+      // Preparamos o PDF mas NÃO abrimos ainda para não interromper o envio
       const docPdf = generateFgrPDF(basePayload);
       const docBlob = docPdf.output("blob");
-      openPDFSafely(URL.createObjectURL(docBlob));
+      const pdfBlobUrl = URL.createObjectURL(docBlob);
 
       let activeUserUid = user?.uid;
       if (!activeUserUid) {
@@ -3668,10 +3681,11 @@ function FgrSection({
         uid: activeUserUid,
       };
 
-      const docRef = await addDoc(
-        collection(db, "fgrMissions"),
-        missionPayload,
-      );
+      // Disparamos o envio ao banco primeiro
+      const docRef = await addDoc(collection(db, "fgrMissions"), missionPayload);
+
+      // Agora que salvou, abrimos o PDF
+      openPDFSafely(pdfBlobUrl);
 
       setIsSaving(false);
       alert("FGR enviado com sucesso! O SIPAA recebeu o relatório oficial.");
