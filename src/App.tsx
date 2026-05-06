@@ -1339,7 +1339,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chart 1: Panorama Operacional */}
-        <div className="card-military p-6 flex flex-col h-[500px]">
+        <div className="card-military p-6 flex flex-col h-[650px]">
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Panorama Operacional</h5>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -1418,7 +1418,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
         </div>
 
         {/* Chart 2: FGRs por Risco */}
-        <div className="card-military p-6 flex flex-col h-[500px]">
+        <div className="card-military p-6 flex flex-col h-[650px]">
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Risco dos FGRs</h5>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -1495,7 +1495,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
         </div>
 
         {/* Chart 3: Motivos de Abortiva */}
-        <div className="card-military p-6 flex flex-col h-[500px]">
+        <div className="card-military p-6 flex flex-col h-[650px]">
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Motivos de Abortiva</h5>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
