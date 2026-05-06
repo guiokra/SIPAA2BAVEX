@@ -1228,7 +1228,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     const r = getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label;
     if (r === "Baixo") riskData[0].value++;
     else if (r === "Médio") riskData[1].value++;
-    else riskData[2].value++;
+    else if (r === "Alto") riskData[2].value++;
   });
 
   // Calculate Abortiva Motives
@@ -1249,25 +1249,52 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
   const fgrCount = filteredFgrs.length;
   const abortivaCount = filteredAbortivas.length;
 
-  const fgrLaunchNums = new Set<string>();
+  const launchesWithFgr = new Set<string>();
+  const launchesWithAbortiva = new Set<string>();
+  
+  // 1. Check direct links
+  filteredLaunches.forEach(l => {
+    if (l.linkedFgrId) launchesWithFgr.add(l.id);
+    const linkedAbortiva = filteredAbortivas.find(a => a.pdvLaunchId === l.id);
+    if (linkedAbortiva) launchesWithAbortiva.add(l.id);
+  });
+
+  // 2. Check by number matching for unlinked reports
   filteredFgrs.forEach(f => {
-    const numsStr = getFgrLaunchNums(f);
-    if (numsStr !== "S/N") numsStr.split(", ").forEach(n => fgrLaunchNums.add(n));
+    const fgrNums = getFgrLaunchNums(f).split(", ");
+    if (fgrNums.length > 0 && fgrNums[0] !== "S/N") {
+      filteredLaunches.forEach(l => {
+        if (!launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id)) {
+          const lNum = extractLaunchNum(l);
+          if (fgrNums.includes(lNum)) {
+             launchesWithFgr.add(l.id);
+          }
+        }
+      });
+    }
   });
 
-  const abortivaLaunchNums = new Set<string>();
   filteredAbortivas.forEach(a => {
-    const n = extractLaunchNum(a);
-    if (n !== "S/N") abortivaLaunchNums.add(n);
+    const aNum = extractLaunchNum(a);
+    if (aNum !== "S/N") {
+      filteredLaunches.forEach(l => {
+        if (!launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id)) {
+          const lNum = extractLaunchNum(l);
+          const lDate = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
+          if (aNum === lNum && (!a.dataVoo || a.dataVoo === lDate)) {
+             launchesWithAbortiva.add(l.id);
+          }
+        }
+      });
+    }
   });
 
-  const allReportedNums = new Set([...fgrLaunchNums, ...abortivaLaunchNums]);
-  const othersLaunchCount = filteredLaunches.filter(l => !allReportedNums.has(extractLaunchNum(l))).length;
+  const othersLaunchCount = Math.max(0, totalLaunches - launchesWithFgr.size - launchesWithAbortiva.size);
 
   const overviewData = [
-    { name: "FGRs Efetuados", value: fgrLaunchNums.size, color: "#ffd700", type: 'fgr' },
-    { name: "Abortivas", value: abortivaLaunchNums.size, color: "#f87171", type: 'abortiva' },
-    { name: "Demais Lançamentos", value: othersLaunchCount, color: "#475569", type: 'others' },
+    { name: "FGRs Efetuados", value: launchesWithFgr.size, color: "#ffd700", type: 'fgr' },
+    { name: "Abortivas", value: launchesWithAbortiva.size, color: "#f87171", type: 'abortiva' },
+    { name: "Demais Lançamentos", value: othersLaunchCount, color: "#64748b", type: 'others' },
   ];
 
   const monthNames = [
@@ -1369,7 +1396,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     }
     if (selectedCategory === "Demais Lançamentos") {
       return filteredLaunches
-        .filter(l => !allReportedNums.has(extractLaunchNum(l)))
+        .filter(l => !launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id))
         .map(l => ({
           type: 'OUTRO',
           num: extractLaunchNum(l),
@@ -1471,23 +1498,25 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Panorama Operacional</h5>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart margin={{ top: 0, right: 40, left: 40, bottom: 0 }}>
                 <Pie
                   data={overviewData}
                   cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
+                  cy="40%"
+                  innerRadius={50}
+                  outerRadius={65}
                   paddingAngle={5}
                   dataKey="value"
+                  labelLine={{ stroke: 'rgba(255,255,255,0.3)', strokeWidth: 1 }}
+                  label={({ value, percent }) => percent > 0.01 ? `${value}` : ""}
                   onClick={handlePieClick}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', outline: 'none' }}
                 >
                   {overviewData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={entry.color} 
-                      stroke={selectedCategory === entry.name ? '#fff' : 'none'}
+                      stroke={selectedCategory === entry.name ? '#fff' : 'rgba(255,255,255,0.1)'}
                       strokeWidth={2}
                     />
                   ))}
@@ -1499,8 +1528,9 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                 <Legend 
                   verticalAlign="bottom" 
                   align="center"
+                  layout="vertical"
                   iconType="circle" 
-                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', paddingTop: '10px' }} 
+                  wrapperStyle={{ fontSize: '8px', textTransform: 'uppercase', color: '#94a3b8', paddingTop: '20px' }} 
                   onClick={(e: any) => handlePieClick(e.payload)}
                 />
               </PieChart>
@@ -1554,23 +1584,25 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Risco dos FGRs</h5>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart margin={{ top: 10, right: 60, left: 60, bottom: 10 }}>
                 <Pie
                   data={riskData}
                   cx="50%"
-                  cy="50%"
-                  outerRadius={85}
+                  cy="45%"
+                  outerRadius={60}
+                  innerRadius={40}
+                  paddingAngle={5}
                   dataKey="value"
-                  labelLine={false}
+                  labelLine={{ stroke: 'rgba(255,255,255,0.3)', strokeWidth: 1 }}
                   label={({ percent }) => percent > 0 ? `${(percent * 100).toFixed(0)}%` : ''}
                   onClick={handleRiskClick}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', outline: 'none' }}
                 >
                   {riskData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={entry.color} 
-                      stroke={selectedRiskCategory === entry.name ? '#fff' : 'none'}
+                      stroke={selectedRiskCategory === entry.name ? '#fff' : 'rgba(255,255,255,0.1)'}
                       strokeWidth={2}
                     />
                   ))}
@@ -1582,14 +1614,14 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   verticalAlign="bottom" 
                   align="center"
                   iconType="rect" 
-                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '10px' }} 
+                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '30px' }} 
                   onClick={(e: any) => handleRiskClick(e.payload)}
                 />
               </PieChart>
             </ResponsiveContainer>
           </div>
           <div className="text-center mt-2 border-t border-white/5 pt-4 flex-1 flex flex-col min-h-0">
-            <span className="text-[20px] font-black text-white">{fgrCount}</span>
+            <span className="text-[20px] font-black text-white">{filteredFgrs.length}</span>
             <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-4">FGRs Preenchidos</p>
 
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pr-1">
