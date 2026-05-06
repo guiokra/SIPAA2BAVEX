@@ -33,6 +33,7 @@ import {
   Settings,
   Plus,
   Loader2,
+  MousePointer2,
   Trash2,
   Eye,
   LogIn,
@@ -1207,18 +1208,48 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
   };
 
   const getCategoryItems = () => {
-    if (selectedCategory === "FGRs Efetuados") return filteredFgrs;
-    if (selectedCategory === "Abortivas") return filteredAbortivas;
+    if (selectedCategory === "FGRs Efetuados") {
+      return filteredFgrs.map(f => ({
+        type: 'FGR',
+        num: f.numLancamento || "S/N",
+        anv: f.aeronave || f.modeloAnv || "S/A",
+        p1: f.trigramaTrip || f.preenchidoPor || "---",
+        p2: "",
+        missao: f.missao || "S/M",
+        color: "#ffd700",
+        id: f.id
+      }));
+    }
+    if (selectedCategory === "Abortivas") {
+      return filteredAbortivas.map(a => ({
+        type: 'ABORTIVA',
+        num: a.numLancamento || "S/N",
+        anv: a.aeronave || "S/A",
+        p1: a.p1 || "---",
+        p2: a.p2 || "",
+        missao: a.motivo || "S/M",
+        color: "#f87171",
+        id: a.id
+      }));
+    }
     if (selectedCategory === "Demais Lançamentos") {
-      // Find launches that are NOT fgr OR abortivas
-      // This is tricky because we don't have a direct link often.
-      // But we can filter by numLancamento?
       const reportedNums = [
         ...filteredFgrs.map(f => f.numLancamento),
         ...filteredAbortivas.map(a => a.numLancamento)
       ].filter(Boolean);
       
-      return filteredLaunches.filter(l => !reportedNums.includes(l.numLancamento));
+      return filteredLaunches
+        .filter(l => !reportedNums.includes(l.num))
+        .map(l => ({
+          type: 'OUTRO',
+          num: l.num || "S/N",
+          anv: l.anv || "S/A",
+          p1: l.p1 || "---",
+          p2: l.p2 || "",
+          missao: l.missao || "S/M",
+          color: "#475569",
+          id: l.id
+        }));
     }
     return [];
   };
@@ -1250,16 +1281,16 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
             onChange={(e) => { setTargetYear(parseInt(e.target.value)); setSelectedCategory(null); }}
             className="bg-slate-900/50 text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded border border-white/10 outline-none focus:border-military-gold/50"
           >
-            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chart 1: Panorama Operacional */}
-        <div className="card-military p-6 flex flex-col h-[380px]">
+        <div className="card-military p-6 flex flex-col h-[500px]">
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Panorama Operacional</h5>
-          <div className="flex-1 min-h-0">
+          <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1290,39 +1321,46 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   verticalAlign="bottom" 
                   align="center"
                   iconType="circle" 
-                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', paddingTop: '20px' }} 
+                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', paddingTop: '10px' }} 
                   onClick={(e: any) => handlePieClick(e.payload)}
                 />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="text-center mt-2">
+          <div className="text-center mt-2 border-t border-white/5 pt-4 flex-1 flex flex-col min-h-0">
             <span className="text-[20px] font-black text-white">{totalLaunches}</span>
-            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Lançamentos Totais</p>
+            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-4">Lançamentos Totais</p>
             
             {/* Drill-down list for Chart 1 */}
-            <div className="mt-4 pt-4 border-t border-white/5 max-h-[120px] overflow-y-auto no-scrollbar">
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pr-1">
               {selectedCategory ? (
-                <div className="space-y-2">
-                  <p className="text-[7px] text-military-gold uppercase font-black text-left mb-1">
+                <>
+                  <p className="text-[7px] text-military-gold uppercase font-black text-left mb-2 sticky top-0 bg-military-black/80 backdrop-blur-sm py-1">
                     {selectedCategory} ({drillDownItems.length})
                   </p>
                   {drillDownItems.length > 0 ? drillDownItems.map((item: any, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center bg-white/2 p-2 rounded text-[8px] uppercase font-bold text-slate-300">
-                      <span className="truncate max-w-[60%]">
-                        {item.numLancamento ? `#${item.numLancamento} ` : ''}
-                        {item.missao || item.motivo || "S/M"}
-                      </span>
-                      <span className="text-slate-500 font-mono text-[7px]">
-                        {item.aeronave || item.modeloAnv || ""}
-                      </span>
+                    <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-accent-gold">LÇ {item.num}</span>
+                        <span className="font-black text-white">{item.anv}</span>
+                      </div>
+                      <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
+                        <span>{item.p1}</span>
+                        {item.p2 && <span>{item.p2}</span>}
+                      </div>
+                      <div className="text-slate-400 font-bold italic truncate text-[8px]">
+                        {item.missao}
+                      </div>
                     </div>
                   )) : (
                     <p className="text-[8px] text-slate-600 italic">Nenhum item encontrado</p>
                   )}
-                </div>
+                </>
               ) : (
-                <p className="text-[8px] text-slate-500 italic mt-4 uppercase">Clique em um setor para ver detalhes</p>
+                <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                   <MousePointer2 size={24} className="mb-2 opacity-20" />
+                   <p className="text-[8px] italic uppercase tracking-widest">Clique no gráfico para detalhes</p>
+                </div>
               )}
             </div>
           </div>
