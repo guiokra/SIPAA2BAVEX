@@ -1094,10 +1094,10 @@ function getRiskClass(r: number, tipoVoo: string = "REGULAR") {
   if (r < thresholds[1]) {
     return {
       label: "Médio",
-      color: "text-yellow-500",
-      bg: "bg-yellow-500/10",
-      border: "border-yellow-500/30",
-      hex: [234, 179, 8],
+      color: "text-amber-400",
+      bg: "bg-amber-400/20",
+      border: "border-amber-400/40",
+      hex: [251, 191, 36],
       decisao: "Ajustar p/ próxima missão e monitorar risco",
       responsavel: "Cmt SU",
     };
@@ -1106,8 +1106,8 @@ function getRiskClass(r: number, tipoVoo: string = "REGULAR") {
     return {
       label: "Alto",
       color: "text-red-500",
-      bg: "bg-red-500/10",
-      border: "border-red-500/30",
+      bg: "bg-red-500/20",
+      border: "border-red-500/40",
       hex: [239, 68, 68],
       decisao: "Ajustar antes da missão (*)",
       responsavel: "Cmt OM",
@@ -1191,12 +1191,26 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
   const totalLaunches = filteredLaunches.length;
   const fgrCount = filteredFgrs.length;
   const abortivaCount = filteredAbortivas.length;
-  const othersCount = Math.max(0, totalLaunches - fgrCount - abortivaCount);
+
+  const fgrLaunchNums = new Set<string>();
+  filteredFgrs.forEach(f => {
+    const numsStr = getFgrLaunchNums(f);
+    if (numsStr !== "S/N") numsStr.split(", ").forEach(n => fgrLaunchNums.add(n));
+  });
+
+  const abortivaLaunchNums = new Set<string>();
+  filteredAbortivas.forEach(a => {
+    const n = extractLaunchNum(a);
+    if (n !== "S/N") abortivaLaunchNums.add(n);
+  });
+
+  const allReportedNums = new Set([...fgrLaunchNums, ...abortivaLaunchNums]);
+  const othersLaunchCount = filteredLaunches.filter(l => !allReportedNums.has(extractLaunchNum(l))).length;
 
   const overviewData = [
-    { name: "FGRs Efetuados", value: fgrCount, color: "#ffd700", type: 'fgr' },
-    { name: "Abortivas", value: abortivaCount, color: "#f87171", type: 'abortiva' },
-    { name: "Demais Lançamentos", value: othersCount, color: "#475569", type: 'others' },
+    { name: "FGRs Efetuados", value: fgrLaunchNums.size, color: "#ffd700", type: 'fgr' },
+    { name: "Abortivas", value: abortivaLaunchNums.size, color: "#f87171", type: 'abortiva' },
+    { name: "Demais Lançamentos", value: othersLaunchCount, color: "#475569", type: 'others' },
   ];
 
   const monthNames = [
@@ -1234,7 +1248,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     
     const searchFields = [item.missao, item.mv, item.motivo, item.desc];
     const lcRegex = /L[ÇC]\s*(\d+)/i;
-    const standaloneNumRegex = /(?:^|\s|\n)(\d{1,3})(?:\s|\n|$)/; // Look for small integers (1-3 digits) that might be launch numbers
+    const standaloneNumRegex = /(?:^|\s|\n)(\d{1,3})(?:\s|\n|$)/;
     
     for (const field of searchFields) {
       if (typeof field === 'string') {
@@ -1248,16 +1262,53 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     return "S/N";
   };
 
-  const mapFgrToItem = (f: any) => ({
-    type: 'FGR',
-    num: extractLaunchNum(f),
-    anv: f.aeronave || f.modeloAnv || "S/A",
-    p1: f.trigramaTrip || f.preenchidoPor || "---",
-    p2: "",
-    missao: f.mv || f.missao || "S/M",
-    date: formatDate(parseOperationalDate(f.data)),
-    id: f.id
-  });
+  const getFgrLaunchNums = (f: any) => {
+    // 1. Linked launches priority
+    const linkedLaunches = launches.filter(l => l.linkedFgrId === f.id);
+    if (linkedLaunches.length > 0) {
+      const nums = linkedLaunches.map(l => extractLaunchNum(l)).filter(n => n !== "S/N");
+      if (nums.length > 0) {
+        return Array.from(new Set(nums)).sort((a,b) => parseInt(a) - parseInt(b)).join(", ");
+      }
+    }
+    
+    // 2. PDV Matching logic (Date + String matching)
+    const launchDateISO = f.data; 
+    const matchedLaunches = launches.filter(l => {
+       const lDateISO = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
+       return lDateISO === launchDateISO && (
+         f.missao?.includes(`LÇ ${l.num}`) || 
+         f.missao?.includes(`LANC ${l.num}`) || 
+         (l.num && f.missao?.includes(l.num))
+       );
+    });
+    
+    if (matchedLaunches.length > 0) {
+      const nums = matchedLaunches.map(l => extractLaunchNum(l)).filter(n => n !== "S/N");
+      if (nums.length > 0) {
+        return Array.from(new Set(nums)).sort((a,b) => parseInt(a) - parseInt(b)).join(", ");
+      }
+    }
+
+    // 3. Direct extraction
+    return extractLaunchNum(f);
+  };
+
+  const mapFgrToItem = (f: any) => {
+    const risk = getRiskClass(f.scores?.riskMax || 0, f.tipoVoo);
+    return {
+      type: 'FGR',
+      num: getFgrLaunchNums(f),
+      anv: f.aeronave || f.modeloAnv || "S/A",
+      p1: f.trigramaTrip || f.preenchidoPor || "---",
+      p2: "",
+      missao: f.mv || f.missao || "S/M",
+      date: formatDate(parseOperationalDate(f.data)),
+      id: f.id,
+      riskColor: risk.color,
+      riskBg: risk.bg
+    };
+  };
 
   const mapAbortivaToItem = (a: any) => ({
     type: 'ABORTIVA',
@@ -1278,13 +1329,8 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
       return filteredAbortivas.map(mapAbortivaToItem);
     }
     if (selectedCategory === "Demais Lançamentos") {
-      const reportedNums = [
-        ...filteredFgrs.map(f => extractLaunchNum(f)),
-        ...filteredAbortivas.map(a => extractLaunchNum(a))
-      ].filter(n => n !== "S/N");
-      
       return filteredLaunches
-        .filter(l => !reportedNums.includes(extractLaunchNum(l)))
+        .filter(l => !allReportedNums.has(extractLaunchNum(l)))
         .map(l => ({
           type: 'OUTRO',
           num: extractLaunchNum(l),
@@ -1411,7 +1457,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   {drillDownItems.length > 0 ? drillDownItems.map((item: any, idx: number) => (
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
-                        <span className="font-black text-accent-gold">LÇ {item.num}</span>
+                        <span className={`font-black ${item.riskColor || 'text-accent-gold'}`}>LÇ {item.num}</span>
                         <div className="flex flex-col items-center">
                            <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
@@ -1493,7 +1539,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   {riskDrillItems.length > 0 ? riskDrillItems.map((item: any, idx: number) => (
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
-                        <span className="font-black text-accent-gold">LÇ {item.num}</span>
+                        <span className={`font-black ${item.riskColor || 'text-accent-gold'}`}>LÇ {item.num}</span>
                         <div className="flex flex-col items-center">
                            <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
