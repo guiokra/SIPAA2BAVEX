@@ -1125,21 +1125,34 @@ function getRiskClass(r: number, tipoVoo: string = "REGULAR") {
 const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abortivas: any[], launches: any[] }) => {
   const [targetMonth, setTargetMonth] = useState(new Date().getMonth());
   const [targetYear, setTargetYear] = useState(new Date().getFullYear());
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const filteredFgrs = fgrs.filter((f: any) => {
-    const d = new Date(f.createdAt);
-    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
-  });
+  const parseOperationalDate = (dateStr: string) => {
+    if (!dateStr) return null;
+    if (dateStr.includes("-")) {
+      const parts = dateStr.split("-");
+      // Could be YYYY-MM-DD
+      if (parts[0].length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+      // Could be DD-MM-YYYY
+      if (parts[2].length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+    }
+    if (dateStr.includes("/")) {
+      const [d, m, y] = dateStr.split("/");
+      return new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 12, 0, 0);
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return d;
+  };
 
-  const filteredAbortivas = abortivas.filter((a: any) => {
-    const d = new Date(a.createdAt);
-    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
-  });
+  const isSameMonth = (dateObj: Date | null) => {
+    if (!dateObj) return false;
+    return dateObj.getMonth() === targetMonth && dateObj.getFullYear() === targetYear;
+  };
 
-  const filteredLaunches = launches.filter((l: any) => {
-    const d = new Date(l.createdAt);
-    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
-  });
+  const filteredFgrs = fgrs.filter((f: any) => isSameMonth(parseOperationalDate(f.data)));
+  const filteredAbortivas = abortivas.filter((a: any) => isSameMonth(parseOperationalDate(a.dataVoo)));
+  const filteredLaunches = launches.filter((l: any) => isSameMonth(parseOperationalDate(l.dateLabel)));
 
   // Calculate Risk Distribution
   const riskData = [
@@ -1172,11 +1185,12 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
   const totalLaunches = filteredLaunches.length;
   const fgrCount = filteredFgrs.length;
   const abortivaCount = filteredAbortivas.length;
+  const othersCount = Math.max(0, totalLaunches - fgrCount - abortivaCount);
 
   const overviewData = [
-    { name: "FGRs Efetuados", value: fgrCount, color: "#ffd700" },
-    { name: "Abortivas", value: abortivaCount, color: "#f87171" },
-    { name: "Demais Lançamentos", value: Math.max(0, totalLaunches - fgrCount - abortivaCount), color: "#475569" },
+    { name: "FGRs Efetuados", value: fgrCount, color: "#ffd700", type: 'fgr' },
+    { name: "Abortivas", value: abortivaCount, color: "#f87171", type: 'abortiva' },
+    { name: "Demais Lançamentos", value: othersCount, color: "#475569", type: 'others' },
   ];
 
   const monthNames = [
@@ -1184,13 +1198,40 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
   ];
 
+  const handlePieClick = (data: any) => {
+    if (selectedCategory === data.name) {
+      setSelectedCategory(null);
+    } else {
+      setSelectedCategory(data.name);
+    }
+  };
+
+  const getCategoryItems = () => {
+    if (selectedCategory === "FGRs Efetuados") return filteredFgrs;
+    if (selectedCategory === "Abortivas") return filteredAbortivas;
+    if (selectedCategory === "Demais Lançamentos") {
+      // Find launches that are NOT fgr OR abortivas
+      // This is tricky because we don't have a direct link often.
+      // But we can filter by numLancamento?
+      const reportedNums = [
+        ...filteredFgrs.map(f => f.numLancamento),
+        ...filteredAbortivas.map(a => a.numLancamento)
+      ].filter(Boolean);
+      
+      return filteredLaunches.filter(l => !reportedNums.includes(l.numLancamento));
+    }
+    return [];
+  };
+
+  const drillDownItems = getCategoryItems();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-military-black/60 p-4 border border-white/5 rounded-lg gap-4">
         <div>
           <h4 className="text-white font-black uppercase text-xs tracking-widest flex items-center gap-2">
             <LayoutDashboard size={14} className="text-military-gold" />
-            Estatísticas Mensais
+            Estatísticas Mensais (Operacional)
           </h4>
           <p className="text-slate-500 text-[10px] font-bold uppercase mt-1">
             Periodo: <span className="text-military-gold">{monthNames[targetMonth]} / {targetYear}</span>
@@ -1199,14 +1240,14 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
         <div className="flex gap-2">
           <select 
             value={targetMonth} 
-            onChange={(e) => setTargetMonth(parseInt(e.target.value))}
+            onChange={(e) => { setTargetMonth(parseInt(e.target.value)); setSelectedCategory(null); }}
             className="bg-slate-900/50 text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded border border-white/10 outline-none focus:border-military-gold/50"
           >
             {monthNames.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
           <select 
             value={targetYear} 
-            onChange={(e) => setTargetYear(parseInt(e.target.value))}
+            onChange={(e) => { setTargetYear(parseInt(e.target.value)); setSelectedCategory(null); }}
             className="bg-slate-900/50 text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded border border-white/10 outline-none focus:border-military-gold/50"
           >
             {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
@@ -1229,9 +1270,16 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
+                  onClick={handlePieClick}
+                  style={{ cursor: 'pointer' }}
                 >
                   {overviewData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.color} 
+                      stroke={selectedCategory === entry.name ? '#fff' : 'none'}
+                      strokeWidth={2}
+                    />
                   ))}
                 </Pie>
                 <RechartsTooltip 
@@ -1243,6 +1291,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   align="center"
                   iconType="circle" 
                   wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', color: '#94a3b8', paddingTop: '20px' }} 
+                  onClick={(e: any) => handlePieClick(e.payload)}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -1250,6 +1299,32 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           <div className="text-center mt-2">
             <span className="text-[20px] font-black text-white">{totalLaunches}</span>
             <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Lançamentos Totais</p>
+            
+            {/* Drill-down list for Chart 1 */}
+            <div className="mt-4 pt-4 border-t border-white/5 max-h-[120px] overflow-y-auto no-scrollbar">
+              {selectedCategory ? (
+                <div className="space-y-2">
+                  <p className="text-[7px] text-military-gold uppercase font-black text-left mb-1">
+                    {selectedCategory} ({drillDownItems.length})
+                  </p>
+                  {drillDownItems.length > 0 ? drillDownItems.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center bg-white/2 p-2 rounded text-[8px] uppercase font-bold text-slate-300">
+                      <span className="truncate max-w-[60%]">
+                        {item.numLancamento ? `#${item.numLancamento} ` : ''}
+                        {item.missao || item.motivo || "S/M"}
+                      </span>
+                      <span className="text-slate-500 font-mono text-[7px]">
+                        {item.aeronave || item.modeloAnv || ""}
+                      </span>
+                    </div>
+                  )) : (
+                    <p className="text-[8px] text-slate-600 italic">Nenhum item encontrado</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[8px] text-slate-500 italic mt-4 uppercase">Clique em um setor para ver detalhes</p>
+              )}
+            </div>
           </div>
         </div>
 
