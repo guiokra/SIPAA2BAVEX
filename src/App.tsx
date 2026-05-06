@@ -7345,7 +7345,7 @@ function AdminSection({
                             {new Date(item.deletedAt).toLocaleString("pt-BR")}
                           </td>
                           <td className="px-4 py-3 text-slate-500 text-[10px]">
-                            {item.deletedBy}
+                            {item.type === "SUGESTÃO" ? "---" : item.deletedBy}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
