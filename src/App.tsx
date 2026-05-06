@@ -1127,14 +1127,14 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
   const [targetMonth, setTargetMonth] = useState(new Date().getMonth());
   const [targetYear, setTargetYear] = useState(new Date().getFullYear());
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedRiskCategory, setSelectedRiskCategory] = useState<string | null>(null);
+  const [selectedMotiveCategory, setSelectedMotiveCategory] = useState<string | null>(null);
 
   const parseOperationalDate = (dateStr: string) => {
     if (!dateStr) return null;
     if (dateStr.includes("-")) {
       const parts = dateStr.split("-");
-      // Could be YYYY-MM-DD
       if (parts[0].length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
-      // Could be DD-MM-YYYY
       if (parts[2].length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
     }
     if (dateStr.includes("/")) {
@@ -1144,6 +1144,11 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return null;
     return d;
+  };
+
+  const formatDate = (dateObj: Date | null) => {
+    if (!dateObj) return "---";
+    return dateObj.toLocaleDateString("pt-BR");
   };
 
   const isSameMonth = (dateObj: Date | null) => {
@@ -1207,30 +1212,50 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     }
   };
 
+  const handleRiskClick = (data: any) => {
+    if (selectedRiskCategory === data.name) {
+      setSelectedRiskCategory(null);
+    } else {
+      setSelectedRiskCategory(data.name);
+    }
+  };
+
+  const handleMotiveClick = (data: any) => {
+    if (selectedMotiveCategory === data.name) {
+      setSelectedMotiveCategory(null);
+    } else {
+      setSelectedMotiveCategory(data.name);
+    }
+  };
+
+  const mapFgrToItem = (f: any) => ({
+    type: 'FGR',
+    num: f.numLancamento || "S/N",
+    anv: f.aeronave || f.modeloAnv || "S/A",
+    p1: f.trigramaTrip || f.preenchidoPor || "---",
+    p2: "",
+    missao: f.missao || "S/M",
+    date: formatDate(parseOperationalDate(f.data)),
+    id: f.id
+  });
+
+  const mapAbortivaToItem = (a: any) => ({
+    type: 'ABORTIVA',
+    num: a.numLancamento || "S/N",
+    anv: a.aeronave || "S/A",
+    p1: a.p1 || "---",
+    p2: a.p2 || "",
+    missao: a.motivo || "S/M",
+    date: formatDate(parseOperationalDate(a.dataVoo)),
+    id: a.id
+  });
+
   const getCategoryItems = () => {
     if (selectedCategory === "FGRs Efetuados") {
-      return filteredFgrs.map(f => ({
-        type: 'FGR',
-        num: f.numLancamento || "S/N",
-        anv: f.aeronave || f.modeloAnv || "S/A",
-        p1: f.trigramaTrip || f.preenchidoPor || "---",
-        p2: "",
-        missao: f.missao || "S/M",
-        color: "#ffd700",
-        id: f.id
-      }));
+      return filteredFgrs.map(mapFgrToItem);
     }
     if (selectedCategory === "Abortivas") {
-      return filteredAbortivas.map(a => ({
-        type: 'ABORTIVA',
-        num: a.numLancamento || "S/N",
-        anv: a.aeronave || "S/A",
-        p1: a.p1 || "---",
-        p2: a.p2 || "",
-        missao: a.motivo || "S/M",
-        color: "#f87171",
-        id: a.id
-      }));
+      return filteredAbortivas.map(mapAbortivaToItem);
     }
     if (selectedCategory === "Demais Lançamentos") {
       const reportedNums = [
@@ -1247,14 +1272,30 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           p1: l.p1 || "---",
           p2: l.p2 || "",
           missao: l.missao || "S/M",
-          color: "#475569",
+          date: formatDate(parseOperationalDate(l.dateLabel)),
           id: l.id
         }));
     }
     return [];
   };
 
+  const getRiskItems = () => {
+    if (!selectedRiskCategory) return [];
+    return filteredFgrs
+      .filter(f => getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label === selectedRiskCategory)
+      .map(mapFgrToItem);
+  };
+
+  const getMotiveItems = () => {
+    if (!selectedMotiveCategory) return [];
+    return filteredAbortivas
+      .filter(a => a.motivo === selectedMotiveCategory)
+      .map(mapAbortivaToItem);
+  };
+
   const drillDownItems = getCategoryItems();
+  const riskDrillItems = getRiskItems();
+  const motiveDrillItems = getMotiveItems();
 
   return (
     <div className="space-y-6">
@@ -1271,14 +1312,24 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
         <div className="flex gap-2">
           <select 
             value={targetMonth} 
-            onChange={(e) => { setTargetMonth(parseInt(e.target.value)); setSelectedCategory(null); }}
+            onChange={(e) => { 
+              setTargetMonth(parseInt(e.target.value)); 
+              setSelectedCategory(null);
+              setSelectedRiskCategory(null);
+              setSelectedMotiveCategory(null);
+            }}
             className="bg-slate-900/50 text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded border border-white/10 outline-none focus:border-military-gold/50"
           >
             {monthNames.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
           <select 
             value={targetYear} 
-            onChange={(e) => { setTargetYear(parseInt(e.target.value)); setSelectedCategory(null); }}
+            onChange={(e) => { 
+                setTargetYear(parseInt(e.target.value)); 
+                setSelectedCategory(null);
+                setSelectedRiskCategory(null);
+                setSelectedMotiveCategory(null);
+            }}
             className="bg-slate-900/50 text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded border border-white/10 outline-none focus:border-military-gold/50"
           >
             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
@@ -1331,7 +1382,6 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
             <span className="text-[20px] font-black text-white">{totalLaunches}</span>
             <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-4">Lançamentos Totais</p>
             
-            {/* Drill-down list for Chart 1 */}
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pr-1">
               {selectedCategory ? (
                 <>
@@ -1342,6 +1392,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
                         <span className="font-black text-accent-gold">LÇ {item.num}</span>
+                        <span className="font-mono text-slate-500 text-[8px]">{item.date}</span>
                         <span className="font-black text-white">{item.anv}</span>
                       </div>
                       <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
@@ -1367,9 +1418,9 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
         </div>
 
         {/* Chart 2: FGRs por Risco */}
-        <div className="card-military p-6 flex flex-col h-[380px]">
+        <div className="card-military p-6 flex flex-col h-[500px]">
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Risco dos FGRs</h5>
-          <div className="flex-1 min-h-0">
+          <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1380,9 +1431,16 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   dataKey="value"
                   labelLine={false}
                   label={({ percent }) => percent > 0 ? `${(percent * 100).toFixed(0)}%` : ''}
+                  onClick={handleRiskClick}
+                  style={{ cursor: 'pointer' }}
                 >
                   {riskData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.color} 
+                      stroke={selectedRiskCategory === entry.name ? '#fff' : 'none'}
+                      strokeWidth={2}
+                    />
                   ))}
                 </Pie>
                 <RechartsTooltip 
@@ -1392,21 +1450,54 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   verticalAlign="bottom" 
                   align="center"
                   iconType="rect" 
-                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '20px' }} 
+                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '10px' }} 
+                  onClick={(e: any) => handleRiskClick(e.payload)}
                 />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="text-center mt-2">
+          <div className="text-center mt-2 border-t border-white/5 pt-4 flex-1 flex flex-col min-h-0">
             <span className="text-[20px] font-black text-white">{fgrCount}</span>
-            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">FGRs Preenchidos</p>
+            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-4">FGRs Preenchidos</p>
+
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pr-1">
+              {selectedRiskCategory ? (
+                <>
+                  <p className="text-[7px] text-military-gold uppercase font-black text-left mb-2 sticky top-0 bg-military-black/80 backdrop-blur-sm py-1">
+                    RISCO {selectedRiskCategory} ({riskDrillItems.length})
+                  </p>
+                  {riskDrillItems.length > 0 ? riskDrillItems.map((item: any, idx: number) => (
+                    <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-accent-gold">LÇ {item.num}</span>
+                        <span className="font-mono text-slate-500 text-[8px]">{item.date}</span>
+                        <span className="font-black text-white">{item.anv}</span>
+                      </div>
+                      <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
+                        <span>{item.p1}</span>
+                      </div>
+                      <div className="text-slate-400 font-bold italic truncate text-[8px]">
+                        {item.missao}
+                      </div>
+                    </div>
+                  )) : (
+                    <p className="text-[8px] text-slate-600 italic">Nenhum item encontrado</p>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                   <MousePointer2 size={24} className="mb-2 opacity-20" />
+                   <p className="text-[8px] italic uppercase tracking-widest">Clique no gráfico para detalhes</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Chart 3: Motivos de Abortiva */}
-        <div className="card-military p-6 flex flex-col h-[380px]">
+        <div className="card-military p-6 flex flex-col h-[500px]">
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Motivos de Abortiva</h5>
-          <div className="flex-1 min-h-0">
+          <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1416,9 +1507,16 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   outerRadius={85}
                   dataKey="value"
                   label={({ name, value }) => value > 0 ? name : ''}
+                  onClick={handleMotiveClick}
+                  style={{ cursor: 'pointer' }}
                 >
                   {abortivaData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.color} 
+                      stroke={selectedMotiveCategory === entry.name ? '#fff' : 'none'}
+                      strokeWidth={2}
+                    />
                   ))}
                 </Pie>
                 <RechartsTooltip 
@@ -1428,14 +1526,45 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   verticalAlign="bottom" 
                   align="center"
                   iconType="circle" 
-                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '20px' }} 
+                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '10px' }} 
+                  onClick={(e: any) => handleMotiveClick(e.payload)}
                 />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="text-center mt-2">
+          <div className="text-center mt-2 border-t border-white/5 pt-4 flex-1 flex flex-col min-h-0">
             <span className="text-[20px] font-black text-white">{abortivaCount}</span>
-            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Total Abortivas</p>
+            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mb-4">Total Abortivas</p>
+
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pr-1">
+              {selectedMotiveCategory ? (
+                <>
+                  <p className="text-[7px] text-military-gold uppercase font-black text-left mb-2 sticky top-0 bg-military-black/80 backdrop-blur-sm py-1">
+                    MOTIVO {selectedMotiveCategory} ({motiveDrillItems.length})
+                  </p>
+                  {motiveDrillItems.length > 0 ? motiveDrillItems.map((item: any, idx: number) => (
+                    <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-accent-gold">LÇ {item.num}</span>
+                        <span className="font-mono text-slate-500 text-[8px]">{item.date}</span>
+                        <span className="font-black text-white">{item.anv}</span>
+                      </div>
+                      <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
+                        <span>{item.p1}</span>
+                        {item.p2 && <span>{item.p2}</span>}
+                      </div>
+                    </div>
+                  )) : (
+                    <p className="text-[8px] text-slate-600 italic">Nenhum item encontrado</p>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                   <MousePointer2 size={24} className="mb-2 opacity-20" />
+                   <p className="text-[8px] italic uppercase tracking-widest">Clique no gráfico para detalhes</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
