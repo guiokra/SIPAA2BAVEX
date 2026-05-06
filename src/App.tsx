@@ -1151,6 +1151,58 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     return dateObj.toLocaleDateString("pt-BR");
   };
 
+  const extractLaunchNum = (item: any) => {
+    if (item.numLancamento && item.numLancamento !== "S/N") return item.numLancamento;
+    if (item.num && item.num !== "S/N") return item.num;
+    
+    const searchFields = [item.missao, item.mv, item.motivo, item.desc];
+    const lcRegex = /L[ÇC]\s*(\d+)/i;
+    const standaloneNumRegex = /(?:^|\s|\n)(\d{1,3})(?:\s|\n|$)/;
+    
+    for (const field of searchFields) {
+      if (typeof field === 'string') {
+        const match = field.match(lcRegex);
+        if (match) return match[1];
+        
+        const numMatch = field.match(standaloneNumRegex);
+        if (numMatch) return numMatch[1];
+      }
+    }
+    return "S/N";
+  };
+
+  const getFgrLaunchNums = (f: any) => {
+    // 1. Linked launches priority
+    const linkedLaunches = launches.filter(l => l.linkedFgrId === f.id);
+    if (linkedLaunches.length > 0) {
+      const nums = linkedLaunches.map(l => extractLaunchNum(l)).filter(n => n !== "S/N");
+      if (nums.length > 0) {
+        return Array.from(new Set(nums)).sort((a,b) => parseInt(a) - parseInt(b)).join(", ");
+      }
+    }
+    
+    // 2. PDV Matching logic (Date + String matching)
+    const launchDateISO = f.data; 
+    const matchedLaunches = launches.filter(l => {
+       const lDateISO = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
+       return lDateISO === launchDateISO && (
+         f.missao?.includes(`LÇ ${l.num}`) || 
+         f.missao?.includes(`LANC ${l.num}`) || 
+         (l.num && f.missao?.includes(l.num))
+       );
+    });
+    
+    if (matchedLaunches.length > 0) {
+      const nums = matchedLaunches.map(l => extractLaunchNum(l)).filter(n => n !== "S/N");
+      if (nums.length > 0) {
+        return Array.from(new Set(nums)).sort((a,b) => parseInt(a) - parseInt(b)).join(", ");
+      }
+    }
+
+    // 3. Direct extraction
+    return extractLaunchNum(f);
+  };
+
   const isSameMonth = (dateObj: Date | null) => {
     if (!dateObj) return false;
     return dateObj.getMonth() === targetMonth && dateObj.getFullYear() === targetYear;
@@ -1240,58 +1292,6 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     } else {
       setSelectedMotiveCategory(data.name);
     }
-  };
-
-  const extractLaunchNum = (item: any) => {
-    if (item.numLancamento && item.numLancamento !== "S/N") return item.numLancamento;
-    if (item.num && item.num !== "S/N") return item.num;
-    
-    const searchFields = [item.missao, item.mv, item.motivo, item.desc];
-    const lcRegex = /L[ÇC]\s*(\d+)/i;
-    const standaloneNumRegex = /(?:^|\s|\n)(\d{1,3})(?:\s|\n|$)/;
-    
-    for (const field of searchFields) {
-      if (typeof field === 'string') {
-        const match = field.match(lcRegex);
-        if (match) return match[1];
-        
-        const numMatch = field.match(standaloneNumRegex);
-        if (numMatch) return numMatch[1];
-      }
-    }
-    return "S/N";
-  };
-
-  const getFgrLaunchNums = (f: any) => {
-    // 1. Linked launches priority
-    const linkedLaunches = launches.filter(l => l.linkedFgrId === f.id);
-    if (linkedLaunches.length > 0) {
-      const nums = linkedLaunches.map(l => extractLaunchNum(l)).filter(n => n !== "S/N");
-      if (nums.length > 0) {
-        return Array.from(new Set(nums)).sort((a,b) => parseInt(a) - parseInt(b)).join(", ");
-      }
-    }
-    
-    // 2. PDV Matching logic (Date + String matching)
-    const launchDateISO = f.data; 
-    const matchedLaunches = launches.filter(l => {
-       const lDateISO = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
-       return lDateISO === launchDateISO && (
-         f.missao?.includes(`LÇ ${l.num}`) || 
-         f.missao?.includes(`LANC ${l.num}`) || 
-         (l.num && f.missao?.includes(l.num))
-       );
-    });
-    
-    if (matchedLaunches.length > 0) {
-      const nums = matchedLaunches.map(l => extractLaunchNum(l)).filter(n => n !== "S/N");
-      if (nums.length > 0) {
-        return Array.from(new Set(nums)).sort((a,b) => parseInt(a) - parseInt(b)).join(", ");
-      }
-    }
-
-    // 3. Direct extraction
-    return extractLaunchNum(f);
   };
 
   const mapFgrToItem = (f: any) => {
