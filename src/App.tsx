@@ -1332,7 +1332,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
       p1: launchData?.p1 || a.tripulacao || a.p1 || a.preenchidoPor || "---",
       p2: launchData?.p2 || a.p2 || "",
       missao: launchData?.mv || a.mv || a.missao || a.motivo || "S/M",
-      date: formatDate(parseOperationalDate(launchData?.dateLabel ? launchData.dateLabel.split("/").reverse().join("-") : a.dataVoo)),
+      date: formatDate(parseOperationalDate(a.createdAt || a.dataVoo)),
       id: a.id
     };
   };
@@ -1635,13 +1635,13 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Motivos de Abortiva</h5>
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={{ top: 0, right: 50, left: 50, bottom: 0 }}>
+              <PieChart margin={{ top: 0, right: 60, left: 60, bottom: 0 }}>
                 <Pie
                   data={abortivaData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={70}
-                  innerRadius={50}
+                  outerRadius={65}
+                  innerRadius={45}
                   paddingAngle={5}
                   dataKey="value"
                   labelLine={{ stroke: 'rgba(255,255,255,0.3)', strokeWidth: 1 }}
@@ -7539,7 +7539,9 @@ function AdminSection({
                       className="hover:bg-white/2 transition-colors"
                     >
                       <td className="px-4 py-3 font-mono">
-                        {new Date(a.createdAt).toLocaleDateString("pt-BR")}
+                        {a.createdAt 
+                          ? new Date(a.createdAt).toLocaleDateString("pt-BR")
+                          : (a.dataVoo ? a.dataVoo.split("-").reverse().join("/") : "---")}
                       </td>
                       <td className="px-4 py-3 text-white font-bold">
                         {a.numLancamento}
@@ -7622,7 +7624,9 @@ function AdminSection({
                       Mod: <span className="text-slate-300">{a.modeloAnv}</span>
                     </div>
                     <div className="text-right">
-                      {new Date(a.createdAt).toLocaleDateString("pt-BR")}
+                      {a.createdAt 
+                        ? new Date(a.createdAt).toLocaleDateString("pt-BR")
+                        : (a.dataVoo ? a.dataVoo.split("-").reverse().join("/") : "---")}
                     </div>
                   </div>
                 </div>
