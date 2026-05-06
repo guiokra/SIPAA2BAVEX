@@ -1228,28 +1228,40 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     }
   };
 
-  const mapFgrToItem = (f: any) => {
-    // If numLancamento is missing, check if missao field contains "LÇ XX"
-    let launchNum = f.numLancamento || "S/N";
-    if (launchNum === "S/N" && f.missao && f.missao.startsWith("LÇ ")) {
-      launchNum = f.missao.replace("LÇ ", "");
+  const extractLaunchNum = (item: any) => {
+    if (item.numLancamento && item.numLancamento !== "S/N") return item.numLancamento;
+    if (item.num && item.num !== "S/N") return item.num;
+    
+    const searchFields = [item.missao, item.mv, item.motivo, item.desc];
+    const lcRegex = /L[ÇC]\s*(\d+)/i;
+    const standaloneNumRegex = /(?:^|\s|\n)(\d{1,3})(?:\s|\n|$)/; // Look for small integers (1-3 digits) that might be launch numbers
+    
+    for (const field of searchFields) {
+      if (typeof field === 'string') {
+        const match = field.match(lcRegex);
+        if (match) return match[1];
+        
+        const numMatch = field.match(standaloneNumRegex);
+        if (numMatch) return numMatch[1];
+      }
     }
-
-    return {
-      type: 'FGR',
-      num: launchNum,
-      anv: f.aeronave || f.modeloAnv || "S/A",
-      p1: f.trigramaTrip || f.preenchidoPor || "---",
-      p2: "",
-      missao: f.mv || f.missao || "S/M",
-      date: formatDate(parseOperationalDate(f.data)),
-      id: f.id
-    };
+    return "S/N";
   };
+
+  const mapFgrToItem = (f: any) => ({
+    type: 'FGR',
+    num: extractLaunchNum(f),
+    anv: f.aeronave || f.modeloAnv || "S/A",
+    p1: f.trigramaTrip || f.preenchidoPor || "---",
+    p2: "",
+    missao: f.mv || f.missao || "S/M",
+    date: formatDate(parseOperationalDate(f.data)),
+    id: f.id
+  });
 
   const mapAbortivaToItem = (a: any) => ({
     type: 'ABORTIVA',
-    num: a.numLancamento || "S/N",
+    num: extractLaunchNum(a),
     anv: a.aeronave || "S/A",
     p1: a.p1 || "---",
     p2: a.p2 || "",
@@ -1267,15 +1279,15 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     }
     if (selectedCategory === "Demais Lançamentos") {
       const reportedNums = [
-        ...filteredFgrs.map(f => f.numLancamento),
-        ...filteredAbortivas.map(a => a.numLancamento)
-      ].filter(Boolean);
+        ...filteredFgrs.map(f => extractLaunchNum(f)),
+        ...filteredAbortivas.map(a => extractLaunchNum(a))
+      ].filter(n => n !== "S/N");
       
       return filteredLaunches
-        .filter(l => !reportedNums.includes(l.num))
+        .filter(l => !reportedNums.includes(extractLaunchNum(l)))
         .map(l => ({
           type: 'OUTRO',
-          num: l.num || "S/N",
+          num: extractLaunchNum(l),
           anv: l.anv || "S/A",
           p1: l.p1 || "---",
           p2: l.p2 || "",
@@ -1401,7 +1413,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                       <div className="flex justify-between items-center">
                         <span className="font-black text-accent-gold">LÇ {item.num}</span>
                         <div className="flex flex-col items-center">
-                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-white/10 px-2 py-0.5 rounded shadow-sm border border-white/5 font-mono">
+                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
@@ -1483,7 +1495,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                       <div className="flex justify-between items-center">
                         <span className="font-black text-accent-gold">LÇ {item.num}</span>
                         <div className="flex flex-col items-center">
-                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-white/10 px-2 py-0.5 rounded shadow-sm border border-white/5 font-mono">
+                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
@@ -1563,7 +1575,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                       <div className="flex justify-between items-center">
                         <span className="font-black text-accent-gold">LÇ {item.num}</span>
                         <div className="flex flex-col items-center">
-                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-white/10 px-2 py-0.5 rounded shadow-sm border border-white/5 font-mono">
+                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
