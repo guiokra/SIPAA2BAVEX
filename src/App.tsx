@@ -4141,6 +4141,7 @@ function FgrSection({
     setP4Selections({});
     setGravidadeSelections({});
     setMitigation("");
+    setSelectedLaunchId("");
     updateStamp();
   };
 
@@ -4338,6 +4339,7 @@ function FgrSection({
         gravidadeSelections,
         mitigation,
         scores,
+        pdvLaunchId: selectedLaunchId,
         relatorName:
           user?.displayName || finalMissionData.preenchidoPor || "Convidado",
         createdAt,
@@ -4365,6 +4367,20 @@ function FgrSection({
 
       // Disparamos o envio ao banco primeiro
       const docRef = await addDoc(collection(db, "fgrMissions"), missionPayload);
+
+      // Vincular ao lançamento no PDV se selecionado
+      if (selectedLaunchId) {
+        try {
+          await setDoc(
+            doc(db, "Lancamentos", selectedLaunchId),
+            { linkedFgrId: docRef.id },
+            { merge: true }
+          );
+          console.log("Vínculo FGR <-> Lançamento realizado com sucesso.");
+        } catch (linkErr) {
+          console.error("Erro ao vincular FGR ao lançamento:", linkErr);
+        }
+      }
 
       // Agora que salvou, abrimos o PDF
       openPDFSafely(pdfBlobUrl);
