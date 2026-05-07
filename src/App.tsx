@@ -1590,20 +1590,20 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   {drillDownItems.length > 0 ? drillDownItems.map((item: any, idx: number) => (
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
-                        <span className={`font-black ${item.riskColor || 'text-accent-gold'}`}>LÇ {item.num}</span>
-                        <div className="flex flex-col items-center">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                          <span className={`font-black whitespace-nowrap ${item.riskColor || 'text-accent-gold'}`}>LÇ {item.num}</span>
+                          <span className="text-slate-400 font-bold italic truncate text-[8px] opacity-70">/ {item.missao}</span>
+                        </div>
+                        <div className="flex flex-col items-center shrink-0">
                            <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
-                        <span className="font-black text-white">{item.anv}</span>
+                        <span className="font-black text-white shrink-0">{item.anv}</span>
                       </div>
                       <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
                         <span>{item.p1}</span>
                         {item.p2 && <span>{item.p2}</span>}
-                      </div>
-                      <div className="text-slate-400 font-bold italic truncate text-[8px]">
-                        {item.missao}
                       </div>
                     </div>
                   )) : (
@@ -1685,19 +1685,19 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   {riskDrillItems.length > 0 ? riskDrillItems.map((item: any, idx: number) => (
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
-                        <span className={`font-black ${item.riskColor || 'text-accent-gold'}`}>LÇ {item.num}</span>
-                        <div className="flex flex-col items-center">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                          <span className={`font-black whitespace-nowrap ${item.riskColor || 'text-accent-gold'}`}>LÇ {item.num}</span>
+                          <span className="text-slate-400 font-bold italic truncate text-[8px] opacity-70">/ {item.missao}</span>
+                        </div>
+                        <div className="flex flex-col items-center shrink-0">
                            <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
-                        <span className="font-black text-white">{item.anv}</span>
+                        <span className="font-black text-white shrink-0">{item.anv}</span>
                       </div>
                       <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
                         <span>{item.p1}</span>
-                      </div>
-                      <div className="text-slate-400 font-bold italic truncate text-[8px]">
-                        {item.missao}
                       </div>
                     </div>
                   )) : (
@@ -1769,13 +1769,16 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   {motiveDrillItems.length > 0 ? motiveDrillItems.map((item: any, idx: number) => (
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
                       <div className="flex justify-between items-center">
-                        <span className="font-black text-accent-gold">LÇ {item.num}</span>
-                        <div className="flex flex-col items-center">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                          <span className="font-black text-accent-gold whitespace-nowrap">LÇ {item.num}</span>
+                          <span className="text-slate-400 font-bold italic truncate text-[8px] opacity-70">/ {item.missao}</span>
+                        </div>
+                        <div className="flex flex-col items-center shrink-0">
                            <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
-                        <span className="font-black text-white">{item.anv}</span>
+                        <span className="font-black text-white shrink-0">{item.anv}</span>
                       </div>
                       <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
                         <span>{item.p1}</span>
