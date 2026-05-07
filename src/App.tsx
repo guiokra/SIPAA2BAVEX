@@ -7993,15 +7993,24 @@ function AdminSection({
                               : "";
                             const isLinked = !!l.linkedFgrId;
                             const hasFgr = isLinked || fgrs.some(
-                              (f) =>
-                                f.data === launchDateISO &&
-                                (f.missao?.includes(`LÇ ${l.num}`) ||
-                                  f.missao?.includes(`LANC ${l.num}`)),
+                              (f) => {
+                                const fDateISO = (f.data && f.data.includes("/")) 
+                                  ? f.data.split("/").reverse().join("-") 
+                                  : f.data;
+                                return fDateISO === launchDateISO && (
+                                  f.missao?.includes(`LÇ ${l.num}`) ||
+                                  f.missao?.includes(`LANC ${l.num}`)
+                                );
+                              }
                             );
                             const hasAbortiva = abortivas.some(
-                              (a) =>
-                                a.dataVoo === launchDateISO &&
-                                a.numLancamento === l.num,
+                              (a) => {
+                                const aDateISO = (a.dataVoo && a.dataVoo.includes("/"))
+                                  ? a.dataVoo.split("/").reverse().join("-")
+                                  : a.dataVoo;
+                                return aDateISO === launchDateISO && 
+                                  a.numLancamento === l.num;
+                              }
                             );
 
                             return (
@@ -8012,7 +8021,7 @@ function AdminSection({
                                 <div className="flex items-center gap-6 sm:gap-10 min-w-0 flex-1 overflow-x-auto custom-scrollbar pb-1">
                                   <div className="flex items-center gap-3 shrink-0">
                                     {hasFgr && (
-                                      <span className={`flex items-center gap-1 text-[8px] font-black ${isLinked ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-green-500/20 text-green-500 border-green-500/30'} px-1.5 py-0.5 rounded uppercase tracking-tighter`}>
+                                      <span className={`flex items-center gap-1 text-[8px] font-black ${isLinked ? 'bg-green-500/20 text-green-500 border-green-500/30' : 'bg-green-500/20 text-green-500 border-green-500/30'} px-1.5 py-0.5 rounded uppercase tracking-tighter`}>
                                         {isLinked && <Link2 size={8} className="shrink-0" />}
                                         FGR
                                       </span>
