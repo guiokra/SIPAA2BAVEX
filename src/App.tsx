@@ -5975,7 +5975,7 @@ function AbastecimentoSection({
             title="Locais e Procedimentos"
             category="Logística"
             desc="Guia completo com os pontos de abastecimento homologados e os procedimentos de segurança exigidos."
-            url="https://drive.google.com/uc?export=download&id=1hLLjEOoihQiwq_pruy6nhEbm5Gd-vkTw"
+            url="https://drive.google.com/uc?export=download&id=10SYEOvYHBMFB0Cim7xYfffPj9LHIprkN"
             buttonText="VER LOCAIS DE ABASTECIMENTO"
           />
         </div>
