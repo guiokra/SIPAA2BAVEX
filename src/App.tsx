@@ -1625,7 +1625,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           <h5 className="text-[10px] font-black text-slate-400 uppercase mb-2 text-center tracking-widest">Risco dos FGRs</h5>
           <div className="h-[230px]">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={{ top: 40, right: 70, left: 70, bottom: 10 }}>
+              <PieChart margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
                 <Pie
                   data={riskData}
                   cx="50%"
@@ -1654,9 +1654,19 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                 <Legend 
                   verticalAlign="bottom" 
                   align="center"
+                  layout="horizontal"
                   iconType="rect" 
+                  iconSize={8}
                   formatter={renderLegendText}
-                  wrapperStyle={{ fontSize: '9px', textTransform: 'uppercase', paddingTop: '15px' }} 
+                  wrapperStyle={{ 
+                    fontSize: '9px', 
+                    textTransform: 'uppercase', 
+                    paddingTop: '15px',
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    flexWrap: 'nowrap'
+                  }} 
                   onClick={(e: any) => handleRiskClick(e.payload)}
                 />
               </PieChart>
@@ -4019,7 +4029,7 @@ function FgrSection({
     missao: "",
     mv: "",
     local: "",
-    data: new Date().toISOString().split("T")[0],
+    data: new Date().toLocaleDateString("pt-BR"),
     trigramaTrip: "",
     preenchidoPor: user?.displayName || "",
     funcao: "",
@@ -4048,11 +4058,7 @@ function FgrSection({
         ...prev,
         modeloAnv: detectedModel || prev.modeloAnv,
         aeronave: anv,
-        data: launch.dateLabel
-          ? launch.dateLabel.includes("/")
-            ? launch.dateLabel.split("/").reverse().join("-")
-            : launch.dateLabel
-          : "",
+        data: launch.dateLabel || "",
         local: launch.dest || "",
         trigramaTrip:
           `${launch.p1 || ""}/${launch.p2 || ""}/${launch.mv !== "---" ? launch.mv : ""}`
@@ -4125,7 +4131,7 @@ function FgrSection({
       missao: "",
       mv: "",
       local: "",
-      data: new Date().toISOString().split("T")[0],
+      data: new Date().toLocaleDateString("pt-BR"),
       trigramaTrip: "",
       preenchidoPor: user?.displayName || "",
       funcao: "",
@@ -4617,16 +4623,17 @@ function FgrSection({
             {/* Data and Trigramas */}
             <div className="space-y-3">
               <label className="text-[10px] uppercase font-bold text-text-secondary tracking-widest">
-                Data <span className="text-red-500 ml-1">*</span>
+                Data <span className="text-red-500 ml-1 font-bold">*</span>
               </label>
               <input
-                type="date"
+                type="text"
                 className="input-military w-full"
                 value={missionData.data}
                 onChange={(e) => {
                   setMissionData({ ...missionData, data: e.target.value });
                   updateStamp();
                 }}
+                placeholder="DD/MM/AAAA"
               />
             </div>
 
