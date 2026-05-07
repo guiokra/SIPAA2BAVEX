@@ -1370,7 +1370,9 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
       anv: launchData?.anv || f.aeronave || f.modeloAnv || "S/A",
       p1: launchData?.p1 || f.trigramaTrip || f.preenchidoPor || "---",
       p2: launchData?.p2 || "",
-      missao: launchData?.mv || f.mv || f.missao || "S/M",
+      mv: launchData?.mv || f.mv || "---",
+      local: launchData?.dest || f.local || "---",
+      missao: launchData?.missao || f.missao || "S/M",
       date: formatDate(parseOperationalDate(launchData?.dateLabel ? launchData.dateLabel.split("/").reverse().join("-") : f.data)),
       id: f.id,
       riskColor: risk.color,
@@ -1391,7 +1393,9 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
       anv: launchData?.anv || a.modeloAnv || a.aeronave || "S/A",
       p1: launchData?.p1 || a.tripulacao || a.p1 || a.preenchidoPor || "---",
       p2: launchData?.p2 || a.p2 || "",
-      missao: launchData?.mv || a.mv || a.missao || a.motivo || "S/M",
+      mv: launchData?.mv || a.mv || "---",
+      local: launchData?.dest || a.local || "---",
+      missao: launchData?.missao || a.missao || a.motivo || "S/M",
       date: formatDate(parseOperationalDate(a.dataVoo)),
       id: a.id
     };
@@ -1434,7 +1438,9 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           anv: l.anv || "S/A",
           p1: l.p1 || "---",
           p2: l.p2 || "",
-          missao: l.mv || "S/M",
+          mv: l.mv || "---",
+          local: l.dest || "---",
+          missao: l.missao || "S/M",
           date: formatDate(parseOperationalDate(l.dateLabel?.split("/").reverse().join("-"))),
           id: l.id
         }));
@@ -1589,21 +1595,17 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   </p>
                   {drillDownItems.length > 0 ? drillDownItems.map((item: any, idx: number) => (
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-1.5 overflow-hidden">
-                          <span className={`font-black whitespace-nowrap ${item.riskColor || 'text-accent-gold'}`}>LÇ {item.num}</span>
-                          <span className="text-slate-400 font-bold italic truncate text-[8px] opacity-70">/ {item.missao}</span>
+                      <div className="flex justify-between items-start mb-1 overflow-hidden">
+                        <div className="flex flex-col min-w-0 flex-1 pr-2">
+                          <span className={`font-black uppercase tracking-tight leading-snug whitespace-normal break-words ${item.riskColor || 'text-accent-gold'}`}>
+                            Lç {item.num}, {item.anv}, {item.p1}, {item.p2 || 'S/2P'}, {item.mv}, {item.local} e {item.missao}
+                          </span>
                         </div>
-                        <div className="flex flex-col items-center shrink-0">
-                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
+                        <div className="shrink-0">
+                           <span className="font-black text-white text-[8px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-1.5 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
-                        <span className="font-black text-white shrink-0">{item.anv}</span>
-                      </div>
-                      <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
-                        <span>{item.p1}</span>
-                        {item.p2 && <span>{item.p2}</span>}
                       </div>
                     </div>
                   )) : (
@@ -1684,20 +1686,17 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   </p>
                   {riskDrillItems.length > 0 ? riskDrillItems.map((item: any, idx: number) => (
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-1.5 overflow-hidden">
-                          <span className={`font-black whitespace-nowrap ${item.riskColor || 'text-accent-gold'}`}>LÇ {item.num}</span>
-                          <span className="text-slate-400 font-bold italic truncate text-[8px] opacity-70">/ {item.missao}</span>
+                      <div className="flex justify-between items-start mb-1 overflow-hidden">
+                        <div className="flex flex-col min-w-0 flex-1 pr-2">
+                          <span className={`font-black uppercase tracking-tight leading-snug whitespace-normal break-words ${item.riskColor || 'text-accent-gold'}`}>
+                            Lç {item.num}, {item.anv}, {item.p1}, {item.p2 || 'S/2P'}, {item.mv}, {item.local} e {item.missao}
+                          </span>
                         </div>
-                        <div className="flex flex-col items-center shrink-0">
-                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
+                        <div className="shrink-0">
+                           <span className="font-black text-white text-[8px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-1.5 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
-                        <span className="font-black text-white shrink-0">{item.anv}</span>
-                      </div>
-                      <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
-                        <span>{item.p1}</span>
                       </div>
                     </div>
                   )) : (
@@ -1768,21 +1767,17 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
                   </p>
                   {motiveDrillItems.length > 0 ? motiveDrillItems.map((item: any, idx: number) => (
                     <div key={idx} className="flex flex-col gap-1 bg-white/2 p-2 rounded border border-white/5 text-[9px] text-left">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-1.5 overflow-hidden">
-                          <span className="font-black text-accent-gold whitespace-nowrap">LÇ {item.num}</span>
-                          <span className="text-slate-400 font-bold italic truncate text-[8px] opacity-70">/ {item.missao}</span>
+                      <div className="flex justify-between items-start mb-1 overflow-hidden">
+                        <div className="flex flex-col min-w-0 flex-1 pr-2">
+                          <span className="font-black text-accent-gold uppercase tracking-tight leading-snug whitespace-normal break-words">
+                            Lç {item.num}, {item.anv}, {item.p1}, {item.p2 || 'S/2P'}, {item.mv}, {item.local} e {item.missao}
+                          </span>
                         </div>
-                        <div className="flex flex-col items-center shrink-0">
-                           <span className="font-black text-white text-[9px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-2 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
+                        <div className="shrink-0">
+                           <span className="font-black text-white text-[8px] uppercase tracking-tighter leading-tight bg-military-gold/20 px-1.5 py-0.5 rounded shadow-sm border border-military-gold/30 font-mono">
                              {item.date}
                            </span>
                         </div>
-                        <span className="font-black text-white shrink-0">{item.anv}</span>
-                      </div>
-                      <div className="flex gap-4 text-slate-500 font-bold uppercase text-[8px] truncate">
-                        <span>{item.p1}</span>
-                        {item.p2 && <span>{item.p2}</span>}
                       </div>
                     </div>
                   )) : (
