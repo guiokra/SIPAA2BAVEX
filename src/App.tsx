@@ -2318,7 +2318,9 @@ const MONTHS_MAP: Record<string, string> = {
 
 async function processPDVFile(file: File) {
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  // Ensure we use the global pdfjsLib if available, or the imported one
+  const pdfjsLib = (window as any).pdfjsLib || pdfjs;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
 
   const dayMap = new Map<string, any[]>();
   let lastContinuationDay: string | null = null;
@@ -2329,19 +2331,19 @@ async function processPDVFile(file: File) {
       normalizeWhitespace: true,
       disableCombineTextItems: false,
     } as any);
-    const originalText = normalizePDVText(
+    const text = normalizePDVText(
       content.items.map((i: any) => i.str || "").join(" "),
     );
 
-    const headers = findPDVHeaders(originalText);
+    const headers = findPDVHeaders(text);
     const tableStarts = findAllIndexes(
-      originalText,
-      /LÇ\s+ANV\s+1P\s+2P\s+MV\s+AD\s+DEST[\s\S]{0,550}?MISS[AÃ]O\s+LEG/g,
+      text,
+      /L[ÇC]\s+ANV[\s\S]{0,900}?MISS[AÃ]O\s+LEG/g,
     );
 
     const eligibleHeaders = headers.filter((h, idx) => {
-      const next = headers[idx + 1]?.index ?? originalText.length;
-      const section = originalText.slice(h.index, next);
+      const next = headers[idx + 1]?.index ?? text.length;
+      const section = text.slice(h.index, next);
       return !/SEM\s+ATIVIDADE\s+A[ÉE]REA/i.test(section);
     });
 
@@ -2361,17 +2363,18 @@ async function processPDVFile(file: File) {
     }
 
     const rowMatches = [
-      ...originalText.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+(\d{3,4})\b/g),
+      ...text.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+(\d{3,4})\b/g),
     ];
     for (let r = 0; r < rowMatches.length; r++) {
       const m = rowMatches[r];
+      if (!m) continue;
       const rowStart = m.index! + (m[0].match(/^\s/) ? 1 : 0);
-      let rowEnd = rowMatches[r + 1]?.index ?? originalText.length;
+      let rowEnd = rowMatches[r + 1]?.index ?? text.length;
 
       const nextTable = tableStarts.find((t) => t > rowStart);
       const nextHeader = headers.find((h) => h.index! > rowStart)?.index;
       const nextLegend = indexAfter(
-        originalText,
+        text,
         /\bLEGENDAS\b|CRISTIAN\s+FERNANDO/i,
         rowStart,
       );
@@ -2382,7 +2385,7 @@ async function processPDVFile(file: File) {
         nextHeader ?? rowEnd,
         nextLegend ?? rowEnd,
       );
-      const block = originalText.slice(rowStart, rowEnd);
+      const block = text.slice(rowStart, rowEnd);
       const launch = parseLaunchBlock(block);
       if (!launch) continue;
 
@@ -2391,6 +2394,7 @@ async function processPDVFile(file: File) {
         .find((t) => t < rowStart);
       const day =
         (previousTable !== undefined ? tableDay.get(previousTable) : null) ||
+        findNearestPreviousHeader(rowStart, headers) ||
         lastContinuationDay;
 
       if (!day) continue;
@@ -2398,7 +2402,7 @@ async function processPDVFile(file: File) {
       if (!dayMap.has(day)) dayMap.set(day, []);
       const dayLaunches = dayMap.get(day)!;
 
-      if (!dayLaunches.some((l) => l.uniqueKey === launch.uniqueKey)) {
+      if (!dayLaunches.some((l) => l.display === launch.display)) {
         dayLaunches.push(launch);
       }
 
@@ -2416,9 +2420,12 @@ async function processPDVFile(file: File) {
   for (const [dateLabel, launches] of dayMap.entries()) {
     launches.sort(
       (a, b) =>
-        Number(a.num) - Number(b.num) || a.display.localeCompare(b.display),
+        Number(a.lc) - Number(b.lc) || a.display.localeCompare(b.display),
     );
-    results.push({ dateLabel, launches });
+    results.push({
+      dateLabel,
+      launches: launches.map((l) => ({ ...l, num: l.lc })),
+    });
   }
 
   return results;
@@ -2486,12 +2493,12 @@ function indexAfter(text: string, re: RegExp, start: number) {
 
 function findPDVHeaders(text: string) {
   const re =
-    /PLANO\s+DI[AÁ]RIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE\s+([A-ZÇÃÁÉÍÓÚ]+)\s+DE\s+(\d{4})/gi;
+    /PLANO\s+DI[AÁ]RIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE\s+(?:DE\s+)?([A-ZÇÃÁÉÍÓÚ]+)\s+DE\s+(\d{4})/gi;
   const headers = [];
   for (const m of text.matchAll(re)) {
     const dd = String(parseInt(m[1], 10)).padStart(2, "0");
     const monthName = stripAccents(m[2].toUpperCase());
-    const mm = MONTHS_MAP[monthName] || "??";
+    const mm = MONTHS_MAP[monthName] || MONTHS_MAP[m[2].toUpperCase()] || "??";
     if (mm === "??") continue;
     headers.push({ index: m.index, dateLabel: `${dd}/${mm}/${m[3]}` });
   }
@@ -2511,7 +2518,7 @@ function parseLaunchBlock(block: string) {
   )
     return null;
 
-  const num = tokens[0];
+  const lc = tokens[0];
   const anv = `EXB ${tokens[2]}`;
   const p1 = cleanCrew(tokens[3]);
   const p2 = cleanCrew(tokens[4]);
@@ -2525,45 +2532,40 @@ function parseLaunchBlock(block: string) {
     i++;
   }
   if (!mvParts.length || i >= tokens.length) return null;
-  const dest = tokens[i].replace(/[^A-Z0-9]/g, "");
-  if (!isIcao(dest)) return null;
+  const adDest = tokens[i].replace(/[^A-Z0-9]/g, "");
+  if (!isIcao(adDest)) return null;
 
   let pob = -1;
   for (let j = i + 1; j < tokens.length; j++) {
-    const t = tokens[j].replace(/[^A-Z]/g, "");
-    if (t === "TBN" || t === "ASD") pob = j;
+    const clean = tokens[j].replace(/[^A-Z]/g, "");
+    if (clean === "TBN" || clean === "ASD") pob = j;
   }
   if (pob < 0 || pob + 1 >= tokens.length) return null;
 
   const missionParts = [];
   for (let j = pob + 1; j < tokens.length; j++) {
-    const raw = tokens[j];
-    const ascii = stripAccents(raw)
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^A-Z0-9/-]/g, "");
-    if (/^\(/.test(raw) || raw === "-" || /^LEGENDAS$/i.test(raw)) break;
-    if (
-      /^(TRIPULACAO|ANV|SAR|AUX|TEL|MINISTERIO|EXERCITO|PLANO)$/.test(ascii)
-    )
+    const t = tokens[j];
+    if (/^\(/.test(t) || t === "-" || /^LEGENDAS$/i.test(t)) break;
+    if (/^(TRIPULAÇÃO|TRIPULACAO|ANV|SAR|AUX|TEL)$/i.test(stripAccents(t)))
       break;
-    missionParts.push(raw);
+    missionParts.push(t);
   }
   const missao = normalizePDVMission(missionParts.join(" "));
   if (!missao) return null;
 
-  const display = `LÇ ${num} - ${anv} - ${p1} - ${p2} - ${unique(mvParts).join(" ")} - ${dest} - ${missao}`;
+  const display = `LÇ ${lc} - ${anv} - ${p1} - ${p2} - ${unique(mvParts).join(" ")} - ${adDest} - ${missao}`;
 
   return {
-    num,
+    lc,
+    num: lc,
     anv,
     p1,
     p2,
     mv: unique(mvParts).join(" "),
-    dest,
+    adDest,
     missao,
     display,
-    uniqueKey: `${num}|${anv}|${p1}|${p2}|${unique(mvParts).join(" ")}|${dest}|${missao}`,
+    uniqueKey: `${lc}_${anv}_${p1}_${p2}_${adDest}_${missao}`.replace(/\s+/g, ""),
   };
 }
 
@@ -6542,6 +6544,9 @@ function AdminSection({
   const [isLinkFgrModalOpen, setIsLinkFgrModalOpen] = useState(false);
   const [launchToLink, setLaunchToLink] = useState<any>(null);
   const [fgrSearchTerm, setFgrSearchTerm] = useState("");
+  const [pdvExtractionStatus, setPdvExtractionStatus] = useState({ msg: "", isError: false });
+  const [previewDay, setPreviewDay] = useState("");
+  const [previewLaunch, setPreviewLaunch] = useState("");
 
   const handleDateMask = (val: string) => {
     let clean = val.replace(/\D/g, "");
@@ -7832,92 +7837,174 @@ function AdminSection({
 
       {selectedView === "pdv" && (
         <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="card-military p-6 text-left">
-            <div className="flex items-center gap-3 mb-6">
-              <FileSearch className="text-military-gold" size={20} />
-              <h3 className="font-black text-white uppercase text-[10px] tracking-widest">
-                Extrator de PDV para FGR
-              </h3>
-            </div>
-
-            <div className="p-4 bg-military-gold/5 border border-military-gold/20 rounded-lg">
-              <h4 className="text-xs font-bold text-military-gold uppercase mb-2 tracking-tight">
-                Upload do Plano Diário de Voo
-              </h4>
-              <p className="text-[10px] text-slate-400 mb-6 uppercase leading-relaxed">
-                Carregue o PDF do PDV. O sistema extrairá os lançamentos e os
-                tornará disponíveis para auto-preenchimento no formulário FGR.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    setIsUploading(true);
-                    try {
-                      const days = await processPDVFile(file);
-                      let count = 0;
-                      const batchId = `PDV_${Date.now()}`;
-                      for (const day of days) {
-                        for (const launch of day.launches) {
-                          await addDoc(collection(db, "Lancamentos"), {
-                            ...launch,
-                            dateLabel: day.dateLabel,
-                            createdAt: new Date().toISOString(),
-                            batchId,
-                            batchName: file.name,
+          <div className="card-military p-8 text-left">
+             <h1 className="text-2xl font-black text-white uppercase mb-8 tracking-tight border-b border-white/10 pb-4">
+               Extrator de lançamentos do PDV
+             </h1>
+             
+             <div className="space-y-6">
+                <div className="space-y-2">
+                  <label htmlFor="pdvInput" className="text-sm font-bold text-military-gold uppercase tracking-widest">
+                    Upload do PDV
+                  </label>
+                  <div className="relative">
+                    <input 
+                      id="pdvInput" 
+                      type="file" 
+                      accept=".pdf" 
+                      multiple 
+                      className="hidden"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || []) as File[];
+                        if (!files.length) return;
+                        
+                        setIsUploading(true);
+                        setPdvExtractionStatus({ msg: "Lendo PDV...", isError: false });
+                        
+                        try {
+                          let totalAdded = 0;
+                          const batchId = `PDV_${Date.now()}`;
+                          
+                          for (const file of files) {
+                            const days = await processPDVFile(file);
+                            for (const day of days) {
+                              for (const launch of day.launches) {
+                                await addDoc(collection(db, "Lancamentos"), {
+                                  ...launch,
+                                  dateLabel: day.dateLabel,
+                                  createdAt: new Date().toISOString(),
+                                  batchId,
+                                  batchName: file.name,
+                                });
+                                totalAdded++;
+                              }
+                            }
+                          }
+                          
+                          if (totalAdded > 0) {
+                            setPdvExtractionStatus({ 
+                              msg: `${totalAdded} lançamento(s) novo(s) encontrado(s).`, 
+                              isError: false 
+                            });
+                          } else {
+                            setPdvExtractionStatus({ 
+                              msg: "PDF carregado, mas nenhum lançamento novo foi encontrado.", 
+                              isError: true 
+                            });
+                          }
+                        } catch (err: any) {
+                          console.error(err);
+                          setPdvExtractionStatus({ 
+                            msg: "Erro ao abrir o PDF. Verifique se o arquivo não está protegido.", 
+                            isError: true 
                           });
-                          count++;
+                        } finally {
+                          setIsUploading(false);
+                          e.target.value = "";
                         }
-                      }
-                      alert(
-                        `${count} lançamentos processados e salvos com sucesso.`,
-                      );
-                    } catch (err: any) {
-                      alert("Erro ao processar PDV: " + err.message);
-                    } finally {
-                      setIsUploading(false);
-                    }
-                  }}
-                  className="hidden"
-                  id="pdv-upload"
-                  disabled={isUploading}
-                />
-                <label
-                  htmlFor="pdv-upload"
-                  className={`btn-military py-3 px-6 text-[10px] cursor-pointer flex items-center justify-center gap-3 transition-all ${isUploading ? "opacity-50 cursor-not-allowed" : "hover:scale-105 active:scale-95"}`}
-                >
-                  {isUploading ? (
-                    <Loader2
-                      size={16}
-                      className="text-military-gold animate-spin"
+                      }}
                     />
-                  ) : (
-                    <Plus size={16} className="text-military-gold" />
-                  )}
-                  <span className={isUploading ? "animate-pulse" : ""}>
-                    {isUploading ? "PROCESSANDO..." : "CARREGAR PDV (PDF)"}
-                  </span>
-                </label>
+                    <label 
+                      htmlFor="pdvInput"
+                      className={`flex items-center justify-center gap-3 p-6 border-2 border-dashed border-military-gold/30 rounded-xl bg-military-gold/5 text-military-gold font-black uppercase text-sm cursor-pointer hover:bg-military-gold/10 hover:border-military-gold transition-all ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {isUploading ? <Loader2 className="animate-spin" size={24} /> : <Upload size={24} />}
+                      {isUploading ? "PROCESSANDO..." : "CARREGAR PDV (PDF)"}
+                    </label>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => {
-                    setEditingLaunch(null);
-                    setManualDate("");
-                    setIsManualModalOpen(true);
-                  }}
-                  className="btn-military py-3 px-6 text-[10px] flex items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95"
-                >
-                  <Plus size={16} className="text-military-black" />
-                  <span className="font-black text-military-black">
-                    LANÇAMENTO MANUAL
-                  </span>
-                </button>
-              </div>
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label htmlFor="daySelect" className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                      Dia
+                    </label>
+                    <select 
+                      id="daySelect" 
+                      disabled={launches.length === 0}
+                      value={previewDay}
+                      onChange={(e) => setPreviewDay(e.target.value)}
+                      className="w-full bg-military-black/50 border border-white/10 rounded-xl p-4 text-white font-bold outline-none focus:border-military-gold transition-all disabled:opacity-30 appearance-none"
+                    >
+                      <option value="">{launches.length === 0 ? "Nenhum dia carregado" : "Selecione um dia"}</option>
+                      {[...new Set(launches.map(l => l.dateLabel).filter(Boolean))].sort((a: any, b: any) => {
+                         const toSortable = (s: string) => {
+                           const p = s.split("/");
+                           return p.length === 3 ? p[2] + p[1] + p[0] : s;
+                         };
+                         return toSortable(b).localeCompare(toSortable(a));
+                      }).map(day => (
+                        <option key={day} value={day}>{day}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="launchSelect" className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                      Lançamento
+                    </label>
+                    <select 
+                      id="launchSelect" 
+                      disabled={!previewDay}
+                      value={previewLaunch}
+                      onChange={(e) => setPreviewLaunch(e.target.value)}
+                      className="w-full bg-military-black/50 border border-white/10 rounded-xl p-4 text-white font-bold outline-none focus:border-military-gold transition-all disabled:opacity-30 appearance-none"
+                    >
+                      <option value="">{!previewDay ? "Selecione um dia" : "Selecione um lançamento"}</option>
+                      {launches
+                        .filter(l => l.dateLabel === previewDay)
+                        .sort((a, b) => Number(a.num) - Number(b.num))
+                        .map(l => (
+                          <option key={l.id} value={l.display}>{l.display}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                {pdvExtractionStatus.msg && (
+                  <div className={`text-xs font-bold uppercase tracking-tight p-3 rounded bg-white/5 border-l-2 ${pdvExtractionStatus.isError ? "text-red-400 border-red-500" : "text-green-400 border-green-500"}`}>
+                    {pdvExtractionStatus.msg}
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
+                  <button
+                    id="clearLink"
+                    onClick={async () => {
+                      if (!confirm('Limpar todos os lançamentos salvos?')) return;
+                      // Logic to clear all launches from Firestore
+                      const batch = writeBatch(db);
+                      launches.forEach(l => {
+                        batch.delete(doc(db, "Lancamentos", l.id));
+                      });
+                      await batch.commit();
+                      setPdvExtractionStatus({ msg: 'Dados removidos.', isError: false });
+                      setPreviewDay("");
+                      setPreviewLaunch("");
+                    }}
+                    className="w-full sm:w-auto px-6 py-3 border border-red-500/50 text-red-500 rounded-xl font-bold uppercase text-[10px] hover:bg-red-500/10 transition-all"
+                  >
+                    Apagar PDVs carregados
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setEditingLaunch(null);
+                      setManualDate("");
+                      setIsManualModalOpen(true);
+                    }}
+                    className="w-full sm:w-auto px-6 py-3 bg-military-gold text-military-black rounded-xl font-black uppercase text-[10px] hover:scale-105 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus size={14} /> LANÇAMENTO MANUAL
+                  </button>
+                </div>
+
+                <p className="text-[9px] text-slate-500 uppercase tracking-tighter">
+                  Os lançamentos ficam salvos e são somados aos anteriores. 
+                  Você pode usar o seletor acima para conferir os dados importados.
+                </p>
+             </div>
           </div>
 
           <div className="card-military p-6 text-left">
