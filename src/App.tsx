@@ -298,10 +298,20 @@ const getFgrLaunchNums = (f: any, launches: any[]) => {
   }
   
   // 2. PDV Matching logic (Date + String matching)
-  const launchDateISO = f.data; 
+  const normalizeToDMY = (dateStr: string) => {
+    if (!dateStr) return "";
+    if (dateStr.includes("-")) {
+      const parts = dateStr.split("-");
+      if (parts[0].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`; // YYYY-MM-DD to DD/MM/YYYY
+      return `${parts[0]}/${parts[1]}/${parts[2]}`; // DD-MM-YYYY to DD/MM/YYYY
+    }
+    return dateStr;
+  };
+  
+  const targetDateDMY = normalizeToDMY(f.data);
   const matchedLaunches = launches.filter(l => {
-     const lDateISO = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
-     return lDateISO === launchDateISO && (
+     const lDateDMY = normalizeToDMY(l.dateLabel);
+     return lDateDMY === targetDateDMY && (
        f.missao?.includes(`LÇ ${l.num}`) || 
        f.missao?.includes(`LANC ${l.num}`) || 
        (l.num && f.missao?.includes(l.num))
@@ -8754,15 +8764,37 @@ function AdminSection({
                     })
                     .sort((a, b) => {
                       // 1. Prioridade por data (Decrescente - mais recente primeiro)
-                      const dateCompare = b.data.localeCompare(a.data);
+                      const parseD = (s: string) => {
+                        if (!s) return 0;
+                        if (s.includes('/')) {
+                          const parts = s.split('/');
+                          if (parts.length === 3) {
+                            const [d, m, y] = parts.map(Number);
+                            return new Date(y, m - 1, d).getTime();
+                          }
+                        }
+                        const dt = new Date(s).getTime();
+                        return isNaN(dt) ? 0 : dt;
+                      };
+                      
+                      const timeA = parseD(a.data);
+                      const timeB = parseD(b.data);
+                      
+                      const dateCompare = timeB - timeA;
                       if (dateCompare !== 0) return dateCompare;
 
                       // 2. Lançamento Sequencial (Crescente - do 1 em diante)
                       const numAStr = getFgrLaunchNums(a, launches).split(",")[0];
                       const numBStr = getFgrLaunchNums(b, launches).split(",")[0];
 
-                      const numA = parseInt(numAStr) || 999;
-                      const numB = parseInt(numBStr) || 999;
+                      // Extrair apenas números para garantir ordenação numérica correta
+                      const getNum = (str: string) => {
+                        const match = str.match(/\d+/);
+                        return match ? parseInt(match[0]) : 999;
+                      };
+
+                      const numA = getNum(numAStr);
+                      const numB = getNum(numBStr);
 
                       return numA - numB;
                     })
