@@ -2592,6 +2592,8 @@ export default function App() {
   const [adminPassword, setAdminPassword] = useState("");
   const [totalRelprev, setTotalRelprev] = useState(0);
   const [launches, setLaunches] = useState<any[]>([]);
+  const [fgrs, setFgrs] = useState<any[]>([]);
+  const [abortivas, setAbortivas] = useState<any[]>([]);
   const [selectedLaunchIdAbortiva, setSelectedLaunchIdAbortiva] = useState("");
 
   const [abortivaData, setAbortivaData] = useState({
@@ -2620,6 +2622,42 @@ export default function App() {
       },
     );
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const qFgr = query(
+      collection(db, "fgrMissions"),
+      orderBy("createdAt", "desc"),
+    );
+    const qAbortivas = query(
+      collection(db, "abortivas"),
+      orderBy("createdAt", "desc"),
+    );
+
+    const unsubFgr = onSnapshot(
+      qFgr,
+      (snap) => {
+        setFgrs(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => {
+        console.error("Erro no listener de FGR (App):", err);
+      },
+    );
+
+    const unsubAbortivas = onSnapshot(
+      qAbortivas,
+      (snap) => {
+        setAbortivas(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => {
+        console.error("Erro no listener de Abortivas (App):", err);
+      },
+    );
+
+    return () => {
+      unsubFgr();
+      unsubAbortivas();
+    };
   }, []);
 
   useEffect(() => {
@@ -2936,6 +2974,8 @@ export default function App() {
                 abastecimentoFiles,
                 launches,
                 setLaunches,
+                fgrs,
+                abortivas,
               })}
             </motion.div>
           </AnimatePresence>
@@ -3044,8 +3084,14 @@ function ImageCarousel() {
 
 function InicioSection({
   onTabChange,
+  launches,
+  fgrs,
+  abortivas,
 }: {
   onTabChange: (tab: SectionKey) => void;
+  launches: any[];
+  fgrs: any[];
+  abortivas: any[];
 }) {
   return (
     <div className="space-y-8">
@@ -3116,7 +3162,6 @@ function InicioSection({
                 className="text-military-black/30 group-hover:translate-x-1 transition-transform"
               />
             </button>
-
             <button
               onClick={() => onTabChange("FGR")}
               className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
@@ -3139,7 +3184,6 @@ function InicioSection({
                 className="text-military-black/30 group-hover:translate-x-1 transition-transform"
               />
             </button>
-
             <button
               onClick={() => onTabChange("Abortiva")}
               className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
@@ -3164,9 +3208,17 @@ function InicioSection({
             </button>
           </div>
         </div>
-
         {/* Abstract Background Element */}
         <div className="absolute -bottom-12 -right-12 h-64 w-64 bg-accent-gold/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-military-gold font-black uppercase text-xs tracking-widest px-1">Estatísticas Operacionais</h3>
+        <AdminStatsDashboard 
+          fgrs={fgrs} 
+          abortivas={abortivas} 
+          launches={launches} 
+        />
       </div>
 
       <ImageCarousel />
@@ -6424,6 +6476,8 @@ function AdminSection({
   abastecimentoFiles,
   launches,
   setLaunches,
+  fgrs: propFgrs,
+  abortivas: propAbortivas,
 }: {
   user: FirebaseUser | null;
   onTabChange: (tab: SectionKey) => void;
@@ -6431,11 +6485,22 @@ function AdminSection({
   abastecimentoFiles: any[];
   launches: any[];
   setLaunches: (l: any[]) => void;
+  fgrs: any[];
+  abortivas: any[];
 }) {
   const [stats, setStats] = useState({ relprevs: 0, fgrs: 0, abortivas: 0, trash: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
-  const [fgrs, setFgrs] = useState<any[]>([]);
-  const [abortivas, setAbortivas] = useState<any[]>([]);
+  const [fgrs, setFgrs] = useState<any[]>(propFgrs);
+  const [abortivas, setAbortivas] = useState<any[]>(propAbortivas);
+
+  useEffect(() => {
+    setFgrs(propFgrs);
+  }, [propFgrs]);
+
+  useEffect(() => {
+    setAbortivas(propAbortivas);
+  }, [propAbortivas]);
+
   const [trashItems, setTrashItems] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [selectedView, setSelectedView] = useState<
@@ -6504,14 +6569,6 @@ function AdminSection({
       collection(db, "relprevReports"),
       orderBy("createdAt", "desc"),
     );
-    const qFgr = query(
-      collection(db, "fgrMissions"),
-      orderBy("createdAt", "desc"),
-    );
-    const qAbortivas = query(
-      collection(db, "abortivas"),
-      orderBy("createdAt", "desc"),
-    );
     const qTrash = query(
       collection(db, "trash"),
       orderBy("deletedAt", "desc"),
@@ -6535,29 +6592,9 @@ function AdminSection({
       },
     );
 
-    const unsubFgr = onSnapshot(
-      qFgr,
-      (snap) => {
-        setStats((prev) => ({ ...prev, fgrs: snap.size }));
-        setFgrs(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      },
-      (err) => {
-        console.error("Erro no listener de FGR:", err);
-        setLastError(err.message);
-      },
-    );
-
-    const unsubAbortivas = onSnapshot(
-      qAbortivas,
-      (snap) => {
-        setStats((prev) => ({ ...prev, abortivas: snap.size }));
-        setAbortivas(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      },
-      (err) => {
-        console.error("Erro no listener de Abortivas:", err);
-        setLastError(err.message);
-      },
-    );
+    // Update local stats for fgrs and abortivas even though they are fetched at App level
+    // to maintain the AdminSection internal state if needed (or we could just use props)
+    setStats(prev => ({ ...prev, fgrs: propFgrs.length, abortivas: propAbortivas.length }));
 
     const unsubTrash = onSnapshot(
       qTrash,
@@ -6582,12 +6619,10 @@ function AdminSection({
 
     return () => {
       unsubRelprev();
-      unsubFgr();
-      unsubAbortivas();
       unsubTrash();
       unsubSuggestions();
     };
-  }, [user]);
+  }, [user, propFgrs.length, propAbortivas.length]);
 
   const [selectedRelprev, setSelectedRelprev] = useState<any>(null);
   const [showAnexos, setShowAnexos] = useState(false);
