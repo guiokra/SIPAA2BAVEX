@@ -8752,7 +8752,20 @@ function AdminSection({
                         `${f.missao} ${f.p1} ${f.data} ${f.anv}`.toLowerCase();
                       return searchStr.includes(fgrSearchTerm.toLowerCase());
                     })
-                    .sort((a, b) => b.data.localeCompare(a.data))
+                    .sort((a, b) => {
+                      // 1. Prioridade por data (Decrescente - mais recente primeiro)
+                      const dateCompare = b.data.localeCompare(a.data);
+                      if (dateCompare !== 0) return dateCompare;
+
+                      // 2. Lançamento Sequencial (Crescente - do 1 em diante)
+                      const numAStr = getFgrLaunchNums(a, launches).split(",")[0];
+                      const numBStr = getFgrLaunchNums(b, launches).split(",")[0];
+
+                      const numA = parseInt(numAStr) || 999;
+                      const numB = parseInt(numBStr) || 999;
+
+                      return numA - numB;
+                    })
                     .map((f) => (
                       <button
                         key={f.id}
