@@ -1235,10 +1235,13 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
   // Overview Data (Operational Panorama) - Counting PDV Launches
   const launchesWithFgr = new Set<string>();
   const launchesWithAbortiva = new Set<string>();
+  const launchesMarkedNoFgr = new Set<string>();
   
   // 1. Direct links check
   filteredLaunches.forEach(l => {
-    if (l.linkedFgrId) {
+    if (l.markedNoFgr === true) {
+      launchesMarkedNoFgr.add(l.id);
+    } else if (l.linkedFgrId) {
       launchesWithFgr.add(l.id);
     } else {
       // Look for linked abortiva record
@@ -1254,7 +1257,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     const fgrNums = getFgrLaunchNums(f, launches).split(", ");
     if (fgrNums.length > 0 && fgrNums[0] !== "S/N") {
       filteredLaunches.forEach(l => {
-        if (!launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id)) {
+        if (!launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id) && !launchesMarkedNoFgr.has(l.id)) {
           const lNum = extractLaunchNum(l);
           if (fgrNums.includes(lNum)) {
              // Date compatibility check
@@ -1272,7 +1275,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
     const aNum = extractLaunchNum(a);
     if (aNum !== "S/N") {
       filteredLaunches.forEach(l => {
-        if (!launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id)) {
+        if (!launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id) && !launchesMarkedNoFgr.has(l.id)) {
           const lNum = extractLaunchNum(l);
           const lDate = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
           if (aNum === lNum && (!a.dataVoo || a.dataVoo === lDate)) {
@@ -1285,12 +1288,18 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
 
   const fgrItemsCount = launchesWithFgr.size;
   const abortivaItemsCount = launchesWithAbortiva.size;
-  const othersLaunchCount = filteredLaunches.filter(l => !launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id)).length;
+  const noFgrItemsCount = launchesMarkedNoFgr.size;
+  const othersLaunchCount = filteredLaunches.filter(l => 
+    !launchesWithFgr.has(l.id) && 
+    !launchesWithAbortiva.has(l.id) && 
+    !launchesMarkedNoFgr.has(l.id)
+  ).length;
 
   const overviewData = [
     { name: "FGRs Efetuados", value: fgrItemsCount, color: "#ffd700", type: 'fgr' },
-    { name: "Abortivas", value: abortivaItemsCount, color: "#f87171", type: 'abortiva' },
-    { name: "Demais Lançamentos", value: othersLaunchCount, color: "#64748b", type: 'others' },
+    { name: "Abortivas", value: abortivaItemsCount, color: "#3b82f6", type: 'abortiva' },
+    { name: "Sem FGR", value: noFgrItemsCount, color: "#ef4444", type: 'no_fgr' },
+    { name: "Lançamentos Pendentes", value: othersLaunchCount, color: "#64748b", type: 'others' },
   ];
 
   // Calculate Risk Distribution (based on launchesWithFgr)
@@ -1439,9 +1448,24 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
            return mapAbortivaToItem(a || {}, l);
         });
     }
-    if (selectedCategory === "Demais Lançamentos") {
+    if (selectedCategory === "Sem FGR") {
       return filteredLaunches
-        .filter(l => !launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id))
+        .filter(l => launchesMarkedNoFgr.has(l.id))
+        .map(l => ({
+           id: l.id,
+           date: l.dateLabel || "---",
+           launch: l.num || l.lc || "---",
+           anv: l.anv || "---",
+           p1: l.p1 || "---",
+           p2: l.p2 || "---",
+           missao: l.missao || "---",
+           type: "no_fgr",
+           statusLabel: "Marcado Sem FGR"
+        }));
+    }
+    if (selectedCategory === "Lançamentos Pendentes") {
+      return filteredLaunches
+        .filter(l => !launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id) && !launchesMarkedNoFgr.has(l.id))
         .map(l => ({
           type: 'OUTRO',
           num: extractLaunchNum(l),
@@ -6545,6 +6569,19 @@ function AdminSection({
   const [launchToLink, setLaunchToLink] = useState<any>(null);
   const [fgrSearchTerm, setFgrSearchTerm] = useState("");
   const [pdvExtractionStatus, setPdvExtractionStatus] = useState({ msg: "", isError: false });
+  const [viewingBatchId, setViewingBatchId] = useState<string | null>(null);
+
+  const toggleNoFgr = async (launchId: string, currentVal: boolean) => {
+    try {
+      const docRef = doc(db, "Lancamentos", launchId);
+      await updateDoc(docRef, {
+        markedNoFgr: !currentVal
+      });
+    } catch (error: any) {
+      console.error("Erro ao alternar Sem FGR:", error);
+      setPdvExtractionStatus({ msg: `Erro ao atualizar: ${error.message}`, isError: true });
+    }
+  };
 
   const handleDateMask = (val: string) => {
     let clean = val.replace(/\D/g, "");
@@ -8004,23 +8041,78 @@ function AdminSection({
                             </span>
                           </div>
                         </div>
-                        <button
-                          onClick={() =>
-                            setBatchDeleteTarget({
-                              id: b.id,
-                              name: b.name,
-                              count: b.count,
-                            })
-                          }
-                          className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
-                          title="Excluir Lote"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setViewingBatchId(viewingBatchId === b.id ? null : b.id)}
+                            className={`px-3 py-1 rounded text-[8px] font-bold uppercase transition-all ${viewingBatchId === b.id ? 'bg-military-gold text-military-black' : 'border border-white/10 text-white hover:border-military-gold/50'}`}
+                          >
+                            {viewingBatchId === b.id ? 'Fechar' : 'Ver Lançamentos'}
+                          </button>
+                          <button
+                            onClick={() =>
+                              setBatchDeleteTarget({
+                                id: b.id,
+                                name: b.name,
+                                count: b.count,
+                              })
+                            }
+                            className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
+                            title="Excluir Lote"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))
                 );
               })()}
+              {viewingBatchId && (
+                <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <h5 className="text-[10px] font-black text-military-gold uppercase tracking-widest">
+                      Lançamentos do Arquivo
+                    </h5>
+                    <button 
+                      onClick={() => setViewingBatchId(null)}
+                      className="text-slate-500 hover:text-white"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {launches
+                      .filter(l => l.batchId === viewingBatchId)
+                      .map(l => (
+                        <div key={l.id} className="p-3 bg-military-black/20 border border-white/5 rounded flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 bg-military-gold/10 text-military-gold text-[8px] font-black rounded">
+                                LÇ {l.num || l.lc}
+                              </span>
+                              <span className="text-[10px] text-white font-bold truncate uppercase">
+                                {l.missao}
+                              </span>
+                            </div>
+                            <span className="text-[8px] text-slate-500 uppercase truncate">
+                              {l.anv} • {l.p1} / {l.p2} • {l.adDest}
+                            </span>
+                          </div>
+                          
+                          <button
+                            onClick={() => toggleNoFgr(l.id, l.markedNoFgr || false)}
+                            className={`px-4 py-1.5 rounded text-[8px] font-black uppercase tracking-wider transition-all shadow-lg ${
+                              l.markedNoFgr 
+                                ? "bg-slate-700 text-slate-300 border border-slate-600" 
+                                : "bg-transparent border border-white/10 text-slate-400 hover:border-military-gold hover:text-military-gold"
+                            }`}
+                          >
+                            {l.markedNoFgr ? "✓ Sem FGR" : "Marcar Sem FGR"}
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -8137,6 +8229,13 @@ function AdminSection({
                                     title="Linkar FGR"
                                   >
                                     <Link2 size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => toggleNoFgr(l.id, l.markedNoFgr || false)}
+                                    className={`p-1.5 transition-colors ${l.markedNoFgr ? "text-red-500" : "text-slate-600 hover:text-red-400"}`}
+                                    title={l.markedNoFgr ? "Remover Sem FGR" : "Marcar Sem FGR"}
+                                  >
+                                    <ShieldAlert size={12} />
                                   </button>
                                   <button
                                     onClick={() => {
