@@ -2296,7 +2296,7 @@ const generateRelprevPDF = (report: any) => {
   }
 
   if (report.email) {
-    addBlock("E-mail para retorno", report.email);
+    addBlock("telefone ou e-mail para retorno", report.email);
   }
 
   // Footer
@@ -4044,11 +4044,11 @@ function RelprevSection({
           {/* Email */}
           <div className="space-y-2 pt-2">
             <label className="text-[10px] font-black text-military-gold uppercase tracking-widest block pl-1">
-              E-mail para retorno (opcional)
+              telefone ou e-mail para retorno (opcional)
             </label>
             <input
-              type="email"
-              placeholder="exemplo@exercito.mil.br"
+              type="text"
+              placeholder="e-mail ou telefone para contato"
               className="input-military w-full"
               value={formData.email}
               onChange={(e) =>
