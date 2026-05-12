@@ -2362,7 +2362,7 @@ async function processPDVFile(file: File) {
     const headers = findPDVHeaders(text);
     const tableStarts = findAllIndexes(
       text,
-      /L[ÇC]\s+ANV[\s\S]{0,900}?MISS[AÃ]O\s+LEG/g,
+      /LÇ\s+ANV\s+1P\s+2P\s+MV\s+AD\s+DEST[\s\S]{0,450}?MISS[AÃ]O\s+LEG/g,
     );
 
     const eligibleHeaders = headers.filter((h, idx) => {
@@ -2387,7 +2387,7 @@ async function processPDVFile(file: File) {
     }
 
     const rowMatches = [
-      ...text.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+(\d{3,4})\b/g),
+      ...text.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+([A-Z0-9]{1,5})\b/g),
     ];
     for (let r = 0; r < rowMatches.length; r++) {
       const m = rowMatches[r];
@@ -2538,7 +2538,7 @@ function parseLaunchBlock(block: string) {
   if (
     !/^\d{2}$/.test(tokens[0]) ||
     tokens[1] !== "EXB" ||
-    !/^\d{3,4}$/.test(tokens[2])
+    !/^[A-Z0-9]{1,5}$/.test(tokens[2])
   )
     return null;
 
@@ -2549,7 +2549,7 @@ function parseLaunchBlock(block: string) {
   if (!isTrigram(p1) || !isTrigram(p2)) return null;
 
   let i = 5;
-  const mvParts = [];
+  const mvParts: string[] = [];
   while (i < tokens.length && !isIcao(tokens[i])) {
     const t = cleanCrew(tokens[i]);
     if (isTrigram(t)) mvParts.push(t);
@@ -2559,15 +2559,14 @@ function parseLaunchBlock(block: string) {
   const adDest = tokens[i].replace(/[^A-Z0-9]/g, "");
   if (!isIcao(adDest)) return null;
 
-  let pob = -1;
+  let tbn = -1;
   for (let j = i + 1; j < tokens.length; j++) {
-    const clean = tokens[j].replace(/[^A-Z]/g, "");
-    if (clean === "TBN" || clean === "ASD") pob = j;
+    if (tokens[j].replace(/[^A-Z]/g, "") === "TBN") tbn = j;
   }
-  if (pob < 0 || pob + 1 >= tokens.length) return null;
+  if (tbn < 0 || tbn + 1 >= tokens.length) return null;
 
   const missionParts = [];
-  for (let j = pob + 1; j < tokens.length; j++) {
+  for (let j = tbn + 1; j < tokens.length; j++) {
     const t = tokens[j];
     if (/^\(/.test(t) || t === "-" || /^LEGENDAS$/i.test(t)) break;
     if (/^(TRIPULAÇÃO|TRIPULACAO|ANV|SAR|AUX|TEL)$/i.test(stripAccents(t)))
@@ -2577,7 +2576,9 @@ function parseLaunchBlock(block: string) {
   const missao = normalizePDVMission(missionParts.join(" "));
   if (!missao) return null;
 
-  const display = `LÇ ${lc} - ${anv} - ${p1} - ${p2} - ${unique(mvParts).join(" ")} - ${adDest} - ${missao}`;
+  const display = `LÇ ${lc} - ${anv} - ${p1} - ${p2} - ${unique(mvParts).join(
+    " ",
+  )} - ${adDest} - ${missao}`;
 
   return {
     lc,
@@ -2589,7 +2590,10 @@ function parseLaunchBlock(block: string) {
     adDest,
     missao,
     display,
-    uniqueKey: `${lc}_${anv}_${p1}_${p2}_${adDest}_${missao}`.replace(/\s+/g, ""),
+    uniqueKey: `${lc}_${anv}_${p1}_${p2}_${adDest}_${missao}`.replace(
+      /\s+/g,
+      "",
+    ),
   };
 }
 
