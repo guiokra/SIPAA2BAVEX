@@ -55,6 +55,7 @@ import {
   Link2,
   Lightbulb,
   MessageSquarePlus,
+  FileDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -2749,6 +2750,8 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  const [isConsultFgrModalOpen, setIsConsultFgrModalOpen] = useState(false);
+
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
@@ -3010,17 +3013,262 @@ export default function App() {
               {React.createElement(sectionComponents[activeTab], {
                 user,
                 onTabChange: handleTabChange,
+                onConsultFgr: () => setIsConsultFgrModalOpen(true),
                 abastecimentoConfig,
                 abastecimentoFiles,
                 launches,
                 setLaunches,
-                fgrs,
+                fgrs: fgrs,
                 abortivas,
               })}
             </motion.div>
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Consult FGR Modal */}
+      <AnimatePresence>
+        {isConsultFgrModalOpen && (
+          <div className="fixed inset-0 z-[60] bg-military-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-military-black border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-military-gold flex items-center justify-center text-military-black">
+                    <Search size={20} />
+                  </div>
+                  <div>
+                    <h2 className="font-black text-white uppercase tracking-widest text-lg">
+                      Consultar FGRs
+                    </h2>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-tighter">
+                      Visualizar e imprimir formulários gerados
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsConsultFgrModalOpen(false)}
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                {fgrs.length > 0 && (
+                  <>
+                    {/* Desktop Table - Only on large screens */}
+                    <div className="hidden lg:block card-military overflow-hidden">
+                      <div className="overflow-x-auto no-scrollbar">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="border-b border-border-theme text-[10px] uppercase text-text-secondary font-black">
+                              <th className="px-4 py-3">Data</th>
+                              <th className="px-4 py-3">Missão</th>
+                              <th className="px-4 py-3">Aeronave</th>
+                              <th className="px-4 py-3">Risco</th>
+                              <th className="px-4 py-3 text-right font-black tracking-widest text-military-gold">
+                                PDF / AÇÕES
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border-theme/30 text-[11px]">
+                            {fgrs
+                              .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                              .map((f: any) => (
+                                <tr
+                                  key={f.id}
+                                  className="hover:bg-white/2 transition-colors"
+                                >
+                                  <td className="px-4 py-3 font-mono">
+                                    {f.data
+                                      ? f.data.split("-").reverse().join("/")
+                                      : new Date(f.createdAt).toLocaleDateString("pt-BR")}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex flex-col">
+                                      <span className="text-white font-bold">{f.missao}</span>
+                                      {!launches.some(l => 
+                                        l.linkedFgrId === f.id || 
+                                        (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
+                                        (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
+                                      ) && (
+                                        <div className="flex flex-col mt-0.5">
+                                          <span className="text-red-500 font-bold text-sm leading-none">*</span>
+                                          <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
+                                            Sem associação com PDV
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-text-secondary uppercase">
+                                    {f.aeronave} | {f.relatorName || "Conv."}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).bg} ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).color}`}
+                                    >
+                                      {f.scores?.riskMax || 0} pts - {getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                                    <button
+                                      onClick={() => {
+                                        const docPdf = generateFgrPDF(f);
+                                        const fgrBlob = docPdf.output("blob");
+                                        const fgrUrl = URL.createObjectURL(fgrBlob);
+                                        window.open(fgrUrl, "_blank");
+                                      }}
+                                      className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
+                                    >
+                                      <Eye size={14} />
+                                      <span className="text-[10px] uppercase font-black">
+                                        Ver PDF
+                                      </span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const docPdf = generateFgrPDF(f);
+                                        let dStr = "SemData";
+                                        if (f.data) {
+                                          dStr = f.data.includes("-")
+                                            ? f.data.split("-").reverse().join("-")
+                                            : f.data.replace(/\//g, "-");
+                                        } else if (f.createdAt) {
+                                          dStr = new Date(f.createdAt)
+                                            .toLocaleDateString("pt-BR")
+                                            .replace(/\//g, "-");
+                                        }
+                                        const mSafe = (f.missao || "FGR").replace(
+                                          /[/\\?%*:|"<>]/g,
+                                          "-",
+                                        );
+                                        docPdf.save(`${dStr}_${mSafe}.pdf`);
+                                      }}
+                                      className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
+                                      title="Baixar PDF Original"
+                                    >
+                                      <Download size={14} />
+                                      <span className="text-[10px] uppercase font-black">
+                                        Baixar
+                                      </span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Mobile/Tablet Cards - Shown on smaller screens */}
+                    <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {fgrs
+                        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map((f: any) => (
+                          <div
+                            key={f.id}
+                            className="card-military p-4 space-y-3 flex flex-col justify-between hover:border-military-gold/50 transition-all border border-white/5"
+                          >
+                            <div>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex flex-col overflow-hidden">
+                                  <span className="text-white font-black text-xs uppercase tracking-tight truncate">
+                                    {f.missao}
+                                  </span>
+                                  {!launches.some(l => 
+                                    l.linkedFgrId === f.id || 
+                                    (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
+                                    (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
+                                  ) && (
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                      <span className="text-red-500 font-bold text-xs leading-none">*</span>
+                                      <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
+                                        Sem associação com PDV
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).bg} ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).color}`}
+                                >
+                                  {f.scores?.riskMax || 0} PTS - {getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label.toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
+                                <div className="truncate">
+                                  Av: <span className="text-slate-300">{f.aeronave}</span>
+                                </div>
+                                <div className="text-right">
+                                  {f.data
+                                    ? f.data.split("-").reverse().join("/")
+                                    : new Date(f.createdAt).toLocaleDateString("pt-BR")}
+                                </div>
+                              </div>
+                              <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight truncate">
+                                Rel:{" "}
+                                <span className="text-slate-300">
+                                  {f.relatorName || "Conv."}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                              <button
+                                onClick={() => {
+                                  const doc = generateFgrPDF(f);
+                                  window.open(doc.output("bloburl"), "_blank");
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold text-military-black text-[10px] font-black uppercase tracking-wider shadow-lg hover:scale(102) active:scale-95 transition-all"
+                              >
+                                <FileText size={14} /> PDF
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const docPdf = generateFgrPDF(f);
+                                  let dStr = "SemData";
+                                  if (f.data) {
+                                    dStr = f.data.includes("-")
+                                      ? f.data.split("-").reverse().join("-")
+                                      : f.data.replace(/\//g, "-");
+                                  } else if (f.createdAt) {
+                                    dStr = new Date(f.createdAt)
+                                      .toLocaleDateString("pt-BR")
+                                      .replace(/\//g, "-");
+                                  }
+                                  const mSafe = (f.missao || "FGR").replace(
+                                    /[/\\?%*:|"<>]/g,
+                                    "-",
+                                  );
+                                  docPdf.save(`${dStr}_${mSafe}.pdf`);
+                                }}
+                                className="w-10 h-9 flex items-center justify-center rounded bg-white/5 text-white border border-white/10 hover:bg-white/10 transition-all"
+                                title="Baixar PDF"
+                              >
+                                <Download size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </>
+                )}
+                  
+                {fgrs.length === 0 && (
+                  <div className="py-20 text-center opacity-40">
+                    <FileSearch className="mx-auto mb-4 text-slate-600" size={48} />
+                    <p className="text-sm uppercase font-bold tracking-widest text-slate-500">Nenhum FGR gerado até o momento</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -3124,11 +3372,13 @@ function ImageCarousel() {
 
 function InicioSection({
   onTabChange,
+  onConsultFgr,
   launches,
   fgrs,
   abortivas,
 }: {
   onTabChange: (tab: SectionKey) => void;
+  onConsultFgr: () => void;
   launches: any[];
   fgrs: any[];
   abortivas: any[];
@@ -3180,6 +3430,28 @@ function InicioSection({
             reporte e garanta a integridade de nossa missão."
           </div>
           <div className="grid grid-cols-1 gap-4 mt-10 w-full max-w-lg">
+            <button
+              onClick={onConsultFgr}
+              className="group flex items-center justify-between p-6 bg-military-blue border border-white/10 rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
+            >
+              <div className="flex items-center gap-5">
+                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white">
+                  <Search size={24} />
+                </div>
+                <div className="text-left">
+                  <span className="block font-black text-white text-lg tracking-widest leading-none uppercase">
+                    Consultar FGR
+                  </span>
+                  <span className="text-[10px] text-white/60 font-bold uppercase tracking-tighter mt-1 block">
+                    Visualizar arquivos gerados
+                  </span>
+                </div>
+              </div>
+              <ChevronRight
+                size={24}
+                className="text-white/30 group-hover:translate-x-1 transition-transform"
+              />
+            </button>
             <button
               onClick={() => onTabChange("RELPREV")}
               className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
@@ -3285,6 +3557,13 @@ function InicioSection({
           desc="Relato de interrupção de missão."
           color="orange"
           onClick={() => onTabChange("Abortiva")}
+        />
+        <QuickCard
+          icon={Search}
+          title="Consultar FGR"
+          desc="Visualizar arquivos gerados."
+          color="blue"
+          onClick={onConsultFgr}
         />
         <QuickCard
           icon={Lightbulb}
