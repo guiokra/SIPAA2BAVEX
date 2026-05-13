@@ -3431,28 +3431,6 @@ function InicioSection({
           </div>
           <div className="grid grid-cols-1 gap-4 mt-10 w-full max-w-lg">
             <button
-              onClick={onConsultFgr}
-              className="group flex items-center justify-between p-6 bg-military-blue border border-white/10 rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
-            >
-              <div className="flex items-center gap-5">
-                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white">
-                  <Search size={24} />
-                </div>
-                <div className="text-left">
-                  <span className="block font-black text-white text-lg tracking-widest leading-none uppercase">
-                    Consultar FGR
-                  </span>
-                  <span className="text-[10px] text-white/60 font-bold uppercase tracking-tighter mt-1 block">
-                    Visualizar arquivos gerados
-                  </span>
-                </div>
-              </div>
-              <ChevronRight
-                size={24}
-                className="text-white/30 group-hover:translate-x-1 transition-transform"
-              />
-            </button>
-            <button
               onClick={() => onTabChange("RELPREV")}
               className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
             >
@@ -3516,6 +3494,28 @@ function InicioSection({
               <ChevronRight
                 size={24}
                 className="text-military-black/30 group-hover:translate-x-1 transition-transform"
+              />
+            </button>
+            <button
+              onClick={onConsultFgr}
+              className="group flex items-center justify-between p-6 bg-military-blue border border-white/10 rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
+            >
+              <div className="flex items-center gap-5">
+                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white">
+                  <Search size={24} />
+                </div>
+                <div className="text-left">
+                  <span className="block font-black text-white text-lg tracking-widest leading-none uppercase">
+                    Consultar FGR
+                  </span>
+                  <span className="text-[10px] text-white/60 font-bold uppercase tracking-tighter mt-1 block">
+                    Visualizar arquivos gerados
+                  </span>
+                </div>
+              </div>
+              <ChevronRight
+                size={24}
+                className="text-white/30 group-hover:translate-x-1 transition-transform"
               />
             </button>
           </div>
