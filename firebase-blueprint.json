@@ -2,7 +2,7 @@
   "entities": {
     "FgrMission": {
       "title": "FgrMission",
-      "description": "Uma missão cadastrada no formulário FGR (Ficha de Gerenciamento de Risco)",
+      "description": "Uma missão cadastrada no Formulário de Gerenciamento de Risco (FGR)",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "description": "ID do usuário autor" },

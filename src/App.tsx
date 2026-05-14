@@ -3061,75 +3061,211 @@ export default function App() {
               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                 {fgrs.length > 0 && (
                   <>
-                    {/* Desktop Table - Only on large screens */}
-                    <div className="hidden lg:block card-military overflow-hidden">
-                      <div className="overflow-x-auto no-scrollbar">
-                        <table className="w-full text-left">
-                          <thead>
-                            <tr className="border-b border-border-theme text-[10px] uppercase text-text-secondary font-black">
-                              <th className="px-4 py-3">Data</th>
-                              <th className="px-4 py-3">Missão</th>
-                              <th className="px-4 py-3">Aeronave</th>
-                              <th className="px-4 py-3">Risco</th>
-                              <th className="px-4 py-3 text-right font-black tracking-widest text-military-gold">
-                                PDF / AÇÕES
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border-theme/30 text-[11px]">
-                            {fgrs
+                    {(() => {
+                      const grouped = fgrs.reduce((acc: any, f: any) => {
+                        const date = f.data || "SEM DATA";
+                        if (!acc[date]) acc[date] = [];
+                        acc[date].push(f);
+                        return acc;
+                      }, {});
+
+                      const sortedDates = Object.keys(grouped).sort((a, b) => {
+                        if (a === "SEM DATA") return 1;
+                        if (b === "SEM DATA") return -1;
+                        const dateA = new Date(a).getTime();
+                        const dateB = new Date(b).getTime();
+                        return dateB - dateA;
+                      });
+
+                      return sortedDates.map((date) => (
+                        <div key={date} className="space-y-4">
+                          <div className="flex items-center gap-4 bg-slate-800/80 p-4 rounded-xl border-l-4 border-military-gold shadow-lg backdrop-blur-sm">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-military-gold/10 flex items-center justify-center text-military-gold">
+                                <Calendar size={18} />
+                              </div>
+                              <div className="flex flex-col">
+                                <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em]">
+                                  {date !== "SEM DATA" 
+                                    ? date.split("-").reverse().join("/")
+                                    : "DATA NÃO INFORMADA"}
+                                </h3>
+                                <span className="text-[7px] text-military-gold font-bold uppercase tracking-widest mt-0.5">
+                                  Formulário de Gerenciamento de Risco
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex-1 h-px bg-white/5" />
+                            <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-[9px] font-black text-slate-400 uppercase tracking-tighter">
+                              {grouped[date].length} {grouped[date].length === 1 ? 'Missão' : 'Missões'}
+                            </div>
+                          </div>
+
+                          {/* Desktop Table - Only on large screens */}
+                          <div className="hidden lg:block card-military overflow-hidden">
+                            <div className="overflow-x-auto no-scrollbar">
+                              <table className="w-full text-left">
+                                <thead>
+                                  <tr className="border-b border-border-theme text-[10px] uppercase text-text-secondary font-black">
+                                    <th className="px-4 py-3">Data</th>
+                                    <th className="px-4 py-3">Missão</th>
+                                    <th className="px-4 py-3">Aeronave</th>
+                                    <th className="px-4 py-3">Risco</th>
+                                    <th className="px-4 py-3 text-right font-black tracking-widest text-military-gold">
+                                      PDF / AÇÕES
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border-theme/30 text-[11px]">
+                                  {grouped[date]
+                                    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                    .map((f: any) => (
+                                      <tr
+                                        key={f.id}
+                                        className="hover:bg-white/2 transition-colors"
+                                      >
+                                        <td className="px-4 py-3 font-mono">
+                                          {f.data
+                                            ? f.data.split("-").reverse().join("/")
+                                            : new Date(f.createdAt).toLocaleDateString("pt-BR")}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <div className="flex flex-col">
+                                            <span className="text-white font-bold">{f.missao}</span>
+                                            {!launches.some(l => 
+                                              l.linkedFgrId === f.id || 
+                                              (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
+                                              (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
+                                            ) && (
+                                              <div className="flex flex-col mt-0.5">
+                                                <span className="text-red-500 font-bold text-sm leading-none">*</span>
+                                                <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
+                                                  Sem associação com PDV
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-text-secondary uppercase">
+                                          {f.aeronave} | {f.relatorName || "Conv."}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span
+                                            className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).bg} ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).color}`}
+                                          >
+                                            {f.scores?.riskMax || 0} pts - {getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                                          <button
+                                            onClick={() => {
+                                              const docPdf = generateFgrPDF(f);
+                                              const fgrBlob = docPdf.output("blob");
+                                              const fgrUrl = URL.createObjectURL(fgrBlob);
+                                              window.open(fgrUrl, "_blank");
+                                            }}
+                                            className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
+                                          >
+                                            <Eye size={14} />
+                                            <span className="text-[10px] uppercase font-black">
+                                              Ver PDF
+                                            </span>
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              const docPdf = generateFgrPDF(f);
+                                              let dStr = "SemData";
+                                              if (f.data) {
+                                                dStr = f.data.includes("-")
+                                                  ? f.data.split("-").reverse().join("-")
+                                                  : f.data.replace(/\//g, "-");
+                                              } else if (f.createdAt) {
+                                                dStr = new Date(f.createdAt)
+                                                  .toLocaleDateString("pt-BR")
+                                                  .replace(/\//g, "-");
+                                              }
+                                              const mSafe = (f.missao || "FGR").replace(
+                                                /[/\\?%*:|"<>]/g,
+                                                "-",
+                                              );
+                                              docPdf.save(`${dStr}_${mSafe}.pdf`);
+                                            }}
+                                            className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
+                                            title="Baixar PDF Original"
+                                          >
+                                            <Download size={14} />
+                                            <span className="text-[10px] uppercase font-black">
+                                              Baixar
+                                            </span>
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* Mobile/Tablet Cards - Shown on smaller screens */}
+                          <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {grouped[date]
                               .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                               .map((f: any) => (
-                                <tr
+                                <div
                                   key={f.id}
-                                  className="hover:bg-white/2 transition-colors"
+                                  className="card-military p-4 space-y-3 flex flex-col justify-between hover:border-military-gold/50 transition-all border border-white/5"
                                 >
-                                  <td className="px-4 py-3 font-mono">
-                                    {f.data
-                                      ? f.data.split("-").reverse().join("/")
-                                      : new Date(f.createdAt).toLocaleDateString("pt-BR")}
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex flex-col">
-                                      <span className="text-white font-bold">{f.missao}</span>
-                                      {!launches.some(l => 
-                                        l.linkedFgrId === f.id || 
-                                        (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
-                                        (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
-                                      ) && (
-                                        <div className="flex flex-col mt-0.5">
-                                          <span className="text-red-500 font-bold text-sm leading-none">*</span>
-                                          <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
-                                            Sem associação com PDV
-                                          </span>
-                                        </div>
-                                      )}
+                                  <div>
+                                    <div className="flex justify-between items-start mb-2">
+                                      <div className="flex flex-col overflow-hidden">
+                                        <span className="text-white font-black text-xs uppercase tracking-tight truncate">
+                                          {f.missao}
+                                        </span>
+                                        {!launches.some(l => 
+                                          l.linkedFgrId === f.id || 
+                                          (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
+                                          (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
+                                        ) && (
+                                          <div className="flex items-center gap-1 mt-0.5">
+                                            <span className="text-red-500 font-bold text-xs leading-none">*</span>
+                                            <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
+                                              Sem associação com PDV
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <span
+                                        className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).bg} ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).color}`}
+                                      >
+                                        {f.scores?.riskMax || 0} PTS - {getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label.toUpperCase()}
+                                      </span>
                                     </div>
-                                  </td>
-                                  <td className="px-4 py-3 text-text-secondary uppercase">
-                                    {f.aeronave} | {f.relatorName || "Conv."}
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <span
-                                      className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).bg} ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).color}`}
-                                    >
-                                      {f.scores?.riskMax || 0} pts - {getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                                    <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
+                                      <div className="truncate">
+                                        Av: <span className="text-slate-300">{f.aeronave}</span>
+                                      </div>
+                                      <div className="text-right">
+                                        {f.data
+                                          ? f.data.split("-").reverse().join("/")
+                                          : new Date(f.createdAt).toLocaleDateString("pt-BR")}
+                                      </div>
+                                    </div>
+                                    <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight truncate">
+                                      Rel:{" "}
+                                      <span className="text-slate-300">
+                                        {f.relatorName || "Conv."}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 pt-3 border-t border-white/5">
                                     <button
                                       onClick={() => {
-                                        const docPdf = generateFgrPDF(f);
-                                        const fgrBlob = docPdf.output("blob");
-                                        const fgrUrl = URL.createObjectURL(fgrBlob);
-                                        window.open(fgrUrl, "_blank");
+                                        const doc = generateFgrPDF(f);
+                                        window.open(doc.output("bloburl"), "_blank");
                                       }}
-                                      className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
+                                      className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold text-military-black text-[10px] font-black uppercase tracking-wider shadow-lg hover:scale(102) active:scale-95 transition-all"
                                     >
-                                      <Eye size={14} />
-                                      <span className="text-[10px] uppercase font-black">
-                                        Ver PDF
-                                      </span>
+                                      <FileText size={14} /> PDF
                                     </button>
                                     <button
                                       onClick={() => {
@@ -3150,111 +3286,18 @@ export default function App() {
                                         );
                                         docPdf.save(`${dStr}_${mSafe}.pdf`);
                                       }}
-                                      className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
-                                      title="Baixar PDF Original"
+                                      className="w-10 h-9 flex items-center justify-center rounded bg-white/5 text-white border border-white/10 hover:bg-white/10 transition-all"
+                                      title="Baixar PDF"
                                     >
-                                      <Download size={14} />
-                                      <span className="text-[10px] uppercase font-black">
-                                        Baixar
-                                      </span>
+                                      <Download size={16} />
                                     </button>
-                                  </td>
-                                </tr>
+                                  </div>
+                                </div>
                               ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* Mobile/Tablet Cards - Shown on smaller screens */}
-                    <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {fgrs
-                        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                        .map((f: any) => (
-                          <div
-                            key={f.id}
-                            className="card-military p-4 space-y-3 flex flex-col justify-between hover:border-military-gold/50 transition-all border border-white/5"
-                          >
-                            <div>
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="flex flex-col overflow-hidden">
-                                  <span className="text-white font-black text-xs uppercase tracking-tight truncate">
-                                    {f.missao}
-                                  </span>
-                                  {!launches.some(l => 
-                                    l.linkedFgrId === f.id || 
-                                    (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
-                                    (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
-                                  ) && (
-                                    <div className="flex items-center gap-1 mt-0.5">
-                                      <span className="text-red-500 font-bold text-xs leading-none">*</span>
-                                      <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
-                                        Sem associação com PDV
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                                <span
-                                  className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).bg} ${getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).color}`}
-                                >
-                                  {f.scores?.riskMax || 0} PTS - {getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label.toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
-                                <div className="truncate">
-                                  Av: <span className="text-slate-300">{f.aeronave}</span>
-                                </div>
-                                <div className="text-right">
-                                  {f.data
-                                    ? f.data.split("-").reverse().join("/")
-                                    : new Date(f.createdAt).toLocaleDateString("pt-BR")}
-                                </div>
-                              </div>
-                              <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight truncate">
-                                Rel:{" "}
-                                <span className="text-slate-300">
-                                  {f.relatorName || "Conv."}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 pt-3 border-t border-white/5">
-                              <button
-                                onClick={() => {
-                                  const doc = generateFgrPDF(f);
-                                  window.open(doc.output("bloburl"), "_blank");
-                                }}
-                                className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold text-military-black text-[10px] font-black uppercase tracking-wider shadow-lg hover:scale(102) active:scale-95 transition-all"
-                              >
-                                <FileText size={14} /> PDF
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const docPdf = generateFgrPDF(f);
-                                  let dStr = "SemData";
-                                  if (f.data) {
-                                    dStr = f.data.includes("-")
-                                      ? f.data.split("-").reverse().join("-")
-                                      : f.data.replace(/\//g, "-");
-                                  } else if (f.createdAt) {
-                                    dStr = new Date(f.createdAt)
-                                      .toLocaleDateString("pt-BR")
-                                      .replace(/\//g, "-");
-                                  }
-                                  const mSafe = (f.missao || "FGR").replace(
-                                    /[/\\?%*:|"<>]/g,
-                                    "-",
-                                  );
-                                  docPdf.save(`${dStr}_${mSafe}.pdf`);
-                                }}
-                                className="w-10 h-9 flex items-center justify-center rounded bg-white/5 text-white border border-white/10 hover:bg-white/10 transition-all"
-                                title="Baixar PDF"
-                              >
-                                <Download size={16} />
-                              </button>
-                            </div>
                           </div>
-                        ))}
-                    </div>
+                        </div>
+                      ));
+                    })()}
                   </>
                 )}
                   
@@ -7801,171 +7844,257 @@ function AdminSection({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-theme/30 text-[11px]">
-                  {fgrs.map((f) => (
-                    <tr
-                      key={f.id}
-                      className="hover:bg-white/2 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-mono">
-                        {f.data
-                          ? f.data.split("-").reverse().join("/")
-                          : new Date(f.createdAt).toLocaleDateString("pt-BR")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col">
-                          <span className="text-white font-bold">{f.missao}</span>
-                          {!launches.some(l => 
-                            l.linkedFgrId === f.id || 
-                            (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
-                            (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
-                          ) && (
-                            <div className="flex flex-col mt-0.5">
-                              <span className="text-red-500 font-bold text-sm leading-none">*</span>
-                              <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
-                                Sem associação com PDV
+                  {(() => {
+                    const grouped = fgrs.reduce((acc: any, f: any) => {
+                      const date = f.data || "SEM DATA";
+                      if (!acc[date]) acc[date] = [];
+                      acc[date].push(f);
+                      return acc;
+                    }, {});
+
+                    const sortedDates = Object.keys(grouped).sort((a, b) => {
+                      if (a === "SEM DATA") return 1;
+                      if (b === "SEM DATA") return -1;
+                      const dateA = new Date(a).getTime();
+                      const dateB = new Date(b).getTime();
+                      return dateB - dateA;
+                    });
+
+                    return sortedDates.map((date) => (
+                      <React.Fragment key={date}>
+                        <tr className="bg-slate-800/40 border-l-4 border-military-gold">
+                          <td colSpan={5} className="px-4 py-3 text-[10px] font-black text-white uppercase tracking-[0.2em] border-y border-white/5">
+                            <div className="flex items-center gap-3">
+                              <Calendar size={14} className="text-military-gold" />
+                              <div className="flex flex-col">
+                                <span>{date !== "SEM DATA" ? date.split('-').reverse().join('/') : "DATA NÃO INFORMADA"}</span>
+                                <span className="text-[7px] text-military-gold/60 font-bold tracking-widest normal-case italic">FORMULÁRIO DE GERENCIAMENTO DE RISCO</span>
+                              </div>
+                              <span className="ml-auto px-2 py-0.5 bg-white/5 rounded text-[8px] text-slate-500 font-bold uppercase tracking-tight">
+                                {grouped[date].length} {grouped[date].length === 1 ? 'Missão' : 'Missões'}
                               </span>
                             </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-text-secondary uppercase">
-                        {f.aeronave} | {f.relatorName || "Conv."}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest ${getRiskClass(f.scores.riskMax, f.tipoVoo).bg} ${getRiskClass(f.scores.riskMax, f.tipoVoo).color}`}
-                        >
-                          {f.scores.riskMax} pts - {getRiskClass(f.scores.riskMax, f.tipoVoo).label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
-                        <button
-                          onClick={() => {
-                            if (f.pdfUrl) {
-                              window.open(f.pdfUrl, "_blank");
-                            } else {
-                              const docPdf = generateFgrPDF(f);
-                              const fgrBlob = docPdf.output("blob");
-                              const fgrUrl = URL.createObjectURL(fgrBlob);
-                              window.open(fgrUrl, "_blank");
-                            }
-                          }}
-                          className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
-                        >
-                          <Eye size={14} />
-                          <span className="text-[10px] uppercase font-black">
-                            {f.pdfUrl ? "Ver PDF" : "Gerar"}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            const docPdf = generateFgrPDF(f);
-                            let dStr = "SemData";
-                            if (f.data) {
-                              dStr = f.data.includes("-")
-                                ? f.data.split("-").reverse().join("-")
-                                : f.data.replace(/\//g, "-");
-                            } else if (f.createdAt) {
-                              dStr = new Date(f.createdAt)
-                                .toLocaleDateString("pt-BR")
-                                .replace(/\//g, "-");
-                            }
-                            const mSafe = (f.missao || "FGR").replace(
-                              /[/\\?%*:|"<>]/g,
-                              "-",
-                            );
-                            docPdf.save(`${dStr}_${mSafe}.pdf`);
-                          }}
-                          className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
-                          title="Baixar PDF Original"
-                        >
-                          <Download size={14} />
-                          <span className="text-[10px] uppercase font-black">
-                            Baixar
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => confirmDelete("fgrMissions", f.id)}
-                          className="text-red-400 hover:text-red-300 p-1"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          </td>
+                        </tr>
+                        {grouped[date]
+                          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                          .map((f: any) => (
+                            <tr
+                              key={f.id}
+                              className="hover:bg-white/2 transition-colors"
+                            >
+                              <td className="px-4 py-3 font-mono">
+                                {f.data
+                                  ? f.data.split("-").reverse().join("/")
+                                  : new Date(f.createdAt).toLocaleDateString("pt-BR")}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-col">
+                                  <span className="text-white font-bold">{f.missao}</span>
+                                  {!launches.some(l => 
+                                    l.linkedFgrId === f.id || 
+                                    (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
+                                    (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
+                                  ) && (
+                                    <div className="flex flex-col mt-0.5">
+                                      <span className="text-red-500 font-bold text-sm leading-none">*</span>
+                                      <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
+                                        Sem associação com PDV
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-text-secondary uppercase">
+                                {f.aeronave} | {f.relatorName || "Conv."}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest ${getRiskClass(f.scores.riskMax, f.tipoVoo).bg} ${getRiskClass(f.scores.riskMax, f.tipoVoo).color}`}
+                                >
+                                  {f.scores.riskMax} pts - {getRiskClass(f.scores.riskMax, f.tipoVoo).label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                                <button
+                                  onClick={() => {
+                                    if (f.pdfUrl) {
+                                      window.open(f.pdfUrl, "_blank");
+                                    } else {
+                                      const docPdf = generateFgrPDF(f);
+                                      const fgrBlob = docPdf.output("blob");
+                                      const fgrUrl = URL.createObjectURL(fgrBlob);
+                                      window.open(fgrUrl, "_blank");
+                                    }
+                                  }}
+                                  className="text-military-gold hover:text-white flex items-center gap-1.5 p-1"
+                                >
+                                  <Eye size={14} />
+                                  <span className="text-[10px] uppercase font-black">
+                                    {f.pdfUrl ? "Ver PDF" : "Gerar"}
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const docPdf = generateFgrPDF(f);
+                                    let dStr = "SemData";
+                                    if (f.data) {
+                                      dStr = f.data.includes("-")
+                                        ? f.data.split("-").reverse().join("-")
+                                        : f.data.replace(/\//g, "-");
+                                    } else if (f.createdAt) {
+                                      dStr = new Date(f.createdAt)
+                                        .toLocaleDateString("pt-BR")
+                                        .replace(/\//g, "-");
+                                    }
+                                    const mSafe = (f.missao || "FGR").replace(
+                                      /[/\\?%*:|"<>]/g,
+                                      "-",
+                                    );
+                                    docPdf.save(`${dStr}_${mSafe}.pdf`);
+                                  }}
+                                  className="text-slate-200 hover:text-white flex items-center gap-1.5 p-1"
+                                  title="Baixar PDF Original"
+                                >
+                                  <Download size={14} />
+                                  <span className="text-[10px] uppercase font-black">
+                                    Baixar
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={() => confirmDelete("fgrMissions", f.id)}
+                                  className="text-red-400 hover:text-red-300 p-1"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </React.Fragment>
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Mobile/Tablet List - Show on anything smaller than XL */}
-          <div className="xl:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {fgrs.map((f) => (
-              <div
-                key={f.id}
-                className="card-military p-4 space-y-3 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex flex-col overflow-hidden">
-                      <span className="text-white font-black text-xs uppercase tracking-tight truncate">
-                        {f.missao}
-                      </span>
-                      {!launches.some(l => 
-                        l.linkedFgrId === f.id || 
-                        (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
-                        (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
-                      ) && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <span className="text-red-500 font-bold text-xs leading-none">*</span>
-                          <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
-                            Sem associação com PDV
-                          </span>
+          <div className="xl:hidden space-y-8">
+            {(() => {
+              const grouped = fgrs.reduce((acc: any, f: any) => {
+                const date = f.data || "SEM DATA";
+                if (!acc[date]) acc[date] = [];
+                acc[date].push(f);
+                return acc;
+              }, {});
+
+              const sortedDates = Object.keys(grouped).sort((a, b) => {
+                if (a === "SEM DATA") return 1;
+                if (b === "SEM DATA") return -1;
+                const dateA = new Date(a).getTime();
+                const dateB = new Date(b).getTime();
+                return dateB - dateA;
+              });
+
+              return sortedDates.map((date) => (
+                <div key={date} className="space-y-4">
+                  <div className="flex items-center gap-4 bg-slate-800/80 p-4 rounded-xl border-l-4 border-military-gold shadow-lg backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-military-gold/10 flex items-center justify-center text-military-gold">
+                        <Calendar size={18} />
+                      </div>
+                      <div className="flex flex-col">
+                        <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em]">
+                          {date !== "SEM DATA" 
+                            ? date.split("-").reverse().join("/")
+                            : "DATA NÃO INFORMADA"}
+                        </h3>
+                        <span className="text-[7px] text-military-gold font-bold uppercase tracking-widest mt-0.5">
+                          Auditada pelo SIPAA
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 h-px bg-white/5" />
+                    <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-[9px] font-black text-slate-400 uppercase tracking-tighter">
+                      {grouped[date].length} {grouped[date].length === 1 ? 'Missão' : 'Missões'}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {grouped[date]
+                      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map((f: any) => (
+                        <div
+                          key={f.id}
+                          className="card-military p-4 space-y-3 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="text-white font-black text-xs uppercase tracking-tight truncate">
+                                  {f.missao}
+                                </span>
+                                {!launches.some(l => 
+                                  l.linkedFgrId === f.id || 
+                                  (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
+                                  (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
+                                ) && (
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <span className="text-red-500 font-bold text-xs leading-none">*</span>
+                                    <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
+                                      Sem associação com PDV
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${getRiskClass(f.scores.riskMax, f.tipoVoo).bg} ${getRiskClass(f.scores.riskMax, f.tipoVoo).color}`}
+                              >
+                                {f.scores.riskMax} PTS - {getRiskClass(f.scores.riskMax, f.tipoVoo).label.toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
+                              <div className="truncate">
+                                Av: <span className="text-slate-300">{f.aeronave}</span>
+                              </div>
+                              <div className="text-right">
+                                {f.data
+                                  ? f.data.split("-").reverse().join("/")
+                                  : new Date(f.createdAt).toLocaleDateString("pt-BR")}
+                              </div>
+                            </div>
+                            <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight truncate">
+                              Rel:{" "}
+                              <span className="text-slate-300">
+                                {f.relatorName || "Conv."}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                            <button
+                              onClick={() => {
+                                if (f.pdfUrl) {
+                                  window.open(f.pdfUrl, "_blank");
+                                } else {
+                                  const doc = generateFgrPDF(f);
+                                  window.open(doc.output("bloburl"), "_blank");
+                                }
+                              }}
+                              className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
+                            >
+                              <FileText size={14} /> PDF
+                            </button>
+                            <button
+                              onClick={() => confirmDelete("fgrMissions", f.id)}
+                              className="w-10 h-9 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${getRiskClass(f.scores.riskMax, f.tipoVoo).bg} ${getRiskClass(f.scores.riskMax, f.tipoVoo).color}`}
-                    >
-                      {f.scores.riskMax} PTS - {getRiskClass(f.scores.riskMax, f.tipoVoo).label.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight grid grid-cols-2 gap-2 mb-1">
-                    <div className="truncate">
-                      Av: <span className="text-slate-300">{f.aeronave}</span>
-                    </div>
-                    <div className="text-right">
-                      {f.data
-                        ? f.data.split("-").reverse().join("/")
-                        : new Date(f.createdAt).toLocaleDateString("pt-BR")}
-                    </div>
-                  </div>
-                  <div className="text-[10px] text-text-secondary uppercase font-bold tracking-tight truncate">
-                    Rel:{" "}
-                    <span className="text-slate-300">
-                      {f.relatorName || "Conv."}
-                    </span>
+                      ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 pt-3 border-t border-white/5">
-                  <button
-                    onClick={() => {
-                      const doc = generateFgrPDF(f);
-                      window.open(doc.output("bloburl"), "_blank");
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 rounded bg-military-gold/10 text-military-gold text-[10px] font-black uppercase tracking-wider border border-military-gold/20"
-                  >
-                    <FileText size={14} /> PDF
-                  </button>
-                  <button
-                    onClick={() => confirmDelete("fgrMissions", f.id)}
-                    className="w-10 h-9 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ));
+            })()}
           </div>
 
           {fgrs.length === 0 && (
@@ -8279,7 +8408,7 @@ function AdminSection({
               <FileText size={14} className="text-military-gold" />
               Arquivos Processados
             </h4>
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[165px] overflow-y-auto pr-1 custom-scrollbar">
               {(() => {
                 const batches = Object.values(
                   launches.reduce((acc: any, curr: any) => {
