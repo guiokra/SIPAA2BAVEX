@@ -3020,6 +3020,7 @@ export default function App() {
                 setLaunches,
                 fgrs: fgrs,
                 abortivas,
+                isAdminAuthenticated,
               })}
             </motion.div>
           </AnimatePresence>
@@ -3072,9 +3073,16 @@ export default function App() {
                       const sortedDates = Object.keys(grouped).sort((a, b) => {
                         if (a === "SEM DATA") return 1;
                         if (b === "SEM DATA") return -1;
-                        const dateA = new Date(a).getTime();
-                        const dateB = new Date(b).getTime();
-                        return dateB - dateA;
+                        
+                        const parseDate = (dStr: string) => {
+                          if (dStr.includes("/")) {
+                            const [d, m, y] = dStr.split("/").map(Number);
+                            return new Date(y, m - 1, d).getTime();
+                          }
+                          return new Date(dStr).getTime();
+                        };
+
+                        return parseDate(b) - parseDate(a);
                       });
 
                       return sortedDates.map((date) => (
@@ -5775,9 +5783,11 @@ function FgrSection({
 function AbortivaSection({
   user,
   launches,
+  onConsultFgr,
 }: {
   user: FirebaseUser | null;
   launches: any[];
+  onConsultFgr?: () => void;
 }) {
   const [selectedLaunchId, setSelectedLaunchId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -6194,6 +6204,19 @@ function AbortivaSection({
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="flex justify-center pt-8">
+        <button
+          onClick={onConsultFgr}
+          className="flex items-center gap-3 px-8 py-4 bg-slate-800/50 border border-military-gold/30 rounded-xl text-military-gold hover:bg-military-gold hover:text-military-black transition-all group shadow-lg"
+        >
+          <Search size={20} className="group-hover:scale-110 transition-transform" />
+          <div className="flex flex-col items-start leading-none">
+            <span className="text-[11px] font-black uppercase tracking-[0.2em]">Consultar FGRs</span>
+            <span className="text-[8px] font-bold uppercase opacity-60 mt-1">Ver histórico de formulários</span>
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -6840,6 +6863,7 @@ function AdminSection({
   setLaunches,
   fgrs: propFgrs,
   abortivas: propAbortivas,
+  isAdminAuthenticated,
 }: {
   user: FirebaseUser | null;
   onTabChange: (tab: SectionKey) => void;
@@ -6849,6 +6873,7 @@ function AdminSection({
   setLaunches: (l: any[]) => void;
   fgrs: any[];
   abortivas: any[];
+  isAdminAuthenticated?: boolean;
 }) {
   const [stats, setStats] = useState({ relprevs: 0, fgrs: 0, abortivas: 0, trash: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
@@ -7324,6 +7349,51 @@ function AdminSection({
     } catch (error) {
       console.error("Erro ao gerar ZIP:", error);
       alert("Erro ao baixar arquivos coletivos. Tente novamente.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCreatePdvFromFgr = async (fgr: any) => {
+    if (!window.confirm("Deseja criar automaticamente um lançamento no Extrator PDV a partir deste FGR?")) return;
+    
+    setIsUploading(true);
+    try {
+      const trigramas = (fgr.trigramaTrip || "").split("/").filter(Boolean);
+      const p1 = trigramas[0] || "---";
+      const p2 = trigramas[1] || "---";
+      const mv = trigramas.slice(2).join("/") || "---";
+      
+      const numMatch = (fgr.missao || "").match(/\d+/);
+      const num = numMatch ? numMatch[0] : "00";
+
+      const payload = {
+        num,
+        lc: num,
+        anv: fgr.aeronave || "---",
+        p1,
+        p2,
+        mv,
+        missao: fgr.mv || fgr.missao || "---",
+        dest: fgr.local || "SBTA",
+        dateLabel: fgr.data || new Date(fgr.createdAt).toLocaleDateString("pt-BR"),
+        createdAt: new Date().toISOString(),
+        batchId: "AUTO_FGR",
+        batchName: "GERADO VIA FGR",
+        linkedFgrId: fgr.id
+      };
+
+      const docRef = await addDoc(collection(db, "Lancamentos"), payload);
+      
+      // Also link the FGR back to this new launch
+      await updateDoc(doc(db, "fgrMissions", fgr.id), {
+        pdvLaunchId: docRef.id
+      });
+
+      alert("Lançamento criado com sucesso no Extrator PDV!");
+    } catch (error: any) {
+      console.error("Erro ao criar PDV a partir do FGR:", error);
+      alert("Erro ao criar lançamento: " + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -7855,24 +7925,35 @@ function AdminSection({
                     const sortedDates = Object.keys(grouped).sort((a, b) => {
                       if (a === "SEM DATA") return 1;
                       if (b === "SEM DATA") return -1;
-                      const dateA = new Date(a).getTime();
-                      const dateB = new Date(b).getTime();
-                      return dateB - dateA;
+                      
+                      const parseDate = (dStr: string) => {
+                        if (dStr.includes("/")) {
+                          const [d, m, y] = dStr.split("/").map(Number);
+                          return new Date(y, m - 1, d).getTime();
+                        }
+                        return new Date(dStr).getTime();
+                      };
+
+                      return parseDate(b) - parseDate(a);
                     });
 
                     return sortedDates.map((date) => (
                       <React.Fragment key={date}>
                         <tr className="bg-slate-800/40 border-l-4 border-military-gold">
-                          <td colSpan={5} className="px-4 py-3 text-[10px] font-black text-white uppercase tracking-[0.2em] border-y border-white/5">
-                            <div className="flex items-center gap-3">
-                              <Calendar size={14} className="text-military-gold" />
-                              <div className="flex flex-col">
-                                <span>{date !== "SEM DATA" ? date.split('-').reverse().join('/') : "DATA NÃO INFORMADA"}</span>
-                                <span className="text-[7px] text-military-gold/60 font-bold tracking-widest normal-case italic">FORMULÁRIO DE GERENCIAMENTO DE RISCO</span>
+                          <td colSpan={5} className="px-4 py-4 text-[11px] font-black text-white uppercase tracking-[0.2em] border-y border-white/10 bg-slate-800/80">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-lg bg-military-gold/10 flex items-center justify-center text-military-gold shadow-inner border border-military-gold/20">
+                                <Calendar size={20} />
                               </div>
-                              <span className="ml-auto px-2 py-0.5 bg-white/5 rounded text-[8px] text-slate-500 font-bold uppercase tracking-tight">
-                                {grouped[date].length} {grouped[date].length === 1 ? 'Missão' : 'Missões'}
-                              </span>
+                              <div className="flex flex-col gap-1">
+                                <span className="text-military-gold text-xs">{date.includes("-") ? date.split('-').reverse().join('/') : date}</span>
+                                <span className="text-[8px] text-white/40 font-bold tracking-[0.3em] normal-case italic">FORMULÁRIO DE GERENCIAMENTO DE RISCO</span>
+                              </div>
+                              <div className="ml-auto flex items-center gap-2">
+                                <span className="px-3 py-1 bg-military-gold/5 rounded-full border border-military-gold/20 text-[9px] text-military-gold font-black uppercase tracking-widest shadow-sm">
+                                  {grouped[date].length} {grouped[date].length === 1 ? 'Missão' : 'Missões'}
+                                </span>
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -7895,14 +7976,28 @@ function AdminSection({
                                     l.linkedFgrId === f.id || 
                                     (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
                                     (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
-                                  ) && (
-                                    <div className="flex flex-col mt-0.5">
-                                      <span className="text-red-500 font-bold text-sm leading-none">*</span>
-                                      <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
-                                        Sem associação com PDV
-                                      </span>
+                                  ) ? (
+                                    <div className="flex items-center gap-3 mt-1 group">
+                                      <div className="flex flex-col">
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-red-500 font-bold text-sm leading-none">*</span>
+                                          <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
+                                            Sem associação com PDV
+                                          </span>
+                                        </div>
+                                        {isAdminAuthenticated && (
+                                          <button
+                                            onClick={() => handleCreatePdvFromFgr(f)}
+                                            disabled={isUploading}
+                                            className="mt-1 flex items-center gap-1.5 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-md text-red-500 hover:bg-red-500 hover:text-white transition-all text-[8px] font-black uppercase tracking-tighter shadow-sm"
+                                          >
+                                            <Plus size={10} />
+                                            Criar Lançamento no Extrator
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
-                                  )}
+                                  ) : null}
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-text-secondary uppercase">
@@ -7987,13 +8082,20 @@ function AdminSection({
                 return acc;
               }, {});
 
-              const sortedDates = Object.keys(grouped).sort((a, b) => {
-                if (a === "SEM DATA") return 1;
-                if (b === "SEM DATA") return -1;
-                const dateA = new Date(a).getTime();
-                const dateB = new Date(b).getTime();
-                return dateB - dateA;
-              });
+                    const sortedDates = Object.keys(grouped).sort((a, b) => {
+                      if (a === "SEM DATA") return 1;
+                      if (b === "SEM DATA") return -1;
+                      
+                      const parseDate = (dStr: string) => {
+                        if (dStr.includes("/")) {
+                          const [d, m, y] = dStr.split("/").map(Number);
+                          return new Date(y, m - 1, d).getTime();
+                        }
+                        return new Date(dStr).getTime();
+                      };
+
+                      return parseDate(b) - parseDate(a);
+                    });
 
               return sortedDates.map((date) => (
                 <div key={date} className="space-y-4">
@@ -8036,14 +8138,26 @@ function AdminSection({
                                   l.linkedFgrId === f.id || 
                                   (getFgrLaunchNums(f, launches).split(", ").some(num => num !== "S/N" && num === extractLaunchNum(l)) && 
                                   (!f.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === f.data)))
-                                ) && (
-                                  <div className="flex items-center gap-1 mt-0.5">
-                                    <span className="text-red-500 font-bold text-xs leading-none">*</span>
-                                    <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
-                                      Sem associação com PDV
-                                    </span>
+                                ) ? (
+                                  <div className="flex flex-col mt-1 gap-1.5">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-red-500 font-bold text-xs leading-none">*</span>
+                                      <span className="text-[7px] text-red-500/80 font-black uppercase tracking-tight leading-none whitespace-nowrap">
+                                        Sem associação com PDV
+                                      </span>
+                                    </div>
+                                    {isAdminAuthenticated && (
+                                      <button
+                                        onClick={() => handleCreatePdvFromFgr(f)}
+                                        disabled={isUploading}
+                                        className="flex items-center justify-center gap-1.5 py-1.5 bg-red-500 border border-red-500/20 rounded shadow-md text-white transition-all text-[8px] font-black uppercase tracking-tighter"
+                                      >
+                                        <Plus size={10} />
+                                        Criar Lançamento no Extrator
+                                      </button>
+                                    )}
                                   </div>
-                                )}
+                                ) : null}
                               </div>
                               <span
                                 className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter shrink-0 ${getRiskClass(f.scores.riskMax, f.tipoVoo).bg} ${getRiskClass(f.scores.riskMax, f.tipoVoo).color}`}
@@ -8408,7 +8522,7 @@ function AdminSection({
               <FileText size={14} className="text-military-gold" />
               Arquivos Processados
             </h4>
-            <div className="space-y-3 max-h-[165px] overflow-y-auto pr-1 custom-scrollbar">
+            <div className="space-y-3 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
               {(() => {
                 const batches = Object.values(
                   launches.reduce((acc: any, curr: any) => {
