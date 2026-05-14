@@ -6921,6 +6921,34 @@ function AdminSection({
   const [fgrSearchTerm, setFgrSearchTerm] = useState("");
   const [pdvExtractionStatus, setPdvExtractionStatus] = useState({ msg: "", isError: false });
   const [viewingBatchId, setViewingBatchId] = useState<string | null>(null);
+  const [selectedPdvMonth, setSelectedPdvMonth] = useState<string>("TODOS");
+
+  const pdvMonths = React.useMemo(() => {
+    const months = new Set<string>();
+    launches.forEach(l => {
+      if (l.dateLabel && l.dateLabel.includes("/")) {
+        const parts = l.dateLabel.split("/");
+        if (parts.length === 3) {
+          months.add(`${parts[1]}/${parts[2]}`);
+        }
+      }
+    });
+    return Array.from(months).sort((a, b) => {
+      const [ma, ya] = a.split("/").map(Number);
+      const [mb, yb] = b.split("/").map(Number);
+      if (ya !== yb) return yb - ya;
+      return mb - ma;
+    });
+  }, [launches]);
+
+  const filteredPdvLaunches = React.useMemo(() => {
+    if (selectedPdvMonth === "TODOS") return launches;
+    return launches.filter(l => {
+      if (!l.dateLabel) return false;
+      const month = l.dateLabel.split("/").slice(1, 3).join("/");
+      return month === selectedPdvMonth;
+    });
+  }, [launches, selectedPdvMonth]);
 
   const toggleNoFgr = async (launchId: string, currentVal: boolean) => {
     try {
@@ -8402,6 +8430,30 @@ function AdminSection({
              <h1 className="text-2xl font-black text-white uppercase mb-8 tracking-tight border-b border-white/10 pb-4">
                Extrator de lançamentos do PDV
              </h1>
+
+             {/* Seletor de Mês */}
+             <div className="mb-8 p-4 bg-military-gold/5 border border-military-gold/20 rounded-xl">
+               <label className="text-[10px] font-black text-military-gold uppercase tracking-[0.2em] mb-3 block">
+                 Filtrar por Mês de Referência
+               </label>
+               <div className="flex flex-wrap gap-2">
+                 <button
+                   onClick={() => setSelectedPdvMonth("TODOS")}
+                   className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${selectedPdvMonth === "TODOS" ? "bg-military-gold text-military-black shadow-lg" : "bg-white/5 text-slate-400 hover:text-white border border-white/5"}`}
+                 >
+                   Todos
+                 </button>
+                 {pdvMonths.map(month => (
+                   <button
+                     key={month}
+                     onClick={() => setSelectedPdvMonth(month)}
+                     className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${selectedPdvMonth === month ? "bg-military-gold text-military-black shadow-lg" : "bg-white/5 text-slate-400 hover:text-white border border-white/5"}`}
+                   >
+                     {month}
+                   </button>
+                 ))}
+               </div>
+             </div>
              
              <div className="space-y-6">
                 <div className="space-y-2">
@@ -8520,12 +8572,12 @@ function AdminSection({
           <div className="card-military p-6 text-left">
             <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
               <FileText size={14} className="text-military-gold" />
-              Arquivos Processados
+              Arquivos Processados {selectedPdvMonth !== "TODOS" && <span className="text-military-gold/60 ml-1">({selectedPdvMonth})</span>}
             </h4>
             <div className="space-y-3 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
               {(() => {
                 const batches = Object.values(
-                  launches.reduce((acc: any, curr: any) => {
+                  filteredPdvLaunches.reduce((acc: any, curr: any) => {
                     if (!curr.batchId) return acc;
                     if (!acc[curr.batchId]) {
                       acc[curr.batchId] = {
@@ -8606,7 +8658,7 @@ function AdminSection({
                     </button>
                   </div>
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {launches
+                    {filteredPdvLaunches
                       .filter(l => l.batchId === viewingBatchId)
                       .map(l => (
                         <div key={l.id} className="p-3 bg-military-black/20 border border-white/5 rounded flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -8645,16 +8697,16 @@ function AdminSection({
           <div className="card-military p-6 text-left">
             <h4 className="text-xs font-bold text-white uppercase mb-4 tracking-tight flex items-center gap-2">
               <History size={14} className="text-military-gold" />
-              Lançamentos Disponíveis ({launches.length})
+              Lançamentos Disponíveis ({filteredPdvLaunches.length}) {selectedPdvMonth !== "TODOS" && <span className="text-military-gold/60 ml-1">({selectedPdvMonth})</span>}
             </h4>
             <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-              {launches.length === 0 ? (
+              {filteredPdvLaunches.length === 0 ? (
                 <p className="text-[10px] text-slate-500 italic uppercase">
-                  Nenhum lançamento importado.
+                  {selectedPdvMonth === "TODOS" ? "Nenhum lançamento importado." : `Nenhum lançamento encontrado para ${selectedPdvMonth}.`}
                 </p>
               ) : (
                 Object.entries(
-                  launches.reduce((acc: any, curr: any) => {
+                  filteredPdvLaunches.reduce((acc: any, curr: any) => {
                     const groupKey = curr.dateLabel || "Sem Data";
                     if (!acc[groupKey]) acc[groupKey] = [];
                     acc[groupKey].push(curr);
