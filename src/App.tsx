@@ -8432,26 +8432,26 @@ function AdminSection({
              </h1>
 
              {/* Seletor de Mês */}
-             <div className="mb-8 p-4 bg-military-gold/5 border border-military-gold/20 rounded-xl max-w-sm">
+             <div className="mb-8 p-4 bg-military-gold/5 border border-military-gold/20 rounded-xl">
                <label className="text-[10px] font-black text-military-gold uppercase tracking-[0.2em] mb-3 block">
                  Filtrar por Mês de Referência
                </label>
-               <div className="relative">
-                 <select
-                   value={selectedPdvMonth}
-                   onChange={(e) => setSelectedPdvMonth(e.target.value)}
-                   className="w-full bg-slate-900 border border-white/10 rounded-lg px-4 py-2.5 text-[11px] font-bold text-white uppercase tracking-wider appearance-none focus:outline-none focus:border-military-gold/50 cursor-pointer shadow-inner"
+               <div className="flex flex-wrap gap-2">
+                 <button
+                   onClick={() => setSelectedPdvMonth("TODOS")}
+                   className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${selectedPdvMonth === "TODOS" ? "bg-military-gold text-military-black shadow-lg" : "bg-white/5 text-slate-400 hover:text-white border border-white/5"}`}
                  >
-                   <option value="TODOS">Todos os Meses</option>
-                   {pdvMonths.map(month => (
-                     <option key={month} value={month}>
-                       {month}
-                     </option>
-                   ))}
-                 </select>
-                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-military-gold">
-                   <ChevronDown size={14} />
-                 </div>
+                   Todos
+                 </button>
+                 {pdvMonths.map(month => (
+                   <button
+                     key={month}
+                     onClick={() => setSelectedPdvMonth(month)}
+                     className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${selectedPdvMonth === month ? "bg-military-gold text-military-black shadow-lg" : "bg-white/5 text-slate-400 hover:text-white border border-white/5"}`}
+                   >
+                     {month}
+                   </button>
+                 ))}
                </div>
              </div>
              
