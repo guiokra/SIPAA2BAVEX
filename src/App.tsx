@@ -57,6 +57,7 @@ import {
   Lightbulb,
   MessageSquarePlus,
   FileDown,
+  Ban,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -8670,6 +8671,11 @@ function AdminSection({
                         <div key={l.id} className="p-3 bg-military-black/20 border border-white/5 rounded flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex flex-col gap-1 min-w-0">
                             <div className="flex items-center gap-2">
+                              {l.markedNoFgr && (
+                                <span className="flex items-center gap-1 text-[8px] font-black bg-red-500/20 text-red-500 border border-red-500/30 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                  SEM FGR
+                                </span>
+                              )}
                               <span className="px-1.5 py-0.5 bg-military-gold/10 text-military-gold text-[8px] font-black rounded">
                                 LÇ {l.num || l.lc}
                               </span>
@@ -8684,13 +8690,14 @@ function AdminSection({
                           
                           <button
                             onClick={() => toggleNoFgr(l.id, l.markedNoFgr || false)}
-                            className={`px-4 py-1.5 rounded text-[8px] font-black uppercase tracking-wider transition-all shadow-lg ${
+                            className={`px-4 py-1.5 rounded text-[8px] font-black uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 ${
                               l.markedNoFgr 
-                                ? "bg-slate-700 text-slate-300 border border-slate-600" 
-                                : "bg-transparent border border-white/10 text-slate-400 hover:border-military-gold hover:text-military-gold"
+                                ? "bg-red-500/20 text-red-500 border border-red-500/30" 
+                                : "bg-transparent border border-white/10 text-slate-400 hover:border-red-500 hover:text-red-500"
                             }`}
                           >
-                            {l.markedNoFgr ? "✓ Sem FGR" : "Marcar Sem FGR"}
+                            <Ban size={10} />
+                            {l.markedNoFgr ? "Sem FGR" : "Marcar Sem FGR"}
                           </button>
                         </div>
                       ))}
@@ -8773,6 +8780,11 @@ function AdminSection({
                               >
                                 <div className="flex items-center gap-6 sm:gap-10 min-w-0 flex-1 overflow-x-auto custom-scrollbar pb-1">
                                   <div className="flex items-center gap-3 shrink-0">
+                                    {l.markedNoFgr && (
+                                      <span className="flex items-center gap-1 text-[8px] font-black bg-red-500/20 text-red-500 border border-red-500/30 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                        SEM FGR
+                                      </span>
+                                    )}
                                     {hasFgr && (
                                       <span className={`flex items-center gap-1 text-[8px] font-black ${isLinked ? 'bg-green-500/20 text-green-500 border-green-500/30' : 'bg-green-500/20 text-green-500 border-green-500/30'} px-1.5 py-0.5 rounded uppercase tracking-tighter`}>
                                         {isLinked && <Link2 size={8} className="shrink-0" />}
@@ -8819,7 +8831,7 @@ function AdminSection({
                                     className={`p-1.5 transition-colors ${l.markedNoFgr ? "text-red-500" : "text-slate-600 hover:text-red-400"}`}
                                     title={l.markedNoFgr ? "Remover Sem FGR" : "Marcar Sem FGR"}
                                   >
-                                    <ShieldAlert size={12} />
+                                    <Ban size={12} />
                                   </button>
                                   <button
                                     onClick={() => {
