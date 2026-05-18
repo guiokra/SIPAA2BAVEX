@@ -2345,259 +2345,220 @@ const MONTHS_MAP: Record<string, string> = {
 
 async function processPDVFile(file: File) {
   const arrayBuffer = await file.arrayBuffer();
-  // Ensure we use the global pdfjsLib if available, or the imported one
   const pdfjsLib = (window as any).pdfjsLib || pdfjs;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
 
-  const dayMap = new Map<string, any[]>();
-  let lastContinuationDay: string | null = null;
-
+  const allTokens: string[] = [];
   for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
     const page = await pdf.getPage(pageNo);
     const content = await page.getTextContent({
       normalizeWhitespace: true,
       disableCombineTextItems: false,
     } as any);
-    const text = normalizePDVText(
-      content.items.map((i: any) => i.str || "").join(" "),
-    );
-
-    const headers = findPDVHeaders(text);
-    const tableStarts = findAllIndexes(
-      text,
-      /LÇ\s+ANV\s+1P\s+2P\s+MV\s+AD\s+DEST[\s\S]{0,450}?MISS[AÃ]O\s+LEG/g,
-    );
-
-    const eligibleHeaders = headers.filter((h, idx) => {
-      const next = headers[idx + 1]?.index ?? text.length;
-      const section = text.slice(h.index, next);
-      return !/SEM\s+ATIVIDADE\s+A[ÉE]REA/i.test(section);
-    });
-
-    const tableDay = new Map<number, string>();
-    if (tableStarts.length) {
-      for (let i = 0; i < tableStarts.length; i++) {
-        let day = eligibleHeaders[i]?.dateLabel;
-        if (!day) {
-          const nearest = findNearestPreviousHeader(
-            tableStarts[i]!,
-            eligibleHeaders,
-          );
-          day = nearest || lastContinuationDay;
-        }
-        if (day) tableDay.set(tableStarts[i]!, day);
-      }
-    }
-
-    const rowMatches = [
-      ...text.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+([A-Z0-9]{1,5})\b/g),
-    ];
-    for (let r = 0; r < rowMatches.length; r++) {
-      const m = rowMatches[r];
-      if (!m) continue;
-      const rowStart = m.index! + (m[0].match(/^\s/) ? 1 : 0);
-      let rowEnd = rowMatches[r + 1]?.index ?? text.length;
-
-      const nextTable = tableStarts.find((t) => t > rowStart);
-      const nextHeader = headers.find((h) => h.index! > rowStart)?.index;
-      const nextLegend = indexAfter(
-        text,
-        /\bLEGENDAS\b|CRISTIAN\s+FERNANDO/i,
-        rowStart,
-      );
-
-      rowEnd = Math.min(
-        rowEnd,
-        nextTable ?? rowEnd,
-        nextHeader ?? rowEnd,
-        nextLegend ?? rowEnd,
-      );
-      const block = text.slice(rowStart, rowEnd);
-      const launch = parseLaunchBlock(block);
-      if (!launch) continue;
-
-      const previousTable = [...tableStarts]
-        .reverse()
-        .find((t) => t < rowStart);
-      const day =
-        (previousTable !== undefined ? tableDay.get(previousTable) : null) ||
-        findNearestPreviousHeader(rowStart, headers) ||
-        lastContinuationDay;
-
-      if (!day) continue;
-
-      if (!dayMap.has(day)) dayMap.set(day, []);
-      const dayLaunches = dayMap.get(day)!;
-
-      if (!dayLaunches.some((l) => l.display === launch.display)) {
-        dayLaunches.push(launch);
-      }
-
-      lastContinuationDay = day;
-    }
-
-    if (tableStarts.length) {
-      const lastTable = tableStarts[tableStarts.length - 1];
-      const lastDay = tableDay.get(lastTable!);
-      if (lastDay) lastContinuationDay = lastDay;
+    for (const item of (content.items as any[])) {
+      const text = item.str || "";
+      const tokens = text.replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\s+/g, " ").trim().split(/\s+/).filter(Boolean);
+      allTokens.push(...tokens);
     }
   }
 
   const results: { dateLabel: string; launches: any[] }[] = [];
+  const dayMap = new Map<string, any[]>();
+  
+  const clean = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\s+/g, " ").trim();
+  const norm = (s: string) => clean(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const isLc = (t: string) => /^\d{2}$/.test(clean(t));
+  const isRowStart = (tokens: string[], i: number) => isLc(tokens[i]) && norm(tokens[i + 1]) === "EXB";
+  const isAirport = (t: string) => {
+    const x = norm(t);
+    return /^(SB[A-Z0-9]{2}|SD[A-Z0-9]{2}|ZZZZ)$/.test(x);
+  };
+  const isTableHeader = (tokens: string[], i: number) => {
+    if (norm(tokens[i]) !== "LÇ" && norm(tokens[i]) !== "LC") return false;
+    const ahead = tokens.slice(i, Math.min(tokens.length, i + 18)).map(norm).join(" ");
+    return /\bANV\b/.test(ahead) && /\b1P\b/.test(ahead) && /\b2P\b/.test(ahead);
+  };
+  const isDayHeader = (tokens: string[], i: number) => {
+    const a = tokens.slice(i, Math.min(tokens.length, i + 10)).map(norm);
+    return a[0] === "PLANO" && a.includes("DIA");
+  };
+  const parseDayHeader = (tokens: string[], i: number) => {
+    const a = tokens.slice(i, Math.min(tokens.length, i + 20));
+    const n = a.map(norm);
+    const diaIdx = n.indexOf("DIA");
+    if (diaIdx < 0) return null;
+    const dayTok = a[diaIdx + 1];
+    if (!/^\d{1,2}$/.test(clean(dayTok))) return null;
+    let k = diaIdx + 2;
+    while (n[k] === "DE") k++;
+    const monthName = n[k];
+    const mm = MONTHS_MAP[monthName];
+    if (!mm) return null;
+    k++;
+    while (n[k] === "DE") k++;
+    const year = a[k] && clean(a[k]).match(/^\d{4}$/) ? clean(a[k]) : "2026";
+    const dd = String(parseInt(dayTok, 10)).padStart(2, "0");
+    const label = `${dd}/${mm}/${year}`;
+    const untilNext = n.slice(diaIdx + 1, diaIdx + 45).join(" ");
+    return { label, dateKey: `${year}-${mm}-${dd}`, inactive: /SEM ATIVIDADE AEREA/.test(untilNext), end: i + Math.min(20, a.length) };
+  };
+  const readCode = (tokens: string[], idx: number) => {
+    let currentIdx = idx;
+    while (currentIdx < tokens.length && !/[A-ZÀ-Ü]/i.test(tokens[currentIdx])) currentIdx++;
+    if (currentIdx >= tokens.length) return { value: "", next: currentIdx };
+    let a = norm(tokens[currentIdx]).replace(/[^A-Z0-9]/g, "");
+    let b = norm(tokens[currentIdx + 1] || "").replace(/[^A-Z0-9]/g, "");
+    if (/^[A-Z]{2}$/.test(a) && /^[A-Z]$/.test(b)) return { value: a + b, next: currentIdx + 2 };
+    if (/^[A-Z]$/.test(a) && /^[A-Z]{2}$/.test(b)) return { value: a + b, next: currentIdx + 2 };
+    return { value: a, next: currentIdx + 1 };
+  };
+  const cleanMissionText = (parts: string[]) => {
+    let s = parts.join(" ");
+    s = s.replace(/\s+\/\s+/g, " / ").replace(/\s*\/\s*/g, " / ");
+    s = s.replace(/\b(MA|BA|PTT|OVN|EMG|BAS)\s+([A-Z0-9])\b/g, "$1$2");
+    s = s.replace(/\s+/g, " ").trim();
+    return s;
+  };
+  const extractMissionFunc = (tokens: string[]) => {
+    for (let i = 0; i < tokens.length; i++) {
+      let raw = norm(tokens[i]).replace(/[^A-Z0-9\/]/g, "");
+      let code = null;
+      let firstExtra = null;
+      const m = raw.match(/^(DVG|DVE|DVI|DII|DIG|NOI|NOE)(?:\/?(.*))?$/);
+      if (m) {
+        code = m[1];
+        firstExtra = m[2] || "";
+      } else continue;
+      let parts = [code];
+      if (firstExtra) {
+        parts.push("/", firstExtra);
+      }
+      let slashSeen = raw.includes("/") || !!firstExtra;
+      for (let j = i + 1; j < tokens.length && parts.length < 8; j++) {
+        let t = clean(tokens[j]);
+        let nt = norm(t);
+        if (!t || /^\(.*\)$/.test(t) || t === "-" || nt === "LEGENDAS" || nt === "LEG") break;
+        if (/^\d{2}$/.test(t) && norm(tokens[j + 1]) === "EXB") break;
+        if (t === "/") {
+          slashSeen = true;
+          parts.push("/");
+          continue;
+        }
+        if (!slashSeen && /^[A-Z0-9]{1,6}$/i.test(t)) {
+          parts.push(t);
+          continue;
+        }
+        if (slashSeen && /^[A-Z0-9\/]{1,8}$/i.test(t)) {
+          parts.push(t);
+          continue;
+        }
+        break;
+      }
+      return cleanMissionText(parts);
+    }
+    return "";
+  };
+
+  const parseRowFunc = (rowTokens: string[], day: any) => {
+    const tokens = rowTokens.map(clean).filter(Boolean);
+    if (tokens.length < 3 || !isRowStart(tokens, 0)) return null;
+    let i = 0;
+    const lc = String(parseInt(tokens[i], 10)).padStart(2, "0");
+    i++;
+    let anv = "EXB";
+    i++; // EXB
+    if (i < tokens.length && /\d/.test(tokens[i]) && !/H/.test(tokens[i].toUpperCase())) {
+      anv += " " + clean(tokens[i]);
+      i++;
+    }
+    const p1 = readCode(tokens, i);
+    const oneP = p1.value;
+    i = p1.next;
+    const p2 = readCode(tokens, i);
+    const twoP = p2.value;
+    i = p2.next;
+    let adIdx = -1;
+    for (let k = i; k < tokens.length; k++) {
+      if (isAirport(tokens[k])) {
+        adIdx = k;
+        break;
+      }
+    }
+    const mvTokens = adIdx >= 0 ? tokens.slice(i, adIdx) : tokens.slice(i, Math.min(tokens.length, i + 4));
+    const mv = mvTokens.map((t) => norm(t).replace(/[^A-Z0-9]/g, "")).filter(Boolean).join(" ");
+    const adDest = adIdx >= 0 ? norm(tokens[adIdx]) : "";
+    const mission = extractMissionFunc(tokens.slice(adIdx >= 0 ? adIdx + 1 : i));
+    if (!lc || !anv) return null;
+    return {
+      lc,
+      num: lc,
+      anv: anv.trim(),
+      p1: oneP,
+      p2: twoP,
+      mv,
+      adDest,
+      missao: mission,
+      display: "",
+      uniqueKey: `${lc}_${anv.trim()}_${oneP}_${twoP}_${adDest}_${mission}`.replace(/\s+/g, ""),
+    };
+  };
+
+  const parsePDVTokens = (tokens: string[]) => {
+    const result: any[] = [];
+    let pendingDays: any[] = [];
+    let lastFlightDay: any = null;
+    let activeDay: any = null;
+    let i = 0;
+    while (i < tokens.length) {
+      const day = isDayHeader(tokens, i) ? parseDayHeader(tokens, i) : null;
+      if (day) {
+        if (!day.inactive) {
+          pendingDays.push(day);
+          lastFlightDay = day;
+        }
+        i++;
+        continue;
+      }
+      if (isTableHeader(tokens, i)) {
+        activeDay = pendingDays.length ? pendingDays.shift() : activeDay || lastFlightDay;
+        i++;
+        continue;
+      }
+      if (isRowStart(tokens, i)) {
+        const dayForRow = activeDay || (pendingDays.length === 1 ? pendingDays[0] : lastFlightDay);
+        let j = i + 2;
+        while (j < tokens.length && !isRowStart(tokens, j) && !isTableHeader(tokens, j) && !isDayHeader(tokens, j)) j++;
+        if (dayForRow) {
+          const row = parseRowFunc(tokens.slice(i, j), dayForRow);
+          if (row) {
+            row.dateLabel = dayForRow.label;
+            row.display = `LÇ ${row.lc} - ${row.anv} - ${row.p1} - ${row.p2} - ${row.mv} - ${row.adDest} - ${row.missao}`.replace(/\s+-\s+-/g, " - -").replace(/\s+/g, " ").trim();
+            result.push(row);
+          }
+        }
+        i = j;
+        continue;
+      }
+      i++;
+    }
+    return result;
+  };
+
+  const extracted = parsePDVTokens(allTokens);
+  for (const item of extracted) {
+    if (!dayMap.has(item.dateLabel)) dayMap.set(item.dateLabel, []);
+    const dayLaunches = dayMap.get(item.dateLabel)!;
+    if (!dayLaunches.some((l) => l.uniqueKey === item.uniqueKey)) {
+      dayLaunches.push(item);
+    }
+  }
+
   for (const [dateLabel, launches] of dayMap.entries()) {
-    launches.sort(
-      (a, b) =>
-        Number(a.lc) - Number(b.lc) || a.display.localeCompare(b.display),
-    );
-    results.push({
-      dateLabel,
-      launches: launches.map((l) => ({ ...l, num: l.lc })),
-    });
+    launches.sort((a, b) => Number(a.lc) - Number(b.lc));
+    results.push({ dateLabel, launches });
   }
 
   return results;
-}
-
-function normalizePDVText(s: string) {
-  return String(s || "")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")
-    .replace(/\u00A0/g, " ")
-    .replace(/\s*\/\s*/g, "/")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
-}
-
-function normalizePDVMission(s: string) {
-  return String(s || "")
-    .replace(/\s*\/\s*/g, " / ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
-}
-
-function stripAccents(s: string) {
-  return String(s || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function cleanCrew(s: string) {
-  return String(s || "")
-    .replace(/[^A-Z]/g, "")
-    .toUpperCase();
-}
-
-function isTrigram(s: string) {
-  return /^[A-Z]{3}$/.test(cleanCrew(s));
-}
-
-function isIcao(s: string) {
-  return /^[A-Z]{4}$/.test(String(s || "").replace(/[^A-Z]/g, ""));
-}
-
-function unique(arr: any[]) {
-  return [...new Set(arr.filter(Boolean))];
-}
-
-function findAllIndexes(text: string, re: RegExp) {
-  return [...text.matchAll(re)].map((m) => m.index);
-}
-
-function findNearestPreviousHeader(pos: number, headers: any[]) {
-  let day = null;
-  for (const h of headers) {
-    if (h.index !== undefined && h.index < pos) day = h.dateLabel;
-    else break;
-  }
-  return day;
-}
-
-function indexAfter(text: string, re: RegExp, start: number) {
-  const m = re.exec(text.slice(start));
-  return m ? start + m.index : null;
-}
-
-function findPDVHeaders(text: string) {
-  const re =
-    /PLANO\s+DI[AÁ]RIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE\s+(?:DE\s+)?([A-ZÇÃÁÉÍÓÚ]+)\s+DE\s+(\d{4})/gi;
-  const headers = [];
-  for (const m of text.matchAll(re)) {
-    const dd = String(parseInt(m[1], 10)).padStart(2, "0");
-    const monthName = stripAccents(m[2].toUpperCase());
-    const mm = MONTHS_MAP[monthName] || MONTHS_MAP[m[2].toUpperCase()] || "??";
-    if (mm === "??") continue;
-    headers.push({ index: m.index, dateLabel: `${dd}/${mm}/${m[3]}` });
-  }
-  return headers;
-}
-
-function parseLaunchBlock(block: string) {
-  block = normalizePDVText(block)
-    .replace(/\bLEGENDAS\b[\s\S]*$/i, "")
-    .replace(/CRISTIAN\s+FERNANDO[\s\S]*$/i, "");
-  const tokens = block.split(" ").filter(Boolean);
-  if (tokens.length < 10) return null;
-  if (
-    !/^\d{2}$/.test(tokens[0]) ||
-    tokens[1] !== "EXB" ||
-    !/^[A-Z0-9]{1,5}$/.test(tokens[2])
-  )
-    return null;
-
-  const lc = tokens[0];
-  const anv = `EXB ${tokens[2]}`;
-  const p1 = cleanCrew(tokens[3]);
-  const p2 = cleanCrew(tokens[4]);
-  if (!isTrigram(p1) || !isTrigram(p2)) return null;
-
-  let i = 5;
-  const mvParts: string[] = [];
-  while (i < tokens.length && !isIcao(tokens[i])) {
-    const t = cleanCrew(tokens[i]);
-    if (isTrigram(t)) mvParts.push(t);
-    i++;
-  }
-  if (!mvParts.length || i >= tokens.length) return null;
-  const adDest = tokens[i].replace(/[^A-Z0-9]/g, "");
-  if (!isIcao(adDest)) return null;
-
-  let tbn = -1;
-  for (let j = i + 1; j < tokens.length; j++) {
-    if (tokens[j].replace(/[^A-Z]/g, "") === "TBN") tbn = j;
-  }
-  if (tbn < 0 || tbn + 1 >= tokens.length) return null;
-
-  const missionParts = [];
-  for (let j = tbn + 1; j < tokens.length; j++) {
-    const t = tokens[j];
-    if (/^\(/.test(t) || t === "-" || /^LEGENDAS$/i.test(t)) break;
-    if (/^(TRIPULAÇÃO|TRIPULACAO|ANV|SAR|AUX|TEL)$/i.test(stripAccents(t)))
-      break;
-    missionParts.push(t);
-  }
-  const missao = normalizePDVMission(missionParts.join(" "));
-  if (!missao) return null;
-
-  const display = `LÇ ${lc} - ${anv} - ${p1} - ${p2} - ${unique(mvParts).join(
-    " ",
-  )} - ${adDest} - ${missao}`;
-
-  return {
-    lc,
-    num: lc,
-    anv,
-    p1,
-    p2,
-    mv: unique(mvParts).join(" "),
-    adDest,
-    missao,
-    display,
-    uniqueKey: `${lc}_${anv}_${p1}_${p2}_${adDest}_${missao}`.replace(
-      /\s+/g,
-      "",
-    ),
-  };
 }
 
 export default function App() {
