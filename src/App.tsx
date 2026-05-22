@@ -1393,7 +1393,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
       p1: launchData?.p1 || f.trigramaTrip || f.preenchidoPor || "---",
       p2: launchData?.p2 || "",
       mv: launchData?.mv || f.mv || "---",
-      local: launchData?.dest || f.local || "---",
+      local: launchData?.dest || launchData?.adDest || f.local || "---",
       missao: launchData?.missao || f.missao || "S/M",
       date: formatDate(parseOperationalDate(launchData?.dateLabel ? launchData.dateLabel.split("/").reverse().join("-") : f.data)),
       id: f.id,
@@ -1416,7 +1416,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
       p1: launchData?.p1 || a.tripulacao || a.p1 || a.preenchidoPor || "---",
       p2: launchData?.p2 || a.p2 || "",
       mv: launchData?.mv || a.mv || "---",
-      local: launchData?.dest || a.local || "---",
+      local: launchData?.dest || launchData?.adDest || a.local || "---",
       missao: launchData?.missao || a.missao || a.motivo || "S/M",
       date: formatDate(parseOperationalDate(a.dataVoo)),
       id: a.id
@@ -1476,7 +1476,7 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
           p1: l.p1 || "---",
           p2: l.p2 || "",
           mv: l.mv || "---",
-          local: l.dest || "---",
+          local: l.dest || l.adDest || "---",
           missao: l.missao || "S/M",
           date: formatDate(parseOperationalDate(l.dateLabel?.split("/").reverse().join("-"))),
           id: l.id
@@ -2459,7 +2459,7 @@ async function processPDVFile(file: File) {
     return "";
   };
 
-  const parseRowFunc = (rowTokens: string[], day: any) => {
+  const parseRowFunc = (rowTokens: string[], day: any): any => {
     const tokens = rowTokens.map(clean).filter(Boolean);
     if (tokens.length < 3 || !isRowStart(tokens, 0)) return null;
     let i = 0;
@@ -4442,7 +4442,7 @@ function FgrSection({
         modeloAnv: detectedModel || prev.modeloAnv,
         aeronave: anv,
         data: launch.dateLabel || "",
-        local: launch.dest || "",
+        local: launch.dest || launch.adDest || "",
         trigramaTrip:
           `${launch.p1 || ""}/${launch.p2 || ""}/${launch.mv !== "---" ? launch.mv : ""}`
             .replace(/\/+$/, "")
@@ -5787,7 +5787,7 @@ function AbortivaSection({
         numLancamento: launch.num || "",
         modeloAnv: detectedModel || prev.modeloAnv,
         mv: launch.missao || "", // Using launch.missao for mission description
-        destino: launch.dest || "",
+        destino: launch.dest || launch.adDest || "",
         tripulacao:
           `${launch.p1 || ""}/${launch.p2 || ""}/${launch.mv !== "---" ? launch.mv : ""}`
             .replace(/\/+$/, "")
@@ -8769,7 +8769,7 @@ function AdminSection({
                                       <span className="shrink-0">{l.p1}</span>
                                       <span className="shrink-0">{l.p2}</span>
                                       <span className="shrink-0">{l.mv}</span>
-                                      <span className="shrink-0">{l.dest}</span>
+                                      <span className="shrink-0">{l.dest || l.adDest}</span>
                                       <span className="whitespace-nowrap shrink-0">
                                         {l.missao}
                                       </span>
