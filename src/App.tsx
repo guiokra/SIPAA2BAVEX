@@ -7157,6 +7157,35 @@ function AdminSection({
     setDeleteColl("suggestions");
   };
 
+  const clearAllSuggestions = async () => {
+    if (suggestions.length === 0) return;
+    if (!window.confirm(`Deseja realmente mover todas as ${suggestions.length} sugestões para a lixeira?`)) return;
+
+    try {
+      setDbStatus("CONNECTING");
+      const batch = writeBatch(db);
+      suggestions.forEach(item => {
+        const { id, ...cleanData } = item;
+        const trashDocRef = doc(collection(db, "trash"));
+        batch.set(trashDocRef, {
+          originalId: item.id,
+          originalCollection: "suggestions",
+          data: cleanData,
+          type: "SUGESTÃO",
+          deletedAt: new Date().toISOString(),
+          deletedBy: user?.email || "anonymous",
+        });
+        batch.delete(doc(db, "suggestions", item.id));
+      });
+      await batch.commit();
+      alert("Todas as sugestões foram movidas para a lixeira com sucesso!");
+    } catch (error: any) {
+      alert("Erro ao apagar sugestões: " + error.message);
+    } finally {
+      setDbStatus("CONNECTED");
+    }
+  };
+
   const handleSaveManualLaunch = async (e: React.FormEvent) => {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
@@ -8946,7 +8975,7 @@ function AdminSection({
           </div>
         </div>
       )}
-      {selectedView === "suggestions" && (
+       {selectedView === "suggestions" && (
         <div className="space-y-6">
           <div className="flex justify-between items-center bg-military-gold/10 p-4 rounded border border-military-gold/20">
             <div>
@@ -8958,6 +8987,15 @@ function AdminSection({
                 {suggestions.length} sugestões de melhorias pendentes
               </p>
             </div>
+            {suggestions.length > 0 && (
+              <button
+                onClick={clearAllSuggestions}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600 border border-red-500/30 hover:border-red-500 text-red-400 hover:text-white rounded text-[10px] font-black uppercase transition-all shadow-lg cursor-pointer shrink-0"
+              >
+                <Trash2 size={12} />
+                Apagar Todas
+              </button>
+            )}
           </div>
 
           <div className="space-y-4">
