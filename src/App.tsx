@@ -58,6 +58,7 @@ import {
   MessageSquarePlus,
   FileDown,
   Ban,
+  Pill,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -2323,6 +2324,7 @@ type SectionKey =
   | "Mapa de Risco"
   | "Portal Único de Notificação"
   | "Abastecimento"
+  | "Medicamentos"
   | "Normas CAvEx"
   | "Admin"
   | "Sugestoes";
@@ -2734,6 +2736,7 @@ export default function App() {
     { id: "Abortiva", name: "Abortiva", icon: Zap },
     { id: "Mapa de Risco", name: "Mapa de Risco", icon: MapIcon },
     { id: "Abastecimento", name: "Abastecimento", icon: Droplets },
+    { id: "Medicamentos", name: "Medicamentos de Uso Restritivo", icon: Pill },
     { id: "Normas CAvEx", name: "Normas CAvEx", icon: Gavel },
     { id: "Sugestoes", name: "Sugestões", icon: MessageSquarePlus },
   ];
@@ -6624,6 +6627,50 @@ function FaunaSection({
   );
 }
 
+function MedicamentosSection() {
+  return (
+    <div className="space-y-6">
+      <div className="pb-4 border-b border-slate-800">
+        <h2 className="text-2xl font-bold text-white mb-1">
+          Medicamentos de Uso Restritivo
+        </h2>
+        <p className="text-slate-400 text-sm">
+          Acompanhamento das restrições e orientações relativas ao uso de fármacos para a tripulação.
+        </p>
+      </div>
+
+      <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100vh-220px)] min-h-[550px] flex flex-col">
+        <div className="p-4 bg-military-dark-gray/40 border-b border-white/5 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-military-gold">
+            <Pill size={16} />
+            <span className="text-xs font-black uppercase tracking-widest">
+              Guia Completo de Medicamentos de Uso Restritivo
+            </span>
+          </div>
+          <a
+            href="https://drive.google.com/file/d/1jlUwQaC6W0uhtul4n7C7IQPmA1miizMp/view?usp=drive_link"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-military-gold/10 hover:bg-military-gold/20 text-military-gold rounded border border-military-gold/20 text-[10px] font-bold uppercase transition-all tracking-wider"
+          >
+            Abrir em Nova Aba
+            <ExternalLink size={10} />
+          </a>
+        </div>
+
+        <div className="flex-1 w-full bg-slate-950 relative">
+          <iframe
+            src="https://drive.google.com/file/d/1jlUwQaC6W0uhtul4n7C7IQPmA1miizMp/preview"
+            className="w-full h-full border-none absolute inset-0"
+            allow="autoplay"
+            title="Medicamentos de Uso Restritivo PDF"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NormasSection({
   onTabChange,
 }: {
@@ -10016,6 +10063,7 @@ const sectionComponents: Record<string, FC<any>> = {
   "Mapa de Risco": MapaRiscoSection,
   "Portal Único de Notificação": NotificacaoSection,
   Abastecimento: AbastecimentoSection,
+  Medicamentos: MedicamentosSection,
   "Normas CAvEx": NormasSection,
   Admin: AdminSection,
   Sugestoes: SugestoesSection,
