@@ -59,6 +59,7 @@ import {
   FileDown,
   Ban,
   Pill,
+  Database,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -2311,6 +2312,140 @@ const generateRelprevPDF = (report: any) => {
     pageWidth / 2,
     pageHeight - 10,
     { align: "center" },
+  );
+
+  return doc;
+};
+
+const generateMonthlyStatsPDF = (
+  targetMonth: number,
+  targetYear: number,
+  fgrs: any[],
+  abortivas: any[],
+  launches: any[]
+) => {
+  const MONTH_NAMES_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ];
+  const parseDateLocal = (dateStr: string) => {
+    if (!dateStr) return null;
+    if (dateStr.includes("-")) {
+      const parts = dateStr.split("-");
+      if (parts[0].length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+      if (parts[2].length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+    }
+    if (dateStr.includes("/")) {
+      const parts = dateStr.split("/");
+      if (parts[2]?.length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+      if (parts[0]?.length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return d;
+  };
+
+  const isSameMonthLocal = (dateObj: Date | null) => {
+    if (!dateObj) return false;
+    return dateObj.getMonth() === targetMonth && dateObj.getFullYear() === targetYear;
+  };
+
+  const filteredFgrs = fgrs.filter((f) => isSameMonthLocal(parseDateLocal(f.data)));
+  const filteredAbortivas = abortivas.filter((a) => isSameMonthLocal(parseDateLocal(a.dataVoo)));
+  const filteredLaunches = launches.filter((l) => isSameMonthLocal(parseDateLocal(l.dateLabel)));
+
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Header
+  doc.setFillColor(26, 31, 37); // #1a1f25
+  doc.rect(0, 0, pageWidth, 40, "F");
+
+  doc.setTextColor(212, 175, 55); // #d4af37
+  doc.setFontSize(22);
+  doc.setFont("helvetica", "bold");
+  doc.text("SIPAA 2º BAvEx", 20, 24);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10);
+  doc.text(`RELATORIO DE ESTATISTICAS MENSAIS - ${MONTH_NAMES_PT[targetMonth].toUpperCase()} DE ${targetYear}`, 20, 31);
+
+  // Stats Table
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("I - Panorama Geral do Mes", 20, 52);
+
+  autoTable(doc, {
+    startY: 57,
+    head: [["Metrica", "Quantidade"]],
+    body: [
+      ["Lancamentos Totais PDV do Mes", String(filteredLaunches.length)],
+      ["FGRs Efetuados no Mes", String(filteredFgrs.length)],
+      ["Abortivas no Mes", String(filteredAbortivas.length)],
+    ],
+    theme: "striped",
+    headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] },
+  });
+
+  const nextY1 = (doc as any).lastAutoTable.finalY + 10;
+  doc.text("II - Distribuicao de Risco (FGR)", 20, nextY1);
+
+  const riskCounts = { Alto: 0, Medio: 0, Baixo: 0 };
+  filteredFgrs.forEach(f => {
+    const score = f.scores?.riskMax || 0;
+    const isP4 = f.tipoVoo !== "REGULAR";
+    const thresholds = isP4 ? [50, 95, 125] : [45, 90, 120];
+    let label = "Baixo";
+    if (score >= thresholds[1]) {
+      label = "Alto";
+    } else if (score >= thresholds[0]) {
+      label = "Medio";
+    }
+    riskCounts[label as "Alto" | "Medio" | "Baixo"]++;
+  });
+
+  autoTable(doc, {
+    startY: nextY1 + 5,
+    head: [["Grau de Risco", "Quantidade", "Percentual"]],
+    body: [
+      ["Grau de Risco - Alto", String(riskCounts.Alto), `${filteredFgrs.length > 0 ? ((riskCounts.Alto / filteredFgrs.length) * 100).toFixed(1) : 0}%`],
+      ["Grau de Risco - Medio", String(riskCounts.Medio), `${filteredFgrs.length > 0 ? ((riskCounts.Medio / filteredFgrs.length) * 100).toFixed(1) : 0}%`],
+      ["Grau de Risco - Baixo", String(riskCounts.Baixo), `${filteredFgrs.length > 0 ? ((riskCounts.Baixo / filteredFgrs.length) * 100).toFixed(1) : 0}%`],
+    ],
+    theme: "striped",
+    headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] },
+  });
+
+  const nextY2 = (doc as any).lastAutoTable.finalY + 10;
+  doc.text("III - Motivos de Abortivas de Voo", 20, nextY2);
+
+  const motiveCounts = { DOS: 0, DFM: 0, DCP: 0, DCM: 0 };
+  filteredAbortivas.forEach(a => {
+    const mot = a.motivo as "DOS" | "DFM" | "DCP" | "DCM";
+    if (motiveCounts[mot] !== undefined) motiveCounts[mot]++;
+  });
+
+  autoTable(doc, {
+    startY: nextY2 + 5,
+    head: [["Motivo", "Descricao", "Quantidade", "Percentual"]],
+    body: [
+      ["DOS", "Devido a Ordem Superior", String(motiveCounts.DOS), `${filteredAbortivas.length > 0 ? ((motiveCounts.DOS / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
+      ["DFM", "Devido a Falha de Material", String(motiveCounts.DFM), `${filteredAbortivas.length > 0 ? ((motiveCounts.DFM / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
+      ["DCP", "Devido a Condicoes Pessoais", String(motiveCounts.DCP), `${filteredAbortivas.length > 0 ? ((motiveCounts.DCP / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
+      ["DCM", "Devido a Condicoes Meteorologicas", String(motiveCounts.DCM), `${filteredAbortivas.length > 0 ? ((motiveCounts.DCM / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
+    ],
+    theme: "striped",
+    headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] },
+  });
+
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text(
+    `Gerado em: ${new Date().toLocaleString("pt-BR")}`,
+    pageWidth - 20,
+    doc.internal.pageSize.getHeight() - 10,
+    { align: "right" },
   );
 
   return doc;
@@ -6909,6 +7044,7 @@ function AdminSection({
     | "pdv"
     | "trash"
     | "suggestions"
+    | "database"
   >("stats");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
@@ -6932,6 +7068,108 @@ function AdminSection({
   const [pdvExtractionStatus, setPdvExtractionStatus] = useState({ msg: "", isError: false });
   const [viewingBatchId, setViewingBatchId] = useState<string | null>(null);
   const [selectedPdvMonth, setSelectedPdvMonth] = useState<string>("TODOS");
+
+  const [backupMonth, setBackupMonth] = useState(new Date().getMonth());
+  const [backupYear, setBackupYear] = useState(new Date().getFullYear());
+
+  const handleDownloadStatsPDF = () => {
+    try {
+      const docPdf = generateMonthlyStatsPDF(backupMonth, backupYear, fgrs, abortivas, launches);
+      const MONTH_NAMES_PT = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+      ];
+      docPdf.save(`Estatisticas_Operacionais_${MONTH_NAMES_PT[backupMonth]}_de_${backupYear}.pdf`);
+    } catch (error: any) {
+      alert("Erro ao gerar relatório de estatísticas: " + error.message);
+    }
+  };
+
+  const handleDownloadFullBackup = async () => {
+    try {
+      setIsUploading(true);
+      const zip = new JSZip();
+
+      // 1. Add All FGRs
+      const fgrFolder = zip.folder("FGRs");
+      if (fgrFolder) {
+        const nameCounts: Record<string, number> = {};
+        fgrs.forEach((f) => {
+          const docPdf = generateFgrPDF(f);
+          const pdfBlob = docPdf.output("blob");
+
+          let dateStr = "SemData";
+          if (f.data) {
+            dateStr = f.data.includes("-")
+              ? f.data.split("-").reverse().join("-")
+              : f.data.replace(/\//g, "-");
+          } else if (f.createdAt) {
+            dateStr = new Date(f.createdAt)
+              .toLocaleDateString("pt-BR")
+              .replace(/\//g, "-");
+          }
+
+          const missionSafe = (f.missao || "FGR").replace(/[/\\?%*:|"<>]/g, "-");
+          let filenameBase = `${dateStr}_${missionSafe}`;
+          if (nameCounts[filenameBase] === undefined) {
+            nameCounts[filenameBase] = 1;
+          } else {
+            nameCounts[filenameBase]++;
+            filenameBase += `_${nameCounts[filenameBase]}`;
+          }
+          fgrFolder.file(`${filenameBase}.pdf`, pdfBlob);
+        });
+      }
+
+      // 2. Add All Abortivas
+      const abortivasFolder = zip.folder("Abortivas");
+      if (abortivasFolder) {
+        const nameCounts: Record<string, number> = {};
+        abortivas.forEach((a) => {
+          const docPdf = generateAbortivaPDF(a);
+          const pdfBlob = docPdf.output("blob");
+
+          let dateStr = "SemData";
+          if (a.createdAt) {
+            dateStr = new Date(a.createdAt)
+              .toLocaleDateString("pt-BR")
+              .replace(/\//g, "-");
+          }
+
+          const missionSafe = (a.numLancamento || "Abortiva").replace(/[/\\?%*:|"<>]/g, "-");
+          let filenameBase = `${dateStr}_${missionSafe}`;
+          if (nameCounts[filenameBase] === undefined) {
+            nameCounts[filenameBase] = 1;
+          } else {
+            nameCounts[filenameBase]++;
+            filenameBase += `_${nameCounts[filenameBase]}`;
+          }
+          abortivasFolder.file(`${filenameBase}.pdf`, pdfBlob);
+        });
+      }
+
+      // 3. Add Monthly Stats PDF
+      const statsDoc = generateMonthlyStatsPDF(backupMonth, backupYear, fgrs, abortivas, launches);
+      const statsBlob = statsDoc.output("blob");
+      const MONTH_NAMES_PT = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+      ];
+      const statsFilename = `Estatisticas_Operacionais_${MONTH_NAMES_PT[backupMonth]}_de_${backupYear}.pdf`;
+      zip.file(statsFilename, statsBlob);
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(
+        content,
+        `BACKUP_COMPLETO_SIPAA_${new Date().toLocaleDateString("pt-BR").replace(/\//g, "-")}.zip`
+      );
+    } catch (error: any) {
+      console.error("Erro ao gerar backup de dados:", error);
+      alert("Erro ao gerar backup de dados: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const pdvMonths = React.useMemo(() => {
     const months = new Set<string>();
@@ -7678,6 +7916,13 @@ function AdminSection({
         >
           <Lightbulb size={10} />
           Sugestões {suggestions.length > 0 && `(${suggestions.length})`}
+        </button>
+        <button
+          onClick={() => setSelectedView("database")}
+          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "database" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white flex items-center gap-1.5"}`}
+        >
+          <Database size={10} />
+          Banco de Dados
         </button>
       </div>
 
@@ -9082,6 +9327,149 @@ function AdminSection({
                 </div>
               ))
             )}
+          </div>
+        </div>
+      )}
+      {selectedView === "database" && (
+        <div className="space-y-6">
+          <div className="pb-4 border-b border-white/5">
+            <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+              <Database size={16} className="text-military-gold animate-pulse" />
+              Gerenciamento e Backup do Banco de Dados
+            </h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+              Backup operacional, exportação consolidada e relatórios em tempo real
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* FGR Backup Card */}
+            <div className="card-military p-6 space-y-4 flex flex-col justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded bg-military-gold/10 text-military-gold border border-military-gold/20">
+                    <Database size={16} />
+                  </div>
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                    Exportar Todos os FGR
+                  </h4>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
+                  Gere arquivos PDF individuais de todos os Gerenciamentos de Risco Operacional (FGRs) cadastrados no sistema. Todo o lote será compactado e baixado em formato Zip.
+                </p>
+              </div>
+              <button
+                onClick={handleDownloadAllFGRs}
+                disabled={isUploading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-military-gold hover:bg-military-gold-dark text-military-black hover:text-military-black font-black uppercase tracking-wider rounded text-[10px] transition-all cursor-pointer shadow-lg disabled:opacity-50"
+              >
+                <Download size={14} />
+                Baixar FGRs ({fgrs.length})
+              </button>
+            </div>
+
+            {/* Abortivas Backup Card */}
+            <div className="card-military p-6 space-y-4 flex flex-col justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded bg-military-gold/10 text-military-gold border border-military-gold/20">
+                    <Database size={16} />
+                  </div>
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                    Exportar Todas as Abortivas
+                  </h4>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
+                  Gere arquivos PDF individuais de todos os Relatos de Abortiva de Voo armazenados no banco de dados, compactados e estruturados em um único arquivo Zip simples.
+                </p>
+              </div>
+              <button
+                onClick={handleDownloadAllAbortivas}
+                disabled={isUploading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-military-gold hover:bg-military-gold-dark text-military-black hover:text-military-black font-black uppercase tracking-wider rounded text-[10px] transition-all cursor-pointer shadow-lg disabled:opacity-50"
+              >
+                <Download size={14} />
+                Baixar Abortivas ({abortivas.length})
+              </button>
+            </div>
+
+            {/* Monthly Stats Card */}
+            <div className="card-military p-6 space-y-4 flex flex-col justify-between md:col-span-1">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded bg-military-gold/10 text-military-gold border border-military-gold/20">
+                    <Calendar size={16} />
+                  </div>
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                    Estatísticas Mensais (PDF)
+                  </h4>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
+                  Selecione o período de referência para exportar o relatório operacional consolidado de estatísticas mensais contendo o panorama do mês, riscos analisados e motivos de abortivas em PDF.
+                </p>
+                <div className="grid grid-cols-2 gap-2 p-3 bg-military-black rounded border border-white/5">
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-black text-slate-500">Mês</label>
+                    <select
+                      value={backupMonth}
+                      onChange={(e) => setBackupMonth(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-white uppercase font-black cursor-pointer"
+                    >
+                      {[
+                        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+                      ].map((mName, idx) => (
+                        <option key={idx} value={idx}>{mName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-black text-slate-500">Ano</label>
+                    <select
+                      value={backupYear}
+                      onChange={(e) => setBackupYear(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-white uppercase font-black cursor-pointer"
+                    >
+                      {Array.from({ length: 11 }, (_, i) => 2020 + i).map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleDownloadStatsPDF}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-military-gold hover:bg-military-gold-dark text-military-black hover:text-military-black font-black uppercase tracking-wider rounded text-[10px] transition-all cursor-pointer shadow-lg mt-4"
+              >
+                <Download size={14} />
+                Baixar Relatório Mensal
+              </button>
+            </div>
+
+            {/* Complete Backup Card */}
+            <div className="card-military p-6 space-y-4 flex flex-col justify-between md:col-span-1 border-military-gold/30">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded bg-military-gold/20 text-military-gold border border-military-gold/40">
+                    <Database size={16} />
+                  </div>
+                  <h4 className="text-xs font-black text-military-gold uppercase tracking-wider">
+                    Download Backup Completo (Tudo)
+                  </h4>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed font-semibold">
+                  Baixe tudo de uma vez. Esta ação gerará um arquivo compactado (Zip) mestre contendo uma pasta com todos os FGRs em formato de PDF individuais, uma pasta com os PDFs das Abortivas de Voo e o documento PDF com as estatísticas do mês selecionado.
+                </p>
+              </div>
+              <button
+                onClick={handleDownloadFullBackup}
+                disabled={isUploading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-military-gold hover:bg-military-gold-dark text-military-black hover:text-military-black font-black uppercase tracking-wider rounded text-[10px] transition-all cursor-pointer shadow-lg disabled:opacity-50"
+              >
+                {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                Baixar Backup Geral (ZIP)
+              </button>
+            </div>
           </div>
         </div>
       )}
