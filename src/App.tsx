@@ -6811,6 +6811,155 @@ function NormasSection({
 }: {
   onTabChange: (tab: SectionKey) => void;
 }) {
+  const [activeNorm, setActiveNorm] = React.useState<{ title: string; category: string; url: string } | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState("");
+
+  const getGoogleDrivePreviewUrl = (urlStr: string) => {
+    if (!urlStr) return "";
+    if (urlStr.includes("/preview")) return urlStr;
+    const idMatch = urlStr.match(/[?&]id=([^&]+)/);
+    if (idMatch && idMatch[1]) {
+      return `https://drive.google.com/file/d/${idMatch[1]}/preview`;
+    }
+    const pathMatch = urlStr.match(/\/file\/d\/([^/]+)/);
+    if (pathMatch && pathMatch[1]) {
+      return `https://drive.google.com/file/d/${pathMatch[1]}/preview`;
+    }
+    return urlStr;
+  };
+
+  const normasList = [
+    {
+      title: "Norma Operacional 1",
+      category: "SEGURANÇA DE VOO",
+      url: "https://drive.google.com/uc?export=download&id=1i5SO0RbSeX_pZwXUdF-KDpR7V83Zktpr"
+    },
+    {
+      title: "Norma Operacional 3",
+      category: "AERÓDROMO DE TBE E ÁREAS DE INSTRUÇÃO",
+      url: "https://drive.google.com/uc?export=download&id=1FCPinzpqh4LaGWpEWPPwCbA4AOPiwjsF"
+    },
+    {
+      title: "Norma Operacional 4",
+      category: "TRANSPORTES ESPECIAIS",
+      url: "https://drive.google.com/uc?export=download&id=1zonhjXC1P92fyGytOWMj9Coxj3p8b_Ay"
+    },
+    {
+      title: "Norma Operacional 5",
+      category: "NÍVEIS OPERACIONAIS, REQUISITOS E FUNÇÕES PARA TRIPULANTES",
+      url: "https://drive.google.com/uc?export=download&id=1ofKNRn-b0iBC-PJNoqnfk5QJ586Gezoh"
+    },
+    {
+      title: "Norma Operacional 6",
+      category: "VOO POR INSTRUMENTO",
+      url: "https://drive.google.com/uc?export=download&id=1zQHrMfGR4GCZLMCnqP456vD77rzhl9d0"
+    },
+    {
+      title: "Norma Operacional 7",
+      category: "CÓDIGOS DE IDENTIFICAÇÃO DE MISSÕES DE VOO",
+      url: "https://drive.google.com/uc?export=download&id=1zuqHwZhDwHtgWb93ABrAhqn5EnkhC8at"
+    },
+    {
+      title: "Norma Operacional 8",
+      category: "CONSELHO DE VOO",
+      url: "https://drive.google.com/uc?export=download&id=1tManea_uOI4k_r4mTL2y3nDwR-xMTWtw"
+    },
+    {
+      title: "Norma Operacional 9",
+      category: "VOOS TÉCNICOS",
+      url: "https://drive.google.com/uc?export=download&id=1l91octhJG7tiyyaciaoMyWPWk8VaIVFr"
+    },
+    {
+      title: "Norma Operacional 11",
+      category: "VOO COM ÓCULOS DE VISÃO NOTURNA",
+      url: "https://drive.google.com/uc?export=download&id=1qwWffNhDDl60JBNhvgvVxbtPPxPjfJgL"
+    },
+    {
+      title: "Norma Operacional 12",
+      category: "ABASTECIMENTO DE AERONAVES",
+      url: "https://drive.google.com/uc?export=download&id=1Di39GNdHF77NHIIqXQjMg_SJgK57WWsP"
+    },
+    {
+      title: "Norma Operacional 13",
+      category: "TRATORAMENTO E TRACIONAMENTO DE AERONAVES",
+      url: "https://drive.google.com/uc?export=download&id=1_8UTQXD-9j-6sh508PYOyxh0e9FOg16s"
+    },
+    {
+      title: "Norma Operacional 14",
+      category: "ANCORAGEM DE AERONAVES",
+      url: "https://drive.google.com/uc?export=download&id=1rK_BgUljBDIwQ2FNjJZsVNLomimAH-RG"
+    }
+  ];
+
+  const filteredNormas = normasList.filter(norma =>
+    norma.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    norma.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (activeNorm) {
+    const previewUrl = getGoogleDrivePreviewUrl(activeNorm.url);
+    const directUrl = activeNorm.url.includes("export=download") 
+      ? `https://drive.google.com/file/d/${activeNorm.url.match(/[?&]id=([^&]+)/)?.[1]}/view?usp=drivesdk` 
+      : activeNorm.url;
+
+    return (
+      <div className="space-y-6">
+        <div className="pb-4 border-b border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
+              <button
+                onClick={() => setActiveNorm(null)}
+                className="text-slate-400 hover:text-white transition-colors mr-1 cursor-pointer"
+                title="Voltar para as Normas"
+              >
+                ←
+              </button>
+              {activeNorm.title}
+            </h2>
+            <p className="text-slate-400 text-sm">
+              Categoria: {activeNorm.category}
+            </p>
+          </div>
+          <button
+            onClick={() => setActiveNorm(null)}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white hover:text-military-gold text-xs font-bold uppercase transition-all rounded cursor-pointer"
+          >
+            Voltar às Normas
+          </button>
+        </div>
+
+        <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100vh-220px)] min-h-[550px] flex flex-col">
+          <div className="p-4 bg-military-dark-gray/40 border-b border-white/5 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-military-gold">
+              <FileText size={16} />
+              <span className="text-xs font-black uppercase tracking-widest">
+                Visualização Direta da {activeNorm.title}
+              </span>
+            </div>
+            <a
+              href={directUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-military-gold/10 hover:bg-military-gold/20 text-military-gold rounded border border-military-gold/20 text-[10px] font-bold uppercase transition-all tracking-wider"
+            >
+              Abrir em Nova Aba
+              <ExternalLink size={10} />
+            </a>
+          </div>
+
+          <div className="flex-1 w-full bg-slate-950 relative">
+            <iframe
+              src={previewUrl}
+              className="w-full h-full border-none absolute inset-0"
+              allow="autoplay"
+              title={`${activeNorm.title} PDF`}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-slate-800">
@@ -6824,8 +6973,10 @@ function NormasSection({
         </div>
         <div className="relative group">
           <input
-            className="bg-military-gray border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-sm outline-none focus:border-military-gold w-full md:w-80 group-hover:border-slate-500 transition-all"
+            className="bg-military-gray border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-sm outline-none focus:border-military-gold w-full md:w-80 group-hover:border-slate-500 transition-all text-white"
             placeholder="Pesquisar Norma..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
           <FileText
             className="absolute left-3 top-3.5 text-slate-500 group-hover:text-military-gold transition-colors"
@@ -6834,68 +6985,25 @@ function NormasSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <NormaCard
-          title="Norma Operacional 1"
-          category="SEGURANÇA DE VOO"
-          url="https://drive.google.com/uc?export=download&id=1i5SO0RbSeX_pZwXUdF-KDpR7V83Zktpr"
-        />
-        <NormaCard
-          title="Norma Operacional 3"
-          category="AERÓDROMO DE TBE E ÁREAS DE INSTRUÇÃO"
-          url="https://drive.google.com/uc?export=download&id=1FCPinzpqh4LaGWpEWPPwCbA4AOPiwjsF"
-        />
-        <NormaCard
-          title="Norma Operacional 4"
-          category="TRANSPORTES ESPECIAIS"
-          url="https://drive.google.com/uc?export=download&id=1zonhjXC1P92fyGytOWMj9Coxj3p8b_Ay"
-        />
-        <NormaCard
-          title="Norma Operacional 5"
-          category="NÍVEIS OPERACIONAIS, REQUISITOS E FUNÇÕES PARA TRIPULANTES"
-          url="https://drive.google.com/uc?export=download&id=1ofKNRn-b0iBC-PJNoqnfk5QJ586Gezoh"
-        />
-        <NormaCard
-          title="Norma Operacional 6"
-          category="VOO POR INSTRUMENTO"
-          url="https://drive.google.com/uc?export=download&id=1zQHrMfGR4GCZLMCnqP456vD77rzhl9d0"
-        />
-        <NormaCard
-          title="Norma Operacional 7"
-          category="CÓDIGOS DE IDENTIFICAÇÃO DE MISSÕES DE VOO"
-          url="https://drive.google.com/uc?export=download&id=1zuqHwZhDwHtgWb93ABrAhqn5EnkhC8at"
-        />
-        <NormaCard
-          title="Norma Operacional 8"
-          category="CONSELHO DE VOO"
-          url="https://drive.google.com/uc?export=download&id=1tManea_uOI4k_r4mTL2y3nDwR-xMTWtw"
-        />
-        <NormaCard
-          title="Norma Operacional 9"
-          category="VOOS TÉCNICOS"
-          url="https://drive.google.com/uc?export=download&id=1l91octhJG7tiyyaciaoMyWPWk8VaIVFr"
-        />
-        <NormaCard
-          title="Norma Operacional 11"
-          category="VOO COM ÓCULOS DE VISÃO NOTURNA"
-          url="https://drive.google.com/uc?export=download&id=1qwWffNhDDl60JBNhvgvVxbtPPxPjfJgL"
-        />
-        <NormaCard
-          title="Norma Operacional 12"
-          category="ABASTECIMENTO DE AERONAVES"
-          url="https://drive.google.com/uc?export=download&id=1Di39GNdHF77NHIIqXQjMg_SJgK57WWsP"
-        />
-        <NormaCard
-          title="Norma Operacional 13"
-          category="TRATORAMENTO E TRACIONAMENTO DE AERONAVES"
-          url="https://drive.google.com/uc?export=download&id=1_8UTQXD-9j-6sh508PYOyxh0e9FOg16s"
-        />
-        <NormaCard
-          title="Norma Operacional 14"
-          category="ANCORAGEM DE AERONAVES"
-          url="https://drive.google.com/uc?export=download&id=1rK_BgUljBDIwQ2FNjJZsVNLomimAH-RG"
-        />
-      </div>
+      {filteredNormas.length === 0 ? (
+        <div className="text-center py-12 bg-military-black border border-white/5 rounded-xl">
+          <FileText size={48} className="mx-auto text-slate-600 mb-3 animate-pulse" />
+          <h4 className="text-sm font-bold text-slate-300 uppercase">Nenhuma norma encontrada</h4>
+          <p className="text-xs text-slate-500 mt-1">Refine seus termos de pesquisa</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredNormas.map((norma, idx) => (
+            <NormaCard
+              key={idx}
+              title={norma.title}
+              category={norma.category}
+              url={norma.url}
+              onView={() => setActiveNorm(norma)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -10255,6 +10363,7 @@ function NormaCard({
   desc,
   url,
   buttonText = "Visualizar Norma",
+  onView,
 }: any) {
   return (
     <div className="card-military h-full flex flex-col group hover:border-military-gold transition-all">
@@ -10274,8 +10383,14 @@ function NormaCard({
         <div className="flex-1 mb-4" />
       )}
       <button
-        className="w-full py-2 bg-white/5 border border-white/10 rounded text-[10px] font-black uppercase tracking-widest text-white hover:bg-military-gold hover:text-military-gray transition-all"
-        onClick={() => window.open(url || "#", "_blank")}
+        className="w-full py-2 bg-white/5 border border-white/10 rounded text-[10px] font-black uppercase tracking-widest text-white hover:bg-military-gold hover:text-military-gray transition-all cursor-pointer"
+        onClick={() => {
+          if (onView) {
+            onView();
+          } else {
+            window.open(url || "#", "_blank");
+          }
+        }}
       >
         {buttonText}
       </button>
