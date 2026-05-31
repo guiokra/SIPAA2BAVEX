@@ -2354,6 +2354,67 @@ const generateMonthlyStatsPDF = (
   const filteredAbortivas = abortivas.filter((a) => isSameMonthLocal(parseDateLocal(a.dataVoo)));
   const filteredLaunches = launches.filter((l) => isSameMonthLocal(parseDateLocal(l.dateLabel)));
 
+  // Counting logic exactly matching AdminStatsDashboard
+  const launchesWithFgr = new Set<string>();
+  const launchesWithAbortiva = new Set<string>();
+  const launchesMarkedNoFgr = new Set<string>();
+
+  // 1. Direct links check
+  filteredLaunches.forEach(l => {
+    if (l.markedNoFgr === true) {
+      launchesMarkedNoFgr.add(l.id);
+    } else if (l.linkedFgrId) {
+      launchesWithFgr.add(l.id);
+    } else {
+      const linkedAbortiva = filteredAbortivas.find(a => a.pdvLaunchId === l.id);
+      if (linkedAbortiva) {
+        launchesWithAbortiva.add(l.id);
+      }
+    }
+  });
+
+  // 2. Matching logic based on launch numbers (for unlinked reports)
+  fgrs.forEach(f => {
+    const fgrNums = getFgrLaunchNums(f, launches).split(", ");
+    if (fgrNums.length > 0 && fgrNums[0] !== "S/N") {
+      filteredLaunches.forEach(l => {
+        if (!launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id) && !launchesMarkedNoFgr.has(l.id)) {
+          const lNum = extractLaunchNum(l);
+          if (fgrNums.includes(lNum)) {
+             const lDate = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
+             if (!f.data || lDate === f.data) {
+                launchesWithFgr.add(l.id);
+             }
+          }
+        }
+      });
+    }
+  });
+
+  abortivas.forEach(a => {
+    const aNum = extractLaunchNum(a);
+    if (aNum !== "S/N") {
+      filteredLaunches.forEach(l => {
+        if (!launchesWithFgr.has(l.id) && !launchesWithAbortiva.has(l.id) && !launchesMarkedNoFgr.has(l.id)) {
+          const lNum = extractLaunchNum(l);
+          const lDate = l.dateLabel ? l.dateLabel.split("/").reverse().join("-") : "";
+          if (aNum === lNum && (!a.dataVoo || a.dataVoo === lDate)) {
+             launchesWithAbortiva.add(l.id);
+          }
+        }
+      });
+    }
+  });
+
+  const fgrItemsCount = launchesWithFgr.size;
+  const abortivaItemsCount = launchesWithAbortiva.size;
+  const noFgrItemsCount = launchesMarkedNoFgr.size;
+  const othersLaunchCount = filteredLaunches.filter(l => 
+    !launchesWithFgr.has(l.id) && 
+    !launchesWithAbortiva.has(l.id) && 
+    !launchesMarkedNoFgr.has(l.id)
+  ).length;
+
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -2368,50 +2429,59 @@ const generateMonthlyStatsPDF = (
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(10);
-  doc.text(`RELATORIO DE ESTATISTICAS MENSAIS - ${MONTH_NAMES_PT[targetMonth].toUpperCase()} DE ${targetYear}`, 20, 31);
+  doc.text(`RELATÓRIO DE ESTATÍSTICAS MENSAIS - ${MONTH_NAMES_PT[targetMonth].toUpperCase()} DE ${targetYear}`, 20, 31);
 
   // Stats Table
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("I - Panorama Geral do Mes", 20, 52);
+  doc.text("I - Panorama Geral do Mês (PDV)", 20, 52);
 
   autoTable(doc, {
     startY: 57,
-    head: [["Metrica", "Quantidade"]],
+    head: [["Métrica / Categoria", "Quantidade"]],
     body: [
-      ["Lancamentos Totais PDV do Mes", String(filteredLaunches.length)],
-      ["FGRs Efetuados no Mes", String(filteredFgrs.length)],
-      ["Abortivas no Mes", String(filteredAbortivas.length)],
+      ["Lançamentos Totais no Mês (PDV)", String(filteredLaunches.length)],
+      ["FGRs Efetuados", String(fgrItemsCount)],
+      ["Abortivas", String(abortivaItemsCount)],
+      ["Lançamentos Pendentes", String(othersLaunchCount)],
+      ["Sem FGR", String(noFgrItemsCount)],
     ],
     theme: "striped",
     headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] },
   });
 
   const nextY1 = (doc as any).lastAutoTable.finalY + 10;
-  doc.text("II - Distribuicao de Risco (FGR)", 20, nextY1);
+  doc.text("II - Distribuição de Risco (FGR)", 20, nextY1);
 
   const riskCounts = { Alto: 0, Medio: 0, Baixo: 0 };
-  filteredFgrs.forEach(f => {
-    const score = f.scores?.riskMax || 0;
-    const isP4 = f.tipoVoo !== "REGULAR";
-    const thresholds = isP4 ? [50, 95, 125] : [45, 90, 120];
-    let label = "Baixo";
-    if (score >= thresholds[1]) {
-      label = "Alto";
-    } else if (score >= thresholds[0]) {
-      label = "Medio";
+  
+  filteredLaunches.filter(l => launchesWithFgr.has(l.id)).forEach(l => {
+    const f = fgrs.find(fgr => fgr.id === l.linkedFgrId) || 
+              fgrs.find(fgr => {
+                const nums = getFgrLaunchNums(fgr, launches).split(", ");
+                const lNum = extractLaunchNum(l);
+                return nums.includes(lNum) && (!fgr.data || (l.dateLabel && l.dateLabel.split("/").reverse().join("-") === fgr.data));
+              });
+    if (f) {
+      const r = getRiskClass(f.scores?.riskMax || 0, f.tipoVoo).label;
+      if (r === "Alto" || r === "Muito Alto") {
+        riskCounts.Alto++;
+      } else if (r === "Médio") {
+        riskCounts.Medio++;
+      } else {
+        riskCounts.Baixo++;
+      }
     }
-    riskCounts[label as "Alto" | "Medio" | "Baixo"]++;
   });
 
   autoTable(doc, {
     startY: nextY1 + 5,
     head: [["Grau de Risco", "Quantidade", "Percentual"]],
     body: [
-      ["Grau de Risco - Alto", String(riskCounts.Alto), `${filteredFgrs.length > 0 ? ((riskCounts.Alto / filteredFgrs.length) * 100).toFixed(1) : 0}%`],
-      ["Grau de Risco - Medio", String(riskCounts.Medio), `${filteredFgrs.length > 0 ? ((riskCounts.Medio / filteredFgrs.length) * 100).toFixed(1) : 0}%`],
-      ["Grau de Risco - Baixo", String(riskCounts.Baixo), `${filteredFgrs.length > 0 ? ((riskCounts.Baixo / filteredFgrs.length) * 100).toFixed(1) : 0}%`],
+      ["Grau de Risco - Alto / Muito Alto", String(riskCounts.Alto), `${fgrItemsCount > 0 ? ((riskCounts.Alto / fgrItemsCount) * 100).toFixed(1) : 0}%`],
+      ["Grau de Risco - Médio", String(riskCounts.Medio), `${fgrItemsCount > 0 ? ((riskCounts.Medio / fgrItemsCount) * 100).toFixed(1) : 0}%`],
+      ["Grau de Risco - Baixo", String(riskCounts.Baixo), `${fgrItemsCount > 0 ? ((riskCounts.Baixo / fgrItemsCount) * 100).toFixed(1) : 0}%`],
     ],
     theme: "striped",
     headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] },
@@ -2428,12 +2498,12 @@ const generateMonthlyStatsPDF = (
 
   autoTable(doc, {
     startY: nextY2 + 5,
-    head: [["Motivo", "Descricao", "Quantidade", "Percentual"]],
+    head: [["Motivo", "Descrição", "Quantidade", "Percentual"]],
     body: [
       ["DOS", "Devido a Ordem Superior", String(motiveCounts.DOS), `${filteredAbortivas.length > 0 ? ((motiveCounts.DOS / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
       ["DFM", "Devido a Falha de Material", String(motiveCounts.DFM), `${filteredAbortivas.length > 0 ? ((motiveCounts.DFM / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
-      ["DCP", "Devido a Condicoes Pessoais", String(motiveCounts.DCP), `${filteredAbortivas.length > 0 ? ((motiveCounts.DCP / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
-      ["DCM", "Devido a Condicoes Meteorologicas", String(motiveCounts.DCM), `${filteredAbortivas.length > 0 ? ((motiveCounts.DCM / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
+      ["DCP", "Devido a Condições Pessoais", String(motiveCounts.DCP), `${filteredAbortivas.length > 0 ? ((motiveCounts.DCP / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
+      ["DCM", "Devido a Condições Meteorológicas", String(motiveCounts.DCM), `${filteredAbortivas.length > 0 ? ((motiveCounts.DCM / filteredAbortivas.length) * 100).toFixed(1) : 0}%`],
     ],
     theme: "striped",
     headStyles: { fillColor: [26, 31, 37], textColor: [212, 175, 55] },
