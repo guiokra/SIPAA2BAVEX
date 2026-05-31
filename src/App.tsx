@@ -60,6 +60,7 @@ import {
   Ban,
   Pill,
   Database,
+  Phone,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -2531,6 +2532,7 @@ type SectionKey =
   | "Abastecimento"
   | "Medicamentos"
   | "Normas CAvEx"
+  | "Telefones"
   | "Admin"
   | "Sugestoes";
 
@@ -2943,6 +2945,7 @@ export default function App() {
     { id: "Abastecimento", name: "Abastecimento", icon: Droplets },
     { id: "Medicamentos", name: "Medicamentos de Uso Restritivo", icon: Pill },
     { id: "Normas CAvEx", name: "Normas CAvEx", icon: Gavel },
+    { id: "Telefones", name: "Telefones", icon: Phone },
     { id: "Sugestoes", name: "Sugestões", icon: MessageSquarePlus },
   ];
 
@@ -6583,7 +6586,7 @@ function AbastecimentoSection({
   onTabChange: (tab: SectionKey) => void;
 }) {
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6">
       <div className="pb-4 border-b border-slate-800">
         <h2 className="text-2xl font-bold text-white mb-1">Abastecimento</h2>
         <p className="text-slate-400 text-sm">
@@ -6591,14 +6594,31 @@ function AbastecimentoSection({
         </p>
       </div>
 
-      <div className="flex justify-center mt-12">
-        <div className="w-full max-w-md">
-          <NormaCard
-            title="Locais e Procedimentos"
-            category="Logística"
-            desc="Guia completo com os pontos de abastecimento homologados e os procedimentos de segurança exigidos."
-            url="https://drive.google.com/uc?export=download&id=10SYEOvYHBMFB0Cim7xYfffPj9LHIprkN"
-            buttonText="VER LOCAIS DE ABASTECIMENTO"
+      <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100vh-220px)] min-h-[550px] flex flex-col">
+        <div className="p-4 bg-military-dark-gray/40 border-b border-white/5 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-military-gold">
+            <Droplets size={16} />
+            <span className="text-xs font-black uppercase tracking-widest">
+              Locais de Abastecimento e Procedimentos de Segurança
+            </span>
+          </div>
+          <a
+            href="https://drive.google.com/file/d/10SYEOvYHBMFB0Cim7xYfffPj9LHIprkN/view?usp=drive_link"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-military-gold/10 hover:bg-military-gold/20 text-military-gold rounded border border-military-gold/20 text-[10px] font-bold uppercase transition-all tracking-wider"
+          >
+            Abrir em Nova Aba
+            <ExternalLink size={10} />
+          </a>
+        </div>
+
+        <div className="flex-1 w-full bg-slate-950 relative">
+          <iframe
+            src="https://drive.google.com/file/d/10SYEOvYHBMFB0Cim7xYfffPj9LHIprkN/preview"
+            className="w-full h-full border-none absolute inset-0"
+            allow="autoplay"
+            title="Locais de Abastecimento PDF"
           />
         </div>
       </div>
@@ -10526,6 +10546,96 @@ function AdminStat({ label, value, trend, onClick }: any) {
   );
 }
 
+function TelefonesSection() {
+  const contacts = [
+    {
+      role: "Ch SIPAA",
+      number: "67 9877-7410",
+      description: "Chefe da Seção de Investigação e Prevenção de Acidentes Aeronáuticos do 2º BAvEx.",
+      waUrl: "https://wa.me/556798777410",
+    },
+    {
+      role: "Adj SIPAA",
+      number: "92 98116-0477",
+      description: "Adjunto da Seção de Investigação e Prevenção de Acidentes Aeronáuticos do 2º BAvEx.",
+      waUrl: "https://wa.me/5592981160477",
+    },
+    {
+      role: "Cmt Gd",
+      number: "12 99674-2637",
+      description: "Comandante da Guarda / Contato geral de prontidão da unidade para reporte e emergências.",
+      waUrl: "https://wa.me/5512996742637",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="pb-4 border-b border-white/5">
+        <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
+          <Phone className="text-military-gold animate-bounce" size={24} />
+          Telefones Úteis e Emergência - SIPAA
+        </h2>
+        <p className="text-slate-400 text-sm">
+          Acesso rápido aos canais de comunicação com investigadores e equipes de prevenção do 2º BAvEx. Clique nos números para abrir diretamente no WhatsApp.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {contacts.map((c, idx) => (
+          <div
+            key={idx}
+            className="card-military p-6 space-y-4 flex flex-col justify-between hover:border-military-gold transition-all duration-300 group"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <span className="text-military-gold text-[10px] font-black uppercase tracking-widest bg-military-gold/10 px-2.5 py-1 rounded">
+                  {c.role}
+                </span>
+                <div className="w-8 h-8 rounded bg-military-black border border-white/5 flex items-center justify-center text-slate-500 group-hover:text-military-gold transition-colors">
+                  <Phone size={14} />
+                </div>
+              </div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                Contato de Prontidão
+              </h3>
+              <p className="text-[11px] text-slate-400 font-semibold leading-relaxed min-h-[50px]">
+                {c.description}
+              </p>
+              <div className="text-sm font-bold text-slate-200 bg-military-black/80 py-3 px-4 rounded border border-white/5 font-mono select-all text-center">
+                +55 {c.number}
+              </div>
+            </div>
+
+            <a
+              href={c.waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#25D366] hover:bg-[#20ba5a] text-black font-black uppercase tracking-wider rounded text-[10px] transition-all cursor-pointer shadow-lg shadow-green-950/20"
+            >
+              Iniciar via WhatsApp
+              <ExternalLink size={12} />
+            </a>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-military-black border border-white/5 rounded-xl p-5 flex items-start gap-3">
+        <div className="p-2 rounded bg-military-gold/15 text-military-gold border border-military-gold/25 mt-0.5">
+          <Phone size={14} className="animate-pulse" />
+        </div>
+        <div>
+          <h4 className="text-xs font-black text-white uppercase tracking-wider mb-1">
+            Instruções operacionais para reporte
+          </h4>
+          <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
+            As comunicações via WhatsApp são seguras e de recebimento imediato. Para envio de arquivos de mídias, fotos, coordenadas geográficas ou relatos rápidos, dê preferência aos contatos acima.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SugestoesSection() {
   const [suggestion, setSuggestion] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -10638,6 +10748,7 @@ const sectionComponents: Record<string, FC<any>> = {
   Abastecimento: AbastecimentoSection,
   Medicamentos: MedicamentosSection,
   "Normas CAvEx": NormasSection,
+  Telefones: TelefonesSection,
   Admin: AdminSection,
   Sugestoes: SugestoesSection,
 };
