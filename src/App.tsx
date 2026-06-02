@@ -2557,211 +2557,241 @@ async function processPDVFile(file: File) {
   const pdfjsLib = (window as any).pdfjsLib || pdfjs;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
 
-  const allTokens: string[] = [];
+  const MONTHS_MAP_LOCAL: Record<string, string> = {
+    JANEIRO: "01",
+    FEVEREIRO: "02",
+    MARCO: "03",
+    "MARÇO": "03",
+    ABRIL: "04",
+    MAIO: "05",
+    JUNHO: "06",
+    JULHO: "07",
+    AGOSTO: "08",
+    SETEMBRO: "09",
+    OUTUBRO: "10",
+    NOVEMBRO: "11",
+    DEZEMBRO: "12"
+  };
+
+  const dayMap = new Map<string, any[]>();
+  let lastContinuationDay: string | null = null;
+
+  const toLinearText = (s: string) => {
+    return String(s || "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+  };
+
+  const cleanCell = (s: string) => {
+    return String(s || "").replace(/\s+/g, " ").trim().toUpperCase();
+  };
+
+  const joinCell = (parts: string[]) => {
+    return cleanCell(parts.filter(x => x !== undefined && x !== null && String(x).trim() !== "").join(" "));
+  };
+
+  const stripAccents = (s: string) => {
+    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  };
+
+  const isAirportCode = (s: string) => {
+    return /^[A-Z]{4}$/.test(String(s || "").replace(/[^A-Z]/g, ""));
+  };
+
+  const findHeaders = (text: string) => {
+    const re = /PLANO\s+DI[AÁ]RIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE\s+(?:DE\s+)?([A-ZÇÃÁÉÍÓÚ]+)\s+DE\s+(\d{4})/gi;
+    const headers: { index: number; key: string }[] = [];
+    for (const m of text.matchAll(re)) {
+      const dd = String(parseInt(m[1], 10)).padStart(2, "0");
+      const rawMonth = m[2].toUpperCase();
+      const mm = MONTHS_MAP_LOCAL[rawMonth] || MONTHS_MAP_LOCAL[stripAccents(rawMonth)] || null;
+      if (!mm) continue;
+      const key = `${dd}/${mm}/${m[3]}`;
+      headers.push({ index: m.index!, key });
+    }
+    return headers;
+  };
+
+  const findAllIndexes = (text: string, re: RegExp) => {
+    return [...text.matchAll(re)].map(m => m.index!);
+  };
+
+  const findNearestPreviousHeader = (pos: number, headers: { index: number; key: string }[]) => {
+    let day = null;
+    for (const h of headers) {
+      if (h.index < pos) day = h.key;
+      else break;
+    }
+    return day;
+  };
+
+  const firstAfter = (list: number[], pos: number) => {
+    for (const x of list) {
+      if (x > pos) return x;
+    }
+    return null;
+  };
+
+  const indexAfter = (text: string, re: RegExp, start: number) => {
+    const m = re.exec(text.slice(start));
+    return m ? start + m.index : null;
+  };
+
+  const findLastPobIndex = (tokens: string[]) => {
+    const known = new Set(["TBN", "ASD", "FTB", "ATB"]);
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const t = stripAccents(tokens[i]).toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (known.has(t)) return i;
+    }
+    return -1;
+  };
+
+  const extractMission = (tokens: string[]) => {
+    const pobIdx = findLastPobIndex(tokens);
+    let start = pobIdx >= 0 ? pobIdx + 1 : -1;
+    if (start < 0) {
+      start = Math.max(0, tokens.length - 4);
+    }
+    let end = tokens.length;
+    for (let i = start; i < tokens.length; i++) {
+      const t = tokens[i];
+      if (/^\(/.test(t) || t === "-" || /^LEGENDAS:?$/i.test(stripAccents(t))) {
+        end = i;
+        break;
+      }
+    }
+    return cleanCell(tokens.slice(start, end).join(" "));
+  };
+
+  const parseLaunchBlock = (block: string) => {
+    const cleanBlock = toLinearText(block)
+      .replace(/\bLEGENDAS\b[\s\S]*$/i, "")
+      .replace(/ORIGINAL\s+ASSINADO[\s\S]*$/i, "")
+      .replace(/CRISTIAN\s+FERNANDO[\s\S]*$/i, "")
+      .trim();
+
+    const tokens = cleanBlock.split(/\s+/).filter(Boolean);
+    if (tokens.length < 3) return null;
+    if (!/^\d{2}$/.test(tokens[0]) || stripAccents(tokens[1]).toUpperCase() !== "EXB") return null;
+
+    const lc = tokens[0];
+    const anv = joinCell(["EXB", tokens[2] || ""]);
+    const p1 = tokens[3] || "";
+    const p2 = tokens[4] || "";
+
+    const idxAfterCrew = 5;
+    let adIdx = -1;
+    for (let i = idxAfterCrew; i < tokens.length; i++) {
+      if (isAirportCode(tokens[i])) {
+        adIdx = i;
+        break;
+      }
+    }
+
+    let mv = "";
+    let adDest = "";
+    if (adIdx >= 0) {
+      mv = joinCell(tokens.slice(idxAfterCrew, adIdx));
+      adDest = tokens[adIdx] || "";
+    } else {
+      const pobIdx = findLastPobIndex(tokens);
+      const stop = pobIdx > idxAfterCrew ? Math.min(pobIdx, idxAfterCrew + 4) : Math.min(tokens.length, idxAfterCrew + 4);
+      mv = joinCell(tokens.slice(idxAfterCrew, stop));
+      adDest = "";
+    }
+
+    const missao = extractMission(tokens);
+    const display = `LÇ ${lc} - ${anv} - ${p1} - ${p2} - ${mv} - ${adDest} - ${missao}`
+      .replace(/\s+-\s+-\s+/g, " - - ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return {
+      lc,
+      num: lc,
+      anv,
+      p1,
+      p2,
+      mv,
+      adDest,
+      missao,
+      display,
+      uniqueKey: `${lc}_${anv}_${p1}_${p2}_${adDest}_${missao}`.replace(/\s+/g, "")
+    };
+  };
+
+  const addLaunch = (day: string, launch: any) => {
+    if (!dayMap.has(day)) dayMap.set(day, []);
+    const arr = dayMap.get(day)!;
+    const key = `${launch.lc}|${launch.anv}|${launch.p1}|${launch.p2}|${launch.mv}|${launch.adDest}|${launch.missao}`;
+    if (arr.some(x => `${x.lc}|${x.anv}|${x.p1}|${x.p2}|${x.mv}|${x.adDest}|${x.missao}` === key)) return false;
+    arr.push(launch);
+    arr.sort((a, b) => Number(a.lc) - Number(b.lc) || a.display.localeCompare(b.display));
+    return true;
+  };
+
+  // Process text line by line / page by page
   for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
     const page = await pdf.getPage(pageNo);
     const content = await page.getTextContent({
       normalizeWhitespace: true,
-      disableCombineTextItems: false,
+      disableCombineTextItems: false
     } as any);
-    for (const item of (content.items as any[])) {
-      const text = item.str || "";
-      const tokens = text.replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\s+/g, " ").trim().split(/\s+/).filter(Boolean);
-      allTokens.push(...tokens);
+    const pageText = toLinearText(content.items.map((i: any) => i.str || "").join(" "));
+    if (!pageText) continue;
+
+    const headers = findHeaders(pageText);
+    const tableStarts = findAllIndexes(pageText, /\bLÇ\s+ANV\s+1P\s+2P\s+MV\b/gi);
+    const eligibleHeaders = headers.filter((h, idx) => {
+      const next = headers[idx + 1]?.index ?? pageText.length;
+      const section = pageText.slice(h.index, next);
+      return !/SEM\s+ATIVIDADE\s+A[ÉE]REA/i.test(section);
+    });
+
+    const tableDay = new Map<number, string>();
+    if (tableStarts.length) {
+      for (let i = 0; i < tableStarts.length; i++) {
+        let day = eligibleHeaders[i]?.key;
+        if (!day) day = findNearestPreviousHeader(tableStarts[i], eligibleHeaders) || lastContinuationDay;
+        if (day) tableDay.set(tableStarts[i], day);
+      }
+      const lastTable = tableStarts[tableStarts.length - 1];
+      if (tableDay.get(lastTable)) lastContinuationDay = tableDay.get(lastTable)!;
+    }
+
+    const rowMatches = [...pageText.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+(\S+)/gi)];
+    for (let r = 0; r < rowMatches.length; r++) {
+      const m = rowMatches[r];
+      const rowStart = m.index! + (/^\s/.test(m[0]) ? 1 : 0);
+      let rowEnd = m.index! + m[0].length;
+      if (r + 1 < rowMatches.length) {
+        rowEnd = rowMatches[r + 1].index!;
+      } else {
+        rowEnd = pageText.length;
+      }
+
+      const nextTable = firstAfter(tableStarts, rowStart);
+      const nextHeader = headers.find(h => h.index > rowStart)?.index;
+      const nextLegend = indexAfter(pageText, /\bLEGENDAS\b|ORIGINAL\s+ASSINADO|CRISTIAN\s+FERNANDO/i, rowStart + 5);
+      rowEnd = Math.min(rowEnd, nextTable ?? rowEnd, nextHeader ?? rowEnd, nextLegend ?? rowEnd);
+
+      const block = pageText.slice(rowStart, rowEnd);
+      const launch = parseLaunchBlock(block);
+      if (!launch) continue;
+
+      const previousTable = [...tableStarts].reverse().find(t => t < rowStart);
+      const day = (previousTable != null ? tableDay.get(previousTable) : null) || findNearestPreviousHeader(rowStart, eligibleHeaders) || lastContinuationDay;
+      if (!day) continue;
+
+      addLaunch(day, launch);
+      lastContinuationDay = day;
     }
   }
 
   const results: { dateLabel: string; launches: any[] }[] = [];
-  const dayMap = new Map<string, any[]>();
-  
-  const clean = (s: string) => String(s || "").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\s+/g, " ").trim();
-  const norm = (s: string) => clean(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-  const isLc = (t: string) => /^\d{2}$/.test(clean(t));
-  const isRowStart = (tokens: string[], i: number) => isLc(tokens[i]) && norm(tokens[i + 1]) === "EXB";
-  const isAirport = (t: string) => {
-    const x = norm(t);
-    return /^(SB[A-Z0-9]{2}|SD[A-Z0-9]{2}|ZZZZ)$/.test(x);
-  };
-  const isTableHeader = (tokens: string[], i: number) => {
-    if (norm(tokens[i]) !== "LÇ" && norm(tokens[i]) !== "LC") return false;
-    const ahead = tokens.slice(i, Math.min(tokens.length, i + 18)).map(norm).join(" ");
-    return /\bANV\b/.test(ahead) && /\b1P\b/.test(ahead) && /\b2P\b/.test(ahead);
-  };
-  const isDayHeader = (tokens: string[], i: number) => {
-    const a = tokens.slice(i, Math.min(tokens.length, i + 10)).map(norm);
-    return a[0] === "PLANO" && a.includes("DIA");
-  };
-  const parseDayHeader = (tokens: string[], i: number) => {
-    const a = tokens.slice(i, Math.min(tokens.length, i + 20));
-    const n = a.map(norm);
-    const diaIdx = n.indexOf("DIA");
-    if (diaIdx < 0) return null;
-    const dayTok = a[diaIdx + 1];
-    if (!/^\d{1,2}$/.test(clean(dayTok))) return null;
-    let k = diaIdx + 2;
-    while (n[k] === "DE") k++;
-    const monthName = n[k];
-    const mm = MONTHS_MAP[monthName];
-    if (!mm) return null;
-    k++;
-    while (n[k] === "DE") k++;
-    const year = a[k] && clean(a[k]).match(/^\d{4}$/) ? clean(a[k]) : "2026";
-    const dd = String(parseInt(dayTok, 10)).padStart(2, "0");
-    const label = `${dd}/${mm}/${year}`;
-    const untilNext = n.slice(diaIdx + 1, diaIdx + 45).join(" ");
-    return { label, dateKey: `${year}-${mm}-${dd}`, inactive: /SEM ATIVIDADE AEREA/.test(untilNext), end: i + Math.min(20, a.length) };
-  };
-  const readCode = (tokens: string[], idx: number) => {
-    let currentIdx = idx;
-    while (currentIdx < tokens.length && !/[A-ZÀ-Ü]/i.test(tokens[currentIdx])) currentIdx++;
-    if (currentIdx >= tokens.length) return { value: "", next: currentIdx };
-    let a = norm(tokens[currentIdx]).replace(/[^A-Z0-9]/g, "");
-    let b = norm(tokens[currentIdx + 1] || "").replace(/[^A-Z0-9]/g, "");
-    if (/^[A-Z]{2}$/.test(a) && /^[A-Z]$/.test(b)) return { value: a + b, next: currentIdx + 2 };
-    if (/^[A-Z]$/.test(a) && /^[A-Z]{2}$/.test(b)) return { value: a + b, next: currentIdx + 2 };
-    return { value: a, next: currentIdx + 1 };
-  };
-  const cleanMissionText = (parts: string[]) => {
-    let s = parts.join(" ");
-    s = s.replace(/\s+\/\s+/g, " / ").replace(/\s*\/\s*/g, " / ");
-    s = s.replace(/\b(MA|BA|PTT|OVN|EMG|BAS)\s+([A-Z0-9])\b/g, "$1$2");
-    s = s.replace(/\s+/g, " ").trim();
-    return s;
-  };
-  const extractMissionFunc = (tokens: string[]) => {
-    for (let i = 0; i < tokens.length; i++) {
-      let raw = norm(tokens[i]).replace(/[^A-Z0-9\/]/g, "");
-      let code = null;
-      let firstExtra = null;
-      const m = raw.match(/^(DVG|DVE|DVI|DII|DIG|NOI|NOE)(?:\/?(.*))?$/);
-      if (m) {
-        code = m[1];
-        firstExtra = m[2] || "";
-      } else continue;
-      let parts = [code];
-      if (firstExtra) {
-        parts.push("/", firstExtra);
-      }
-      let slashSeen = raw.includes("/") || !!firstExtra;
-      for (let j = i + 1; j < tokens.length && parts.length < 8; j++) {
-        let t = clean(tokens[j]);
-        let nt = norm(t);
-        if (!t || /^\(.*\)$/.test(t) || t === "-" || nt === "LEGENDAS" || nt === "LEG") break;
-        if (/^\d{2}$/.test(t) && norm(tokens[j + 1]) === "EXB") break;
-        if (t === "/") {
-          slashSeen = true;
-          parts.push("/");
-          continue;
-        }
-        if (!slashSeen && /^[A-Z0-9]{1,6}$/i.test(t)) {
-          parts.push(t);
-          continue;
-        }
-        if (slashSeen && /^[A-Z0-9\/]{1,8}$/i.test(t)) {
-          parts.push(t);
-          continue;
-        }
-        break;
-      }
-      return cleanMissionText(parts);
-    }
-    return "";
-  };
-
-  const parseRowFunc = (rowTokens: string[], day: any): any => {
-    const tokens = rowTokens.map(clean).filter(Boolean);
-    if (tokens.length < 3 || !isRowStart(tokens, 0)) return null;
-    let i = 0;
-    const lc = String(parseInt(tokens[i], 10)).padStart(2, "0");
-    i++;
-    let anv = "EXB";
-    i++; // EXB
-    if (i < tokens.length && /\d/.test(tokens[i]) && !/H/.test(tokens[i].toUpperCase())) {
-      anv += " " + clean(tokens[i]);
-      i++;
-    }
-    const p1 = readCode(tokens, i);
-    const oneP = p1.value;
-    i = p1.next;
-    const p2 = readCode(tokens, i);
-    const twoP = p2.value;
-    i = p2.next;
-    let adIdx = -1;
-    for (let k = i; k < tokens.length; k++) {
-      if (isAirport(tokens[k])) {
-        adIdx = k;
-        break;
-      }
-    }
-    const mvTokens = adIdx >= 0 ? tokens.slice(i, adIdx) : tokens.slice(i, Math.min(tokens.length, i + 4));
-    const mv = mvTokens.map((t) => norm(t).replace(/[^A-Z0-9]/g, "")).filter(Boolean).join(" ");
-    const adDest = adIdx >= 0 ? norm(tokens[adIdx]) : "";
-    const mission = extractMissionFunc(tokens.slice(adIdx >= 0 ? adIdx + 1 : i));
-    if (!lc || !anv) return null;
-    return {
-      lc,
-      num: lc,
-      anv: anv.trim(),
-      p1: oneP,
-      p2: twoP,
-      mv,
-      adDest,
-      missao: mission,
-      display: "",
-      uniqueKey: `${lc}_${anv.trim()}_${oneP}_${twoP}_${adDest}_${mission}`.replace(/\s+/g, ""),
-    };
-  };
-
-  const parsePDVTokens = (tokens: string[]) => {
-    const result: any[] = [];
-    let pendingDays: any[] = [];
-    let lastFlightDay: any = null;
-    let activeDay: any = null;
-    let i = 0;
-    while (i < tokens.length) {
-      const day = isDayHeader(tokens, i) ? parseDayHeader(tokens, i) : null;
-      if (day) {
-        if (!day.inactive) {
-          pendingDays.push(day);
-          lastFlightDay = day;
-        }
-        i++;
-        continue;
-      }
-      if (isTableHeader(tokens, i)) {
-        activeDay = pendingDays.length ? pendingDays.shift() : activeDay || lastFlightDay;
-        i++;
-        continue;
-      }
-      if (isRowStart(tokens, i)) {
-        const dayForRow = activeDay || (pendingDays.length === 1 ? pendingDays[0] : lastFlightDay);
-        let j = i + 2;
-        while (j < tokens.length && !isRowStart(tokens, j) && !isTableHeader(tokens, j) && !isDayHeader(tokens, j)) j++;
-        if (dayForRow) {
-          const row = parseRowFunc(tokens.slice(i, j), dayForRow);
-          if (row) {
-            row.dateLabel = dayForRow.label;
-            row.display = `LÇ ${row.lc} - ${row.anv} - ${row.p1} - ${row.p2} - ${row.mv} - ${row.adDest} - ${row.missao}`.replace(/\s+-\s+-/g, " - -").replace(/\s+/g, " ").trim();
-            result.push(row);
-          }
-        }
-        i = j;
-        continue;
-      }
-      i++;
-    }
-    return result;
-  };
-
-  const extracted = parsePDVTokens(allTokens);
-  for (const item of extracted) {
-    if (!dayMap.has(item.dateLabel)) dayMap.set(item.dateLabel, []);
-    const dayLaunches = dayMap.get(item.dateLabel)!;
-    if (!dayLaunches.some((l) => l.uniqueKey === item.uniqueKey)) {
-      dayLaunches.push(item);
-    }
-  }
-
   for (const [dateLabel, launches] of dayMap.entries()) {
     launches.sort((a, b) => Number(a.lc) - Number(b.lc));
     results.push({ dateLabel, launches });
