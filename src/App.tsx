@@ -2565,6 +2565,7 @@ async function processPDVFile(file: File) {
     ABRIL: "04",
     MAIO: "05",
     JUNHO: "06",
+    JUN: "06",
     JULHO: "07",
     AGOSTO: "08",
     SETEMBRO: "09",
@@ -2576,137 +2577,123 @@ async function processPDVFile(file: File) {
   const dayMap = new Map<string, any[]>();
   let lastContinuationDay: string | null = null;
 
-  const toLinearText = (s: string) => {
+  const cleanText = (s: string) => {
     return String(s || "")
       .replace(/[\u200B-\u200D\uFEFF]/g, "")
-      .replace(/\u00A0/g, " ")
       .replace(/\s+/g, " ")
-      .trim()
-      .toUpperCase();
-  };
-
-  const cleanCell = (s: string) => {
-    return String(s || "").replace(/\s+/g, " ").trim().toUpperCase();
-  };
-
-  const joinCell = (parts: string[]) => {
-    return cleanCell(parts.filter(x => x !== undefined && x !== null && String(x).trim() !== "").join(" "));
-  };
-
-  const stripAccents = (s: string) => {
-    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  };
-
-  const isAirportCode = (s: string) => {
-    return /^[A-Z]{4}$/.test(String(s || "").replace(/[^A-Z]/g, ""));
-  };
-
-  const findHeaders = (text: string) => {
-    const re = /PLANO\s+DI[AÁ]RIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE\s+(?:DE\s+)?([A-ZÇÃÁÉÍÓÚ]+)\s+DE\s+(\d{4})/gi;
-    const headers: { index: number; key: string }[] = [];
-    for (const m of text.matchAll(re)) {
-      const dd = String(parseInt(m[1], 10)).padStart(2, "0");
-      const rawMonth = m[2].toUpperCase();
-      const mm = MONTHS_MAP_LOCAL[rawMonth] || MONTHS_MAP_LOCAL[stripAccents(rawMonth)] || null;
-      if (!mm) continue;
-      const key = `${dd}/${mm}/${m[3]}`;
-      headers.push({ index: m.index!, key });
-    }
-    return headers;
-  };
-
-  const findAllIndexes = (text: string, re: RegExp) => {
-    return [...text.matchAll(re)].map(m => m.index!);
-  };
-
-  const findNearestPreviousHeader = (pos: number, headers: { index: number; key: string }[]) => {
-    let day = null;
-    for (const h of headers) {
-      if (h.index < pos) day = h.key;
-      else break;
-    }
-    return day;
-  };
-
-  const firstAfter = (list: number[], pos: number) => {
-    for (const x of list) {
-      if (x > pos) return x;
-    }
-    return null;
-  };
-
-  const indexAfter = (text: string, re: RegExp, start: number) => {
-    const m = re.exec(text.slice(start));
-    return m ? start + m.index : null;
-  };
-
-  const findLastPobIndex = (tokens: string[]) => {
-    const known = new Set(["TBN", "ASD", "FTB", "ATB"]);
-    for (let i = tokens.length - 1; i >= 0; i--) {
-      const t = stripAccents(tokens[i]).toUpperCase().replace(/[^A-Z0-9]/g, "");
-      if (known.has(t)) return i;
-    }
-    return -1;
-  };
-
-  const extractMission = (tokens: string[]) => {
-    const pobIdx = findLastPobIndex(tokens);
-    let start = pobIdx >= 0 ? pobIdx + 1 : -1;
-    if (start < 0) {
-      start = Math.max(0, tokens.length - 4);
-    }
-    let end = tokens.length;
-    for (let i = start; i < tokens.length; i++) {
-      const t = tokens[i];
-      if (/^\(/.test(t) || t === "-" || /^LEGENDAS:?$/i.test(stripAccents(t))) {
-        end = i;
-        break;
-      }
-    }
-    return cleanCell(tokens.slice(start, end).join(" "));
-  };
-
-  const parseLaunchBlock = (block: string) => {
-    const cleanBlock = toLinearText(block)
-      .replace(/\bLEGENDAS\b[\s\S]*$/i, "")
-      .replace(/ORIGINAL\s+ASSINADO[\s\S]*$/i, "")
-      .replace(/CRISTIAN\s+FERNANDO[\s\S]*$/i, "")
       .trim();
+  };
 
-    const tokens = cleanBlock.split(/\s+/).filter(Boolean);
-    if (tokens.length < 3) return null;
-    if (!/^\d{2}$/.test(tokens[0]) || stripAccents(tokens[1]).toUpperCase() !== "EXB") return null;
+  const normForMatch = (s: string) => {
+    return cleanText(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  };
 
-    const lc = tokens[0];
-    const anv = joinCell(["EXB", tokens[2] || ""]);
-    const p1 = tokens[3] || "";
-    const p2 = tokens[4] || "";
+  function formatDiaKey(dia: string | number, mes: string, ano: string | number) {
+    const mesNum = MONTHS_MAP_LOCAL[normForMatch(mes)] || mes;
+    return String(dia).padStart(2, "0") + "/" + mesNum + "/" + ano;
+  }
 
-    const idxAfterCrew = 5;
-    let adIdx = -1;
-    for (let i = idxAfterCrew; i < tokens.length; i++) {
-      if (isAirportCode(tokens[i])) {
-        adIdx = i;
-        break;
+  function parseDiaFromLine(line: string) {
+    const txt = normForMatch(line);
+    const m = txt.match(/PLANO\s+DIARIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE(?:\s+DE)?\s+([A-Z]+)\s+DE\s+(\d{4})/);
+    if (!m) return null;
+    return formatDiaKey(m[1], m[2], m[3]);
+  }
+
+  interface PDFItem {
+    text: string;
+    x: number;
+    y: number;
+    top: number;
+    width: number;
+    cx: number;
+  }
+
+  interface LineGroup {
+    top: number;
+    items: PDFItem[];
+    text?: string;
+    norm?: string;
+  }
+
+  function groupLines(items: PDFItem[]): LineGroup[] {
+    const sorted = items.slice().sort((a, b) => (a.top - b.top) || (a.x - b.x));
+    const groups: LineGroup[] = [];
+    for (const it of sorted) {
+      if (!it.text) continue;
+      const last = groups[groups.length - 1];
+      if (last && Math.abs(last.top - it.top) <= 4) {
+        last.items.push(it);
+        last.top = (last.top + it.top) / 2;
+      } else {
+        groups.push({ top: it.top, items: [it] });
       }
     }
-
-    let mv = "";
-    let adDest = "";
-    if (adIdx >= 0) {
-      mv = joinCell(tokens.slice(idxAfterCrew, adIdx));
-      adDest = tokens[adIdx] || "";
-    } else {
-      const pobIdx = findLastPobIndex(tokens);
-      const stop = pobIdx > idxAfterCrew ? Math.min(pobIdx, idxAfterCrew + 4) : Math.min(tokens.length, idxAfterCrew + 4);
-      mv = joinCell(tokens.slice(idxAfterCrew, stop));
-      adDest = "";
+    for (const g of groups) {
+      g.items.sort((a, b) => a.x - b.x);
+      g.text = cleanText(g.items.map(i => i.text).join(" "));
+      g.norm = normForMatch(g.text);
     }
+    return groups;
+  }
 
-    const missao = extractMission(tokens);
+  function isTableHeader(line: string) {
+    const n = normForMatch(line);
+    return /\bLC\b/.test(n.replace(/Ç/g, "C")) && /\bANV\b/.test(n) && !/TRIPULACAO/.test(n);
+  }
+
+  function isSectionLine(line: string) {
+    const n = normForMatch(line);
+    return /TRIPULACAO\s+DE\s+ALERTA|PLANO\s+DIARIO|LEGENDAS:|ORIGINAL\s+ASSINADO|CRISTIAN\s+FERNANDO|COMANDANTE\s+DO/.test(n);
+  }
+
+  function detectRowStarts(items: PDFItem[], pageWidth: number) {
+    return items
+      .filter(it => /^\d{1,2}$/.test(it.text) && it.x < pageWidth * 0.075)
+      .sort((a, b) => a.top - b.top);
+  }
+
+  function getColumnBounds(pageWidth: number) {
+    const ratios = [0, 0.048, 0.095, 0.145, 0.193, 0.243, 0.297, 0.349, 0.413, 0.503, 0.563, 0.611, 0.670, 0.724, 0.777, 0.836, 0.878, 0.956, 1.02];
+    return ratios.map(r => r * pageWidth);
+  }
+
+  function textInColumn(rowItems: PDFItem[], x1: number, x2: number) {
+    const selected = rowItems
+      .filter(it => it.cx >= x1 && it.cx < x2)
+      .sort((a, b) => (a.top - b.top) || (a.x - b.x));
+    const lines: { top: number; items: PDFItem[] }[] = [];
+    for (const it of selected) {
+      const last = lines[lines.length - 1];
+      if (last && Math.abs(last.top - it.top) <= 4) {
+        last.items.push(it);
+      } else {
+        lines.push({ top: it.top, items: [it] });
+      }
+    }
+    const parts = lines.map(l => {
+      l.items.sort((a, b) => a.x - b.x);
+      return cleanText(l.items.map(i => i.text).join(" "));
+    }).filter(Boolean);
+    return cleanText(parts.join(" "));
+  }
+
+  function parseRow(rowItems: PDFItem[], pageWidth: number, forcedLenc: string) {
+    const b = getColumnBounds(pageWidth);
+    const cells: string[] = [];
+    for (let i = 0; i < b.length - 1; i++) {
+      cells.push(textInColumn(rowItems, b[i], b[i + 1]));
+    }
+    const lc = cells[0] || forcedLenc || "";
+    const anv = cells[1] || "";
+    const p1 = cells[2] || "";
+    const p2 = cells[3] || "";
+    const mv = cells[4] || "";
+    const adDest = cells[5] || "";
+    const missao = cells[16] || "";
     const display = `LÇ ${lc} - ${anv} - ${p1} - ${p2} - ${mv} - ${adDest} - ${missao}`
-      .replace(/\s+-\s+-\s+/g, " - - ")
-      .replace(/\s+/g, " ")
+      .replace(/\s+-\s+/g, " - ")
+      .replace(/\s{2,}/g, " ")
       .trim();
 
     return {
@@ -2721,73 +2708,131 @@ async function processPDVFile(file: File) {
       display,
       uniqueKey: `${lc}_${anv}_${p1}_${p2}_${adDest}_${missao}`.replace(/\s+/g, "")
     };
-  };
+  }
 
-  const addLaunch = (day: string, launch: any) => {
-    if (!dayMap.has(day)) dayMap.set(day, []);
-    const arr = dayMap.get(day)!;
-    const key = `${launch.lc}|${launch.anv}|${launch.p1}|${launch.p2}|${launch.mv}|${launch.adDest}|${launch.missao}`;
+  function addLancamento(dia: string, lanc: any) {
+    if (!dia || !lanc || !lanc.lc) return false;
+    if (!dayMap.has(dia)) dayMap.set(dia, []);
+    const arr = dayMap.get(dia)!;
+    const key = `${lanc.lc}|${lanc.anv}|${lanc.p1}|${lanc.p2}|${lanc.mv}|${lanc.adDest}|${lanc.missao}`;
     if (arr.some(x => `${x.lc}|${x.anv}|${x.p1}|${x.p2}|${x.mv}|${x.adDest}|${x.missao}` === key)) return false;
-    arr.push(launch);
-    arr.sort((a, b) => Number(a.lc) - Number(b.lc) || a.display.localeCompare(b.display));
+    arr.push(lanc);
+    arr.sort((a, b) => Number(a.lc) - Number(b.lc));
     return true;
+  }
+
+  const state = {
+    pendingDays: [] as { key: string; inactive: boolean }[],
+    lastPending: null as { key: string; inactive: boolean } | null,
+    currentDay: null as string | null,
+    inTable: false,
+    lastRowTop: null as number | null
   };
 
-  // Process text line by line / page by page
-  for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-    const page = await pdf.getPage(pageNo);
-    const content = await page.getTextContent({
-      normalizeWhitespace: true,
-      disableCombineTextItems: false
-    } as any);
-    const pageText = toLinearText(content.items.map((i: any) => i.str || "").join(" "));
-    if (!pageText) continue;
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+    const pageWidth = viewport.width;
+    const pageHeight = viewport.height;
+    
+    const items: PDFItem[] = (content.items as any[]).map(raw => {
+      const text = cleanText(raw.str);
+      const x = raw.transform[4];
+      const y = raw.transform[5];
+      const w = raw.width || 0;
+      const top = pageHeight - y;
+      return { text, x, y, top, width: w, cx: x + (w / 2) };
+    }).filter(it => it.text);
 
-    const headers = findHeaders(pageText);
-    const tableStarts = findAllIndexes(pageText, /\bLÇ\s+ANV\s+1P\s+2P\s+MV\b/gi);
-    const eligibleHeaders = headers.filter((h, idx) => {
-      const next = headers[idx + 1]?.index ?? pageText.length;
-      const section = pageText.slice(h.index, next);
-      return !/SEM\s+ATIVIDADE\s+A[ÉE]REA/i.test(section);
-    });
+    const lines = groupLines(items);
+    const rowStarts = detectRowStarts(items, pageWidth);
 
-    const tableDay = new Map<number, string>();
-    if (tableStarts.length) {
-      for (let i = 0; i < tableStarts.length; i++) {
-        let day = eligibleHeaders[i]?.key;
-        if (!day) day = findNearestPreviousHeader(tableStarts[i], eligibleHeaders) || lastContinuationDay;
-        if (day) tableDay.set(tableStarts[i], day);
-      }
-      const lastTable = tableStarts[tableStarts.length - 1];
-      if (tableDay.get(lastTable)) lastContinuationDay = tableDay.get(lastTable)!;
+    interface EventItem {
+      type: "line" | "row";
+      top: number;
+      line?: LineGroup;
+      rowStart?: PDFItem;
     }
 
-    const rowMatches = [...pageText.matchAll(/(?:^|\s)(\d{2})\s+EXB\s+(\S+)/gi)];
-    for (let r = 0; r < rowMatches.length; r++) {
-      const m = rowMatches[r];
-      const rowStart = m.index! + (/^\s/.test(m[0]) ? 1 : 0);
-      let rowEnd = m.index! + m[0].length;
-      if (r + 1 < rowMatches.length) {
-        rowEnd = rowMatches[r + 1].index!;
-      } else {
-        rowEnd = pageText.length;
+    const events: EventItem[] = [];
+    for (const line of lines) {
+      events.push({ type: "line", top: line.top, line });
+    }
+    for (const rs of rowStarts) {
+      events.push({ type: "row", top: rs.top, rowStart: rs });
+    }
+    events.sort((a, b) => (a.top - b.top) || (a.type === "line" ? -1 : 1));
+
+    function nextRowTopAfter(t: number) {
+      const next = rowStarts.find(r => r.top > t + 2);
+      return next ? next.top : null;
+    }
+    function nextSectionTopAfter(t: number) {
+      const next = lines.find(l => l.top > t + 8 && l.text && isSectionLine(l.text));
+      return next ? next.top : null;
+    }
+    function previousRowTopBefore(t: number) {
+      let prev = null;
+      for (const r of rowStarts) {
+        if (r.top < t - 2) prev = r.top;
+        else break;
       }
+      return prev;
+    }
 
-      const nextTable = firstAfter(tableStarts, rowStart);
-      const nextHeader = headers.find(h => h.index > rowStart)?.index;
-      const nextLegend = indexAfter(pageText, /\bLEGENDAS\b|ORIGINAL\s+ASSINADO|CRISTIAN\s+FERNANDO/i, rowStart + 5);
-      rowEnd = Math.min(rowEnd, nextTable ?? rowEnd, nextHeader ?? rowEnd, nextLegend ?? rowEnd);
+    for (const ev of events) {
+      if (ev.type === "line" && ev.line) {
+        const txt = ev.line.text || "";
+        const dia = parseDiaFromLine(txt);
+        if (dia) {
+          const obj = { key: dia, inactive: false };
+          state.pendingDays.push(obj);
+          state.lastPending = obj;
+          continue;
+        }
+        if (/SEM\s+ATIVIDADE\s+A[ÉE]REA/i.test(txt) && state.lastPending) {
+          state.lastPending.inactive = true;
+          continue;
+        }
+        if (isTableHeader(txt)) {
+          let chosen = null;
+          while (state.pendingDays.length) {
+            const d = state.pendingDays.shift();
+            if (d && !d.inactive) {
+              chosen = d.key;
+              break;
+            }
+          }
+          if (!chosen) chosen = state.currentDay;
+          state.currentDay = chosen;
+          state.inTable = !!chosen;
+          state.lastRowTop = null;
+          continue;
+        }
+        if (/TRIPULA[ÇC][ÃA]O\s+DE\s+ALERTA/i.test(txt) && state.inTable && state.lastRowTop !== null && ev.top > state.lastRowTop) {
+          state.inTable = false;
+        }
+      } else if (ev.type === "row" && ev.rowStart) {
+        if (!state.inTable || !state.currentDay) continue;
+        const rowTop = ev.rowStart.top;
+        const prev = previousRowTopBefore(rowTop);
+        const next = nextRowTopAfter(rowTop);
+        const nextSection = nextSectionTopAfter(rowTop);
+        const topMin = prev ? ((prev + rowTop) / 2) : (rowTop - 30);
+        const topMaxCandidates = [];
+        if (next !== null) topMaxCandidates.push((rowTop + next) / 2);
+        if (nextSection !== null) topMaxCandidates.push(nextSection - 3);
+        topMaxCandidates.push(pageHeight + 20);
+        const topMax = Math.min(...topMaxCandidates);
 
-      const block = pageText.slice(rowStart, rowEnd);
-      const launch = parseLaunchBlock(block);
-      if (!launch) continue;
-
-      const previousTable = [...tableStarts].reverse().find(t => t < rowStart);
-      const day = (previousTable != null ? tableDay.get(previousTable) : null) || findNearestPreviousHeader(rowStart, eligibleHeaders) || lastContinuationDay;
-      if (!day) continue;
-
-      addLaunch(day, launch);
-      lastContinuationDay = day;
+        const rowItems = items.filter(it => it.top >= topMin && it.top <= topMax);
+        const lanc = parseRow(rowItems, pageWidth, ev.rowStart.text);
+        if (lanc.lc) {
+          addLancamento(state.currentDay, lanc);
+        }
+        state.lastRowTop = rowTop;
+      }
     }
   }
 
