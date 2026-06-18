@@ -2897,7 +2897,6 @@ export default function App() {
     const q = query(
       collection(db, "Lancamentos"),
       orderBy("createdAt", "desc"),
-      limit(100),
     );
     const unsub = onSnapshot(
       q,
