@@ -1459,11 +1459,13 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
         .filter(l => launchesMarkedNoFgr.has(l.id))
         .map(l => ({
            id: l.id,
-           date: l.dateLabel || "---",
-           launch: l.num || l.lc || "---",
+           date: l.dateLabel ? formatDate(parseOperationalDate(l.dateLabel.split("/").reverse().join("-"))) : "---",
+           num: extractLaunchNum(l),
            anv: l.anv || "---",
            p1: l.p1 || "---",
-           p2: l.p2 || "---",
+           p2: l.p2 || "",
+           mv: l.mv || "---",
+           local: l.dest || l.adDest || "---",
            missao: l.missao || "---",
            type: "no_fgr",
            statusLabel: "Marcado Sem FGR"
@@ -7583,6 +7585,9 @@ function AdminSection({
   const [selectedRelprev, setSelectedRelprev] = useState<any>(null);
   const [showAnexos, setShowAnexos] = useState(false);
 
+  const totalRelprevFiles = relprevs.reduce((sum, r) => sum + (r.images?.length || 0) + (r.extraFiles?.length || 0), 0);
+  const totalSuggestionFiles = suggestions.reduce((sum, s) => sum + (s.images?.length || 0) + (s.extraFiles?.length || 0), 0);
+
   const handleDeleteBatch = async () => {
     if (!batchDeleteTarget) return;
     const { id: batchIdToDelete } = batchDeleteTarget;
@@ -8162,7 +8167,7 @@ function AdminSection({
           onClick={() => setSelectedView("relprevs")}
           className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "relprevs" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
         >
-          Relatos
+          Relatos ({totalRelprevFiles} {totalRelprevFiles === 1 ? 'arquivo' : 'arquivos'})
         </button>
         <button
           onClick={() => setSelectedView("fgrs")}
@@ -8194,7 +8199,7 @@ function AdminSection({
           className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "suggestions" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white flex items-center gap-1.5"}`}
         >
           <Lightbulb size={10} />
-          Sugestões {suggestions.length > 0 && `(${suggestions.length})`}
+          Sugestões {suggestions.length > 0 && `(${suggestions.length})`} ({totalSuggestionFiles} {totalSuggestionFiles === 1 ? 'arquivo' : 'arquivos'})
         </button>
         <button
           onClick={() => setSelectedView("database")}
@@ -8341,7 +8346,10 @@ function AdminSection({
                         {new Date(r.createdAt).toLocaleDateString("pt-BR")}
                       </td>
                       <td className="px-4 py-3 text-military-gold font-bold">
-                        {r.codigo}
+                        <div>{r.codigo}</div>
+                        <div className="text-[9px] text-slate-500 font-normal">
+                          {(r.images?.length || 0) + (r.extraFiles?.length || 0)} {((r.images?.length || 0) + (r.extraFiles?.length || 0)) === 1 ? 'arquivo' : 'arquivos'}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-white truncate max-w-[200px]">
                         {r.situacao}
@@ -8401,9 +8409,14 @@ function AdminSection({
               >
                 <div>
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-military-gold font-mono font-black text-xs leading-none">
-                      {r.codigo}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-military-gold font-mono font-black text-xs leading-none">
+                        {r.codigo}
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-normal mt-1">
+                        {(r.images?.length || 0) + (r.extraFiles?.length || 0)} {((r.images?.length || 0) + (r.extraFiles?.length || 0)) === 1 ? 'arquivo' : 'arquivos'}
+                      </span>
+                    </div>
                     <span className="text-[9px] text-text-secondary">
                       {new Date(r.createdAt).toLocaleDateString("pt-BR")}
                     </span>
@@ -9552,7 +9565,7 @@ function AdminSection({
             <div>
               <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
                 <Lightbulb size={16} className="text-military-gold" />
-                Sugestões de Melhorias Recebidas
+                Sugestões de Melhorias Recebidas ({totalSuggestionFiles} {totalSuggestionFiles === 1 ? 'arquivo' : 'arquivos'})
               </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
                 {suggestions.length} sugestões de melhorias pendentes
@@ -9595,9 +9608,14 @@ function AdminSection({
                       <div className="w-8 h-8 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold border border-military-gold/20">
                         <Lightbulb size={14} />
                       </div>
-                      <p className="text-[9px] text-slate-500 font-mono italic">
-                        {new Date(s.createdAt).toLocaleString("pt-BR")}
-                      </p>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-white uppercase tracking-wider">
+                          Sugestão ({(s.images?.length || 0) + (s.extraFiles?.length || 0)} {((s.images?.length || 0) + (s.extraFiles?.length || 0)) === 1 ? 'arquivo' : 'arquivos'})
+                        </span>
+                        <p className="text-[9px] text-slate-500 font-mono italic">
+                          {new Date(s.createdAt).toLocaleString("pt-BR")}
+                        </p>
+                      </div>
                     </div>
                     <div className="text-text-secondary text-base leading-relaxed bg-white/2 p-5 rounded-xl border border-white/5 whitespace-pre-wrap font-medium">
                       {s.text}
