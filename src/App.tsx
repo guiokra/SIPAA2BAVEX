@@ -7326,7 +7326,7 @@ function AdminSection({
     | "trash"
     | "suggestions"
     | "database"
-  >("stats");
+  >("pdv");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteColl, setDeleteColl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -8158,16 +8158,10 @@ function AdminSection({
 
       <div className="flex gap-1 bg-military-black/50 p-1 rounded-lg border border-white/5 overflow-x-auto no-scrollbar mb-8">
         <button
-          onClick={() => setSelectedView("stats")}
-          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "stats" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
+          onClick={() => setSelectedView("pdv")}
+          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "pdv" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
         >
-          Dashboard
-        </button>
-        <button
-          onClick={() => setSelectedView("relprevs")}
-          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "relprevs" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
-        >
-          Relatos ({totalRelprevFiles} {totalRelprevFiles === 1 ? 'arquivo' : 'arquivos'})
+          Extrator PDV
         </button>
         <button
           onClick={() => setSelectedView("fgrs")}
@@ -8182,24 +8176,23 @@ function AdminSection({
           Abortivas
         </button>
         <button
-          onClick={() => setSelectedView("pdv")}
-          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "pdv" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
+          onClick={() => setSelectedView("relprevs")}
+          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "relprevs" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
         >
-          Extrator PDV
-        </button>
-        <button
-          onClick={() => setSelectedView("trash")}
-          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "trash" ? "bg-red-500 text-white" : "text-slate-400 hover:text-red-400 flex items-center gap-1.5"}`}
-        >
-          <Trash2 size={10} />
-          Lixeira {stats.trash > 0 && `(${stats.trash})`}
+          Relatos ({relprevs.length} {relprevs.length === 1 ? 'relato' : 'relatos'})
         </button>
         <button
           onClick={() => setSelectedView("suggestions")}
           className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "suggestions" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white flex items-center gap-1.5"}`}
         >
           <Lightbulb size={10} />
-          Sugestões {suggestions.length > 0 && `(${suggestions.length})`} ({totalSuggestionFiles} {totalSuggestionFiles === 1 ? 'arquivo' : 'arquivos'})
+          Sugestões ({suggestions.length} {suggestions.length === 1 ? 'sugestão' : 'sugestões'})
+        </button>
+        <button
+          onClick={() => setSelectedView("stats")}
+          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "stats" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white"}`}
+        >
+          Dashboard
         </button>
         <button
           onClick={() => setSelectedView("database")}
@@ -8207,6 +8200,13 @@ function AdminSection({
         >
           <Database size={10} />
           Banco de Dados
+        </button>
+        <button
+          onClick={() => setSelectedView("trash")}
+          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "trash" ? "bg-red-500 text-white" : "text-slate-400 hover:text-red-400 flex items-center gap-1.5"}`}
+        >
+          <Trash2 size={10} />
+          Lixeira {stats.trash > 0 && `(${stats.trash})`}
         </button>
       </div>
 
@@ -9565,7 +9565,7 @@ function AdminSection({
             <div>
               <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
                 <Lightbulb size={16} className="text-military-gold" />
-                Sugestões de Melhorias Recebidas ({totalSuggestionFiles} {totalSuggestionFiles === 1 ? 'arquivo' : 'arquivos'})
+                Sugestões de Melhorias Recebidas ({suggestions.length} {suggestions.length === 1 ? 'sugestão' : 'sugestões'})
               </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
                 {suggestions.length} sugestões de melhorias pendentes
