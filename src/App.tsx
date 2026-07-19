@@ -2559,144 +2559,318 @@ async function processPDVFile(file: File) {
   const pdfjsLib = (window as any).pdfjsLib || pdfjs;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
 
-  const MONTHS_MAP_LOCAL: Record<string, string> = {
-    JANEIRO: "01",
-    FEVEREIRO: "02",
-    MARCO: "03",
-    "MARÇO": "03",
-    ABRIL: "04",
-    MAIO: "05",
-    JUNHO: "06",
-    JUN: "06",
-    JULHO: "07",
-    AGOSTO: "08",
-    SETEMBRO: "09",
-    OUTUBRO: "10",
-    NOVEMBRO: "11",
-    DEZEMBRO: "12"
+  const BASE_BOUNDS = [
+    0, 0.048, 0.095, 0.145, 0.193, 0.243, 0.297, 0.349, 0.413,
+    0.503, 0.563, 0.611, 0.670, 0.724, 0.777, 0.836, 0.878, 0.956, 1
+  ];
+
+  const HEADER_ANCHORS = {
+    LC:     (BASE_BOUNDS[0]  + BASE_BOUNDS[1])  / 2,
+    "1P":   (BASE_BOUNDS[2]  + BASE_BOUNDS[3])  / 2,
+    "2P":   (BASE_BOUNDS[3]  + BASE_BOUNDS[4])  / 2,
+    MV:     (BASE_BOUNDS[4]  + BASE_BOUNDS[5])  / 2,
+    EQP:    (BASE_BOUNDS[7]  + BASE_BOUNDS[8])  / 2,
+    ROTA:   (BASE_BOUNDS[8]  + BASE_BOUNDS[9])  / 2,
+    VEL:    (BASE_BOUNDS[9]  + BASE_BOUNDS[10]) / 2,
+    EOBT:   (BASE_BOUNDS[11] + BASE_BOUNDS[12]) / 2,
+    BRF:    (BASE_BOUNDS[12] + BASE_BOUNDS[13]) / 2,
+    EET:    (BASE_BOUNDS[13] + BASE_BOUNDS[14]) / 2,
+    POB:    (BASE_BOUNDS[15] + BASE_BOUNDS[16]) / 2,
+    MISSAO: (BASE_BOUNDS[16] + BASE_BOUNDS[17]) / 2,
+    LEG:    (BASE_BOUNDS[17] + BASE_BOUNDS[18]) / 2
   };
 
   const dayMap = new Map<string, any[]>();
-  let lastContinuationDay: string | null = null;
-
-  const cleanText = (s: string) => {
-    return String(s || "")
-      .replace(/[\u200B-\u200D\uFEFF]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  };
-
-  const normForMatch = (s: string) => {
-    return cleanText(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-  };
-
-  function formatDiaKey(dia: string | number, mes: string, ano: string | number) {
-    const mesNum = MONTHS_MAP_LOCAL[normForMatch(mes)] || mes;
-    return String(dia).padStart(2, "0") + "/" + mesNum + "/" + ano;
-  }
-
-  function parseDiaFromLine(line: string) {
-    const txt = normForMatch(line);
-    const m = txt.match(/PLANO\s+DIARIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE(?:\s+DE)?\s+([A-Z]+)\s+DE\s+(\d{4})/);
-    if (!m) return null;
-    return formatDiaKey(m[1], m[2], m[3]);
-  }
+  let diaAtual: string | null = null;
+  let geometriaNormalizada = { esquerda: 0, largura: 1 };
 
   interface PDFItem {
-    text: string;
+    texto: string;
     x: number;
-    y: number;
-    top: number;
-    width: number;
+    x2: number;
     cx: number;
+    top: number;
+    bottom: number;
+    cy: number;
+    width: number;
+    height: number;
   }
 
   interface LineGroup {
-    top: number;
+    cy: number;
     items: PDFItem[];
-    text?: string;
-    norm?: string;
+    top: number;
+    bottom: number;
+    texto: string;
+    normalizado: string;
   }
 
-  function groupLines(items: PDFItem[]): LineGroup[] {
-    const sorted = items.slice().sort((a, b) => (a.top - b.top) || (a.x - b.x));
-    const groups: LineGroup[] = [];
-    for (const it of sorted) {
-      if (!it.text) continue;
-      const last = groups[groups.length - 1];
-      if (last && Math.abs(last.top - it.top) <= 4) {
-        last.items.push(it);
-        last.top = (last.top + it.top) / 2;
+  const retirarInvisiveis = (valor: string): string => {
+    return String(valor ?? "").replace(/[\u200B-\u200D\uFEFF]/g, "");
+  };
+
+  const normalizarParaBusca = (valor: string): string => {
+    return retirarInvisiveis(valor)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+  };
+
+  const getTransform = (m1: number[], m2: number[]): number[] => {
+    const lib = (window as any).pdfjsLib || pdfjs;
+    if (lib && lib.Util && typeof lib.Util.transform === "function") {
+      return lib.Util.transform(m1, m2);
+    }
+    return [
+      m1[0] * m2[0] + m1[2] * m2[1],
+      m1[1] * m2[0] + m1[3] * m2[1],
+      m1[0] * m2[2] + m1[2] * m2[3],
+      m1[1] * m2[2] + m1[3] * m2[3],
+      m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+      m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
+    ];
+  };
+
+  const chaveDoDia = (dia: string | number, mes: string, ano: string | number): string | null => {
+    const meses: Record<string, string> = {
+      JANEIRO: "01",
+      FEVEREIRO: "02",
+      MARCO: "03",
+      MARÇO: "03",
+      ABRIL: "04",
+      MAIO: "05",
+      JUNHO: "06",
+      JULHO: "07",
+      AGOSTO: "08",
+      SETEMBRO: "09",
+      OUTUBRO: "10",
+      NOVEMBRO: "11",
+      DEZEMBRO: "12"
+    };
+    const numeroMes = meses[normalizarParaBusca(mes)];
+    if (!numeroMes) return null;
+    return `${String(dia).padStart(2, "0")}/${numeroMes}/${ano}`;
+  };
+
+  const extrairDiaDoCabecalho = (texto: string): string | null => {
+    const normalizado = normalizarParaBusca(texto);
+    const resultado = normalizado.match(
+      /PLANO\s+DIARIO\s+DE\s+VOO\s+PARA\s+O\s+DIA\s+(\d{1,2})\s+DE(?:\s+DE)?\s+([A-Z]+)\s+DE\s+(\d{4})/
+    );
+    if (!resultado) return null;
+    return chaveDoDia(resultado[1], resultado[2], resultado[3]);
+  };
+
+  const agruparLinhas = (items: PDFItem[]): LineGroup[] => {
+    const ordenados = items.slice().sort((a, b) => (a.cy - b.cy) || (a.x - b.x));
+    const linhas: { cy: number; items: PDFItem[] }[] = [];
+
+    for (const item of ordenados) {
+      const ultima = linhas[linhas.length - 1];
+      const tolerancia = Math.max(2.4, Math.min(4.5, item.height * 0.36));
+      if (ultima && Math.abs(ultima.cy - item.cy) <= tolerancia) {
+        ultima.items.push(item);
+        ultima.cy = ultima.items.reduce((s, i) => s + i.cy, 0) / ultima.items.length;
       } else {
-        groups.push({ top: it.top, items: [it] });
+        linhas.push({ cy: item.cy, items: [item] });
       }
     }
-    for (const g of groups) {
-      g.items.sort((a, b) => a.x - b.x);
-      g.text = cleanText(g.items.map(i => i.text).join(" "));
-      g.norm = normForMatch(g.text);
-    }
-    return groups;
-  }
 
-  function isTableHeader(line: string) {
-    const n = normForMatch(line);
-    return /\bLC\b/.test(n.replace(/Ç/g, "C")) && /\bANV\b/.test(n) && !/TRIPULACAO/.test(n);
-  }
+    return linhas.map(linha => {
+      linha.items.sort((a, b) => a.x - b.x);
+      const texto = linha.items.map(i => retirarInvisiveis(i.texto).trim()).filter(Boolean).join(" ");
+      const top = Math.min(...linha.items.map(i => i.top));
+      const bottom = Math.max(...linha.items.map(i => i.bottom));
+      return {
+        cy: linha.cy,
+        items: linha.items,
+        top,
+        bottom,
+        texto,
+        normalizado: normalizarParaBusca(texto)
+      };
+    });
+  };
 
-  function isSectionLine(line: string) {
-    const n = normForMatch(line);
-    return /TRIPULACAO\s+DE\s+ALERTA|PLANO\s+DIARIO|LEGENDAS:|ORIGINAL\s+ASSINADO|CRISTIAN\s+FERNANDO|COMANDANTE\s+DO/.test(n);
-  }
+  const ehLinhaCabecalhoTabela = (linha: LineGroup): boolean => {
+    const n = linha.normalizado.replace(/Ç/g, "C");
+    if (!/(^|\s)LC($|\s)/.test(n)) return false;
+    const marcadores = ["1P", "2P", "MV", "EOBT", "MISSAO", "POB"];
+    return marcadores.filter(m => n.includes(m)).length >= 2;
+  };
 
-  function detectRowStarts(items: PDFItem[], pageWidth: number) {
-    return items
-      .filter(it => /^\d{1,2}$/.test(it.text) && it.x < pageWidth * 0.075)
-      .sort((a, b) => a.top - b.top);
-  }
+  const ehLinhaDeSecao = (linha: LineGroup): boolean => {
+    return /LEGENDAS:|ORIGINAL\s+ASSINADO|COMANDANTE\s+DO|RESP\.?\s+COMANDO/.test(linha.normalizado);
+  };
 
-  function getColumnBounds(pageWidth: number) {
-    const ratios = [0, 0.048, 0.095, 0.145, 0.193, 0.243, 0.297, 0.349, 0.413, 0.503, 0.563, 0.611, 0.670, 0.724, 0.777, 0.836, 0.878, 0.956, 1.02];
-    return ratios.map(r => r * pageWidth);
-  }
+  const mesclarIntervalos = (intervalos: [number, number][]): [number, number][] => {
+    if (!intervalos.length) return [];
+    const ordenados = intervalos.slice().sort((a, b) => a[0] - b[0]);
+    const mesclados: [number, number][] = [[ordenados[0][0], ordenados[0][1]]];
 
-  function textInColumn(rowItems: PDFItem[], x1: number, x2: number) {
-    const selected = rowItems
-      .filter(it => it.cx >= x1 && it.cx < x2)
-      .sort((a, b) => (a.top - b.top) || (a.x - b.x));
-    const lines: { top: number; items: PDFItem[] }[] = [];
-    for (const it of selected) {
-      const last = lines[lines.length - 1];
-      if (last && Math.abs(last.top - it.top) <= 4) {
-        last.items.push(it);
+    for (let i = 1; i < ordenados.length; i++) {
+      const [inicio, fim] = ordenados[i];
+      const ultimo = mesclados[mesclados.length - 1];
+      if (inicio <= ultimo[1] + 0.7) {
+        ultimo[1] = Math.max(ultimo[1], fim);
       } else {
-        lines.push({ top: it.top, items: [it] });
+        mesclados.push([inicio, fim]);
       }
     }
-    const parts = lines.map(l => {
-      l.items.sort((a, b) => a.x - b.x);
-      return cleanText(l.items.map(i => i.text).join(" "));
-    }).filter(Boolean);
-    return cleanText(parts.join(" "));
-  }
+    return mesclados;
+  };
 
-  function parseRow(rowItems: PDFItem[], pageWidth: number, forcedLenc: string) {
-    const b = getColumnBounds(pageWidth);
-    const cells: string[] = [];
-    for (let i = 0; i < b.length - 1; i++) {
-      cells.push(textInColumn(rowItems, b[i], b[i + 1]));
+  const calcularLimiteAbaixoDoCabecalho = (items: PDFItem[], cabecalho: any, centroLinha: number): number | null => {
+    const intervalos: [number, number][] = items
+      .filter(i => i.bottom >= cabecalho.top - 22 && i.top <= centroLinha + 5)
+      .map(i => [i.top, i.bottom] as [number, number]);
+
+    const blocos = mesclarIntervalos(intervalos);
+    const espacos = [];
+    for (let i = 0; i < blocos.length - 1; i++) {
+      const atual = blocos[i];
+      const proximo = blocos[i + 1];
+      if (atual[1] < centroLinha && proximo[0] <= centroLinha + 5) {
+        espacos.push({ tamanho: proximo[0] - atual[1], limite: (atual[1] + proximo[0]) / 2 });
+      }
     }
-    const lc = cells[0] || forcedLenc || "";
-    const anv = cells[1] || "";
-    const p1 = cells[2] || "";
-    const p2 = cells[3] || "";
-    const mv = cells[4] || "";
-    const adDest = cells[5] || "";
-    const missao = cells[16] || "";
-    const display = `LÇ ${lc} - ${anv} - ${p1} - ${p2} - ${mv} - ${adDest} - ${missao}`
-      .replace(/\s+-\s+/g, " - ")
-      .replace(/\s{2,}/g, " ")
-      .trim();
+    if (!espacos.length) return null;
+    espacos.sort((a, b) => b.tamanho - a.tamanho);
+    return espacos[0].tamanho > 2 ? espacos[0].limite : null;
+  };
+
+  const regressaoLinear = (pontos: { r: number; x: number }[]) => {
+    if (pontos.length < 2) return null;
+    const mediaR = pontos.reduce((s, p) => s + p.r, 0) / pontos.length;
+    const mediaX = pontos.reduce((s, p) => s + p.x, 0) / pontos.length;
+    const denominador = pontos.reduce((s, p) => s + Math.pow(p.r - mediaR, 2), 0);
+    if (!denominador) return null;
+    const largura = pontos.reduce((s, p) => s + ((p.r - mediaR) * (p.x - mediaX)), 0) / denominador;
+    const esquerda = mediaX - (largura * mediaR);
+    return { esquerda, largura };
+  };
+
+  const calcularGeometriaTabela = (itemsCabecalho: PDFItem[], larguraPagina: number) => {
+    const porRotulo = new Map<string, { r: number; x: number }>();
+
+    for (const item of itemsCabecalho) {
+      const rotulo = normalizarParaBusca(item.texto).replace(/Ç/g, "C");
+      if (Object.prototype.hasOwnProperty.call(HEADER_ANCHORS, rotulo)) {
+        porRotulo.set(rotulo, { r: HEADER_ANCHORS[rotulo as keyof typeof HEADER_ANCHORS], x: item.cx });
+      }
+    }
+
+    const pontos = Array.from(porRotulo.values());
+    if (pontos.length < 3) return null;
+
+    let geometria = regressaoLinear(pontos);
+    if (!geometria) return null;
+
+    const tolerancia = Math.max(6, larguraPagina * 0.012);
+    const filtrados = pontos.filter(p => Math.abs(p.x - (geometria!.esquerda + geometria!.largura * p.r)) < tolerancia);
+    if (filtrados.length >= 3) geometria = regressaoLinear(filtrados);
+    if (!geometria) return null;
+
+    const { esquerda, largura } = geometria;
+    const valida = largura >= larguraPagina * 0.65 &&
+      largura <= larguraPagina * 1.15 &&
+      esquerda >= -larguraPagina * 0.10 &&
+      esquerda <= larguraPagina * 0.20;
+
+    return valida ? geometria : null;
+  };
+
+  const juntarItensDaMesmaLinha = (itens: PDFItem[]): string => {
+    if (!itens.length) return "";
+    const ordenados = itens.slice().sort((a, b) => a.x - b.x);
+    let resultado = "";
+    let anterior: PDFItem | null = null;
+
+    for (const item of ordenados) {
+      const texto = retirarInvisiveis(item.texto).trim();
+      if (!texto) continue;
+
+      if (!resultado) {
+        resultado = texto;
+      } else if (anterior) {
+        const espacoVisual = item.x - anterior.x2;
+        const limiteSemEspaco = Math.max(0.9, Math.min(2.7, item.height * 0.15));
+        resultado += espacoVisual <= limiteSemEspaco ? texto : ` ${texto}`;
+      }
+      anterior = item;
+    }
+    return resultado.trim();
+  };
+
+  const juntarLinhasDaCelula = (linhas: string[]): string => {
+    let resultado = "";
+    for (const linhaOriginal of linhas) {
+      const linha = linhaOriginal.trim();
+      if (!linha) continue;
+      if (!resultado) {
+        resultado = linha;
+        continue;
+      }
+
+      if (resultado.endsWith(" /")) {
+        resultado += ` ${linha}`;
+      } else if (resultado.endsWith("/") || resultado.endsWith("-") || linha.startsWith("/")) {
+        resultado += linha;
+      } else {
+        resultado += ` ${linha}`;
+      }
+    }
+    return resultado.trim();
+  };
+
+  const textoDaCelula = (itemsLinha: PDFItem[], xInicial: number, xFinal: number): string => {
+    const selecionados = itemsLinha
+      .filter(i => i.cx >= xInicial && i.cx < xFinal)
+      .sort((a, b) => (a.cy - b.cy) || (a.x - b.x));
+
+    const linhas: { cy: number; items: PDFItem[] }[] = [];
+    for (const item of selecionados) {
+      const ultima = linhas[linhas.length - 1];
+      const tolerancia = Math.max(2.4, Math.min(4.5, item.height * 0.36));
+      if (ultima && Math.abs(ultima.cy - item.cy) <= tolerancia) {
+        ultima.items.push(item);
+        ultima.cy = ultima.items.reduce((s, i) => s + i.cy, 0) / ultima.items.length;
+      } else {
+        linhas.push({ cy: item.cy, items: [item] });
+      }
+    }
+
+    return juntarLinhasDaCelula(linhas.map(l => juntarItensDaMesmaLinha(l.items)));
+  };
+
+  const montarLancamento = (itemsLinha: PDFItem[], geometria: { esquerda: number; largura: number }, numeroLancamento: string) => {
+    const limites = BASE_BOUNDS.map(r => geometria.esquerda + (geometria.largura * r));
+    const celulas: string[] = [];
+    for (let i = 0; i < limites.length - 1; i++) {
+      celulas.push(textoDaCelula(itemsLinha, limites[i], limites[i + 1]));
+    }
+
+    const lc = numeroLancamento;
+    const anv = celulas[1] || "";
+    const p1 = celulas[2] || "";
+    const p2 = celulas[3] || "";
+    const mv = celulas[4] || "";
+    const adDest = celulas[5] || "";
+    const eobt = celulas[11] || "";
+    const missao = celulas[16] || "";
+
+    const display = [
+      `LÇ ${lc}`,
+      anv,
+      p1,
+      p2,
+      mv,
+      adDest,
+      eobt,
+      missao
+    ].filter(Boolean).join(" - ");
 
     return {
       lc,
@@ -2706,142 +2880,170 @@ async function processPDVFile(file: File) {
       p2,
       mv,
       adDest,
+      eobt,
       missao,
       display,
       uniqueKey: `${lc}_${anv}_${p1}_${p2}_${adDest}_${missao}`.replace(/\s+/g, "")
     };
-  }
-
-  function addLancamento(dia: string, lanc: any) {
-    if (!dia || !lanc || !lanc.lc) return false;
-    if (!dayMap.has(dia)) dayMap.set(dia, []);
-    const arr = dayMap.get(dia)!;
-    const key = `${lanc.lc}|${lanc.anv}|${lanc.p1}|${lanc.p2}|${lanc.mv}|${lanc.adDest}|${lanc.missao}`;
-    if (arr.some(x => `${x.lc}|${x.anv}|${x.p1}|${x.p2}|${x.mv}|${x.adDest}|${x.missao}` === key)) return false;
-    arr.push(lanc);
-    arr.sort((a, b) => Number(a.lc) - Number(b.lc));
-    return true;
-  }
-
-  const state = {
-    pendingDays: [] as { key: string; inactive: boolean }[],
-    lastPending: null as { key: string; inactive: boolean } | null,
-    currentDay: null as string | null,
-    inTable: false,
-    lastRowTop: null as number | null
   };
 
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const viewport = page.getViewport({ scale: 1 });
-    const content = await page.getTextContent();
-    const pageWidth = viewport.width;
-    const pageHeight = viewport.height;
-    
-    const items: PDFItem[] = (content.items as any[]).map(raw => {
-      const text = cleanText(raw.str);
-      const x = raw.transform[4];
-      const y = raw.transform[5];
-      const w = raw.width || 0;
-      const top = pageHeight - y;
-      return { text, x, y, top, width: w, cx: x + (w / 2) };
-    }).filter(it => it.text);
+  const adicionarLancamento = (dia: string, lancamento: any): boolean => {
+    if (!dia || !lancamento || !/^\d{2}$/.test(lancamento.lc)) return false;
+    if (!dayMap.has(dia)) dayMap.set(dia, []);
+    const arr = dayMap.get(dia)!;
 
-    const lines = groupLines(items);
-    const rowStarts = detectRowStarts(items, pageWidth);
+    const key = [
+      dia, lancamento.lc, lancamento.anv, lancamento.p1, lancamento.p2,
+      lancamento.mv, lancamento.adDest, lancamento.eobt, lancamento.missao
+    ].join("|");
 
-    interface EventItem {
-      type: "line" | "row";
-      top: number;
-      line?: LineGroup;
-      rowStart?: PDFItem;
+    if (arr.some(item => `${dia}|${item.lc}|${item.anv}|${item.p1}|${item.p2}|${item.mv}|${item.adDest}|${item.eobt}|${item.missao}` === key)) return false;
+
+    arr.push(lancamento);
+    arr.sort((a, b) => Number(a.lc) - Number(b.lc));
+    return true;
+  };
+
+  for (let numeroPagina = 1; numeroPagina <= pdf.numPages; numeroPagina++) {
+    const pagina = await pdf.getPage(numeroPagina);
+    const viewport = pagina.getViewport({ scale: 1 });
+    const conteudo = await pagina.getTextContent();
+    const larguraPagina = viewport.width;
+    const alturaPagina = viewport.height;
+
+    const items: PDFItem[] = conteudo.items.map((raw: any) => {
+      const transformado = getTransform(viewport.transform, raw.transform);
+      const altura = Math.max(1, Math.abs(raw.height || Math.hypot(transformado[2], transformado[3]) || raw.transform[3] || 1));
+      const largura = Math.max(0, Math.abs((raw.width || 0) * viewport.scale));
+      const x = transformado[4];
+      const baseline = transformado[5];
+      const top = baseline - altura;
+      const bottom = baseline;
+      return {
+        texto: retirarInvisiveis(raw.str),
+        x,
+        x2: x + largura,
+        cx: x + (largura / 2),
+        top,
+        bottom,
+        cy: (top + bottom) / 2,
+        width: largura,
+        height: altura
+      };
+    }).filter((i: any) => i.texto.trim());
+
+    const linhas = agruparLinhas(items);
+    const diasDaPagina: any[] = [];
+    const secoesDaPagina: any[] = [];
+    const cabecalhosDaPagina: any[] = [];
+
+    for (const linha of linhas) {
+      const dia = extrairDiaDoCabecalho(linha.texto);
+      if (dia) diasDaPagina.push({ ...linha, dia });
+      if (ehLinhaDeSecao(linha)) secoesDaPagina.push(linha);
+      if (ehLinhaCabecalhoTabela(linha)) cabecalhosDaPagina.push(linha);
     }
 
-    const events: EventItem[] = [];
-    for (const line of lines) {
-      events.push({ type: "line", top: line.top, line });
+    const candidatos: any[] = [];
+    for (const item of items) {
+      const numero = item.texto.trim();
+      if (!/^\d{2}$/.test(numero) || item.x >= larguraPagina * 0.18) continue;
+      if (candidatos.some(c => Math.abs(c.cy - item.cy) < 2 && c.numero === numero)) continue;
+      candidatos.push({ ...item, numero });
     }
-    for (const rs of rowStarts) {
-      events.push({ type: "row", top: rs.top, rowStart: rs });
-    }
-    events.sort((a, b) => (a.top - b.top) || (a.type === "line" ? -1 : 1));
+    candidatos.sort((a, b) => a.cy - b.cy);
 
-    function nextRowTopAfter(t: number) {
-      const next = rowStarts.find(r => r.top > t + 2);
-      return next ? next.top : null;
-    }
-    function nextSectionTopAfter(t: number) {
-      const next = lines.find(l => l.top > t + 8 && l.text && isSectionLine(l.text));
-      return next ? next.top : null;
-    }
-    function previousRowTopBefore(t: number) {
-      let prev = null;
-      for (const r of rowStarts) {
-        if (r.top < t - 2) prev = r.top;
-        else break;
+    const eventos = [
+      ...diasDaPagina.map(d => ({ tipo: "dia" as const, cy: d.cy, prioridade: 0, dado: d })),
+      ...cabecalhosDaPagina.map(h => ({ tipo: "cabecalho" as const, cy: h.cy, prioridade: 1, dado: h })),
+      ...candidatos.map(c => ({ tipo: "lancamento" as const, cy: c.cy, prioridade: 2, dado: c }))
+    ].sort((a, b) => (a.cy - b.cy) || (a.prioridade - b.prioridade));
+
+    for (const evento of eventos) {
+      if (evento.tipo === "dia") {
+        diaAtual = evento.dado.dia;
+        continue;
       }
-      return prev;
-    }
+      if (evento.tipo !== "lancamento" || !diaAtual) continue;
 
-    for (const ev of events) {
-      if (ev.type === "line" && ev.line) {
-        const txt = ev.line.text || "";
-        const dia = parseDiaFromLine(txt);
-        if (dia) {
-          const obj = { key: dia, inactive: false };
-          state.pendingDays.push(obj);
-          state.lastPending = obj;
-          continue;
-        }
-        if (/SEM\s+ATIVIDADE\s+A[ÉE]REA/i.test(txt) && state.lastPending) {
-          state.lastPending.inactive = true;
-          continue;
-        }
-        if (isTableHeader(txt)) {
-          let chosen = null;
-          while (state.pendingDays.length) {
-            const d = state.pendingDays.shift();
-            if (d && !d.inactive) {
-              chosen = d.key;
-              break;
-            }
-          }
-          if (!chosen) chosen = state.currentDay;
-          state.currentDay = chosen;
-          state.inTable = !!chosen;
-          state.lastRowTop = null;
-          continue;
-        }
-        if (/TRIPULA[ÇC][ÃA]O\s+DE\s+ALERTA/i.test(txt) && state.inTable && state.lastRowTop !== null && ev.top > state.lastRowTop) {
-          state.inTable = false;
-        }
-      } else if (ev.type === "row" && ev.rowStart) {
-        if (!state.inTable || !state.currentDay) continue;
-        const rowTop = ev.rowStart.top;
-        const prev = previousRowTopBefore(rowTop);
-        const next = nextRowTopAfter(rowTop);
-        const nextSection = nextSectionTopAfter(rowTop);
-        const topMin = prev ? ((prev + rowTop) / 2) : (rowTop - 30);
-        const topMaxCandidates = [];
-        if (next !== null) topMaxCandidates.push((rowTop + next) / 2);
-        if (nextSection !== null) topMaxCandidates.push(nextSection - 3);
-        topMaxCandidates.push(pageHeight + 20);
-        const topMax = Math.min(...topMaxCandidates);
+      const candidato = evento.dado;
+      const diaAnteriorNaPagina = diasDaPagina
+        .filter(d => d.cy < candidato.cy)
+        .sort((a, b) => b.cy - a.cy)[0] || null;
+      const proximoDiaNaPagina = diasDaPagina
+        .filter(d => d.cy > candidato.cy)
+        .sort((a, b) => a.cy - b.cy)[0] || null;
 
-        const rowItems = items.filter(it => it.top >= topMin && it.top <= topMax);
-        const lanc = parseRow(rowItems, pageWidth, ev.rowStart.text);
-        if (lanc.lc) {
-          addLancamento(state.currentDay, lanc);
+      const pisoCabecalho = diaAnteriorNaPagina ? diaAnteriorNaPagina.bottom : -Infinity;
+      const cabecalho = cabecalhosDaPagina
+        .filter(h => h.cy > pisoCabecalho && h.cy < candidato.cy)
+        .sort((a, b) => b.cy - a.cy)[0] || null;
+
+      let limiteCabecalho = null;
+      let geometria = {
+        esquerda: geometriaNormalizada.esquerda * larguraPagina,
+        largura: geometriaNormalizada.largura * larguraPagina
+      };
+
+      if (cabecalho) {
+        limiteCabecalho = calcularLimiteAbaixoDoCabecalho(items, cabecalho, candidato.cy);
+        const limiteSuperiorCabecalho = limiteCabecalho ?? (candidato.cy - 10);
+        const itemsCabecalho = items.filter(i =>
+          i.top >= cabecalho.top - 22 && i.bottom <= limiteSuperiorCabecalho + 1
+        );
+        const calculada = calcularGeometriaTabela(itemsCabecalho, larguraPagina);
+        if (calculada) {
+          geometria = calculada;
+          geometriaNormalizada = {
+            esquerda: calculada.esquerda / larguraPagina,
+            largura: calculada.largura / larguraPagina
+          };
         }
-        state.lastRowTop = rowTop;
       }
+
+      const centroEsperadoLc = geometria.esquerda + (geometria.largura * HEADER_ANCHORS.LC);
+      const toleranciaLc = Math.max(20, geometria.largura * 0.035);
+      if (Math.abs(candidato.cx - centroEsperadoLc) > toleranciaLc) continue;
+
+      const candidatosDaTabela = candidatos
+        .filter(c => Math.abs(c.cx - centroEsperadoLc) <= toleranciaLc)
+        .sort((a, b) => a.cy - b.cy);
+      const indice = candidatosDaTabela.indexOf(candidato);
+      if (indice < 0) continue;
+
+      const anterior = indice > 0 ? candidatosDaTabela[indice - 1] : null;
+      const proximo = indice + 1 < candidatosDaTabela.length ? candidatosDaTabela[indice + 1] : null;
+
+      let limiteSuperior = anterior
+        ? (anterior.cy + candidato.cy) / 2
+        : candidato.cy - (proximo ? (proximo.cy - candidato.cy) / 2 : 40);
+      let limiteInferior = proximo
+        ? (candidato.cy + proximo.cy) / 2
+        : alturaPagina + 1;
+
+      if (diaAnteriorNaPagina) limiteSuperior = Math.max(limiteSuperior, diaAnteriorNaPagina.bottom + 1);
+      if (proximoDiaNaPagina) limiteInferior = Math.min(limiteInferior, proximoDiaNaPagina.top - 1);
+      if (limiteCabecalho !== null) limiteSuperior = Math.max(limiteSuperior, limiteCabecalho);
+
+      if (!proximo) {
+        const proximaSecao = secoesDaPagina
+          .filter(s => s.top > candidato.cy)
+          .sort((a, b) => a.top - b.top)[0];
+        if (proximaSecao) limiteInferior = Math.min(limiteInferior, proximaSecao.top - 1);
+        else limiteInferior = Math.min(limiteInferior, alturaPagina + 1);
+      }
+
+      const itemsDaLinha = items.filter(i => i.cy >= limiteSuperior && i.cy < limiteInferior);
+      const lancamento = montarLancamento(itemsDaLinha, geometria, candidato.numero);
+
+      adicionarLancamento(diaAtual, lancamento);
     }
   }
 
   const results: { dateLabel: string; launches: any[] }[] = [];
-  for (const [dateLabel, launches] of dayMap.entries()) {
-    launches.sort((a, b) => Number(a.lc) - Number(b.lc));
-    results.push({ dateLabel, launches });
+  for (const [dateLabel, lcs] of dayMap.entries()) {
+    lcs.sort((a, b) => Number(a.lc) - Number(b.lc));
+    results.push({ dateLabel, launches: lcs });
   }
 
   return results;
