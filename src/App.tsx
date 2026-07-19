@@ -3886,149 +3886,174 @@ function InicioSection({
   fgrs: any[];
   abortivas: any[];
 }) {
+  const shortcuts = [
+    {
+      id: "RELPREV",
+      name: "RELPREV",
+      desc: "Preenchimento de relato",
+      icon: FileSearch,
+    },
+    {
+      id: "FGR",
+      name: "FGR",
+      desc: "Gerenciamento de risco",
+      icon: ShieldCheck,
+    },
+    {
+      id: "Abortiva",
+      name: "Abortiva",
+      desc: "Interrupção de missão",
+      icon: Zap,
+    },
+    {
+      id: "ConsultarFGR",
+      name: "CONSULTAR FGR",
+      desc: "Buscar arquivos FGR",
+      icon: Search,
+      action: onConsultFgr,
+    },
+    {
+      id: "Mapa de Risco",
+      name: "Mapa Risco",
+      desc: "Visualizar mapa de risco",
+      icon: MapIcon,
+    },
+    {
+      id: "Abastecimento",
+      name: "Abastecer",
+      desc: "Controle de combustível",
+      icon: Droplets,
+    },
+    {
+      id: "Medicamentos",
+      name: "Medicamentos",
+      desc: "Uso restritivo",
+      icon: Pill,
+    },
+    {
+      id: "Normas CAvEx",
+      name: "Normas",
+      desc: "Normas CAvEx",
+      icon: Gavel,
+    },
+    {
+      id: "Telefones",
+      name: "Telefones",
+      desc: "Contatos e ramais úteis",
+      icon: Phone,
+    },
+    {
+      id: "Portal Único de Notificação",
+      name: "Portal ANAC",
+      desc: "Notificação externa ANAC",
+      icon: ExternalLink,
+    },
+    {
+      id: "Sugestoes",
+      name: "Sugestões",
+      desc: "Enviar feedback à SIPAA",
+      icon: MessageSquarePlus,
+    },
+  ];
+
   return (
-    <div className="space-y-8">
-      {/* Hero Welcome */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-[#101826] to-[#0d121d] border border-border-theme p-8 lg:p-10 shadow-2xl">
-        <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+    <div className="space-y-6 md:space-y-8">
+      {/* Sleek, Compact Welcome Banner */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0d121d] to-[#080b12] border border-border-theme p-4 sm:p-5 shadow-xl">
+        <div className="absolute top-1/2 -translate-y-1/2 right-6 opacity-5 pointer-events-none hidden sm:block">
           <img
             src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
-            className="w-40 h-40 object-contain"
+            className="w-24 h-24 object-contain"
             alt=""
             referrerPolicy="no-referrer"
           />
         </div>
-        <div className="relative z-10 max-w-2xl">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 bg-accent-gold/20 flex items-center justify-center rounded-xl border border-accent-gold/30 shadow-2xl overflow-hidden">
+        
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 bg-accent-gold/15 flex items-center justify-center rounded-lg border border-accent-gold/20 flex-shrink-0">
               <img
                 src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
-                className="w-10 h-10 object-contain"
+                className="w-8 h-8 object-contain"
                 alt="2º BAvEx Logo"
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div className="w-[1px] h-12 bg-border-theme" />
             <div>
-              <p className="text-accent-gold text-[10px] font-black uppercase tracking-[0.2em]">
-                Exército Brasileiro
-              </p>
-              <h1 className="text-xl font-bold text-white tracking-widest">
-                2º BAvEx
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-accent-gold bg-accent-gold/10 px-1.5 py-0.5 rounded">
+                  SIPAA
+                </span>
+                <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
+                  Exército Brasileiro
+                </span>
+              </div>
+              <h1 className="text-base sm:text-lg font-bold text-white tracking-wider mt-0.5">
+                Segurança de Voo - 2º BAvEx
               </h1>
             </div>
           </div>
-          <p className="text-accent-gold text-xs font-bold uppercase tracking-[0.2em] mb-4">
-            Seção de Investigação e Prevenção de Acidentes Aeronáuticos
-          </p>
-          <motion.h2
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-[28px] font-light text-white mb-6"
-          >
-            Bem-vindo ao Portal de Segurança de Voo
-          </motion.h2>
-          <div className="border-l-2 border-accent-gold pl-6 italic text-text-secondary text-sm max-w-xl leading-relaxed">
-            "A segurança de voo é uma responsabilidade de todos nós. Previna-se,
-            reporte e garanta a integridade de nossa missão."
-          </div>
-          <div className="grid grid-cols-1 gap-4 mt-10 w-full max-w-lg">
-            <button
-              onClick={() => onTabChange("RELPREV")}
-              className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
-            >
-              <div className="flex items-center gap-5">
-                <div className="w-12 h-12 rounded-full bg-military-black/10 flex items-center justify-center">
-                  <FileSearch size={28} className="text-military-black" />
-                </div>
-                <div className="text-left">
-                  <span className="block font-black text-military-black text-lg tracking-widest leading-none">
-                    RELPREV
-                  </span>
-                  <span className="text-[10px] text-military-black/60 font-bold uppercase tracking-tighter mt-1 block">
-                    Relatório de Prevenção
-                  </span>
-                </div>
-              </div>
-              <ChevronRight
-                size={24}
-                className="text-military-black/30 group-hover:translate-x-1 transition-transform"
-              />
-            </button>
-            <button
-              onClick={() => onTabChange("FGR")}
-              className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
-            >
-              <div className="flex items-center gap-5">
-                <div className="w-12 h-12 rounded-full bg-military-black/10 flex items-center justify-center">
-                  <ShieldCheck size={28} className="text-military-black" />
-                </div>
-                <div className="text-left">
-                  <span className="block font-black text-military-black text-lg tracking-widest leading-none">
-                    FGR
-                  </span>
-                  <span className="text-[10px] text-military-black/60 font-bold uppercase tracking-tighter mt-1 block">
-                    Gerenciamento de Risco
-                  </span>
-                </div>
-              </div>
-              <ChevronRight
-                size={24}
-                className="text-military-black/30 group-hover:translate-x-1 transition-transform"
-              />
-            </button>
-            <button
-              onClick={() => onTabChange("Abortiva")}
-              className="group flex items-center justify-between p-6 bg-military-gold rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
-            >
-              <div className="flex items-center gap-5">
-                <div className="w-12 h-12 rounded-full bg-military-black/10 flex items-center justify-center">
-                  <Zap size={28} className="text-military-black" />
-                </div>
-                <div className="text-left">
-                  <span className="block font-black text-military-black text-lg tracking-widest leading-none">
-                    ABORTIVA
-                  </span>
-                  <span className="text-[10px] text-military-black/60 font-bold uppercase tracking-tighter mt-1 block">
-                    Interrupção de Missão
-                  </span>
-                </div>
-              </div>
-              <ChevronRight
-                size={24}
-                className="text-military-black/30 group-hover:translate-x-1 transition-transform"
-              />
-            </button>
-            <button
-              onClick={onConsultFgr}
-              className="group flex items-center justify-between p-6 bg-military-blue border border-white/10 rounded-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border-t-2 border-white/20"
-            >
-              <div className="flex items-center gap-5">
-                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white">
-                  <Search size={24} />
-                </div>
-                <div className="text-left">
-                  <span className="block font-black text-white text-lg tracking-widest leading-none uppercase">
-                    Consultar FGR
-                  </span>
-                  <span className="text-[10px] text-white/60 font-bold uppercase tracking-tighter mt-1 block">
-                    Visualizar arquivos gerados
-                  </span>
-                </div>
-              </div>
-              <ChevronRight
-                size={24}
-                className="text-white/30 group-hover:translate-x-1 transition-transform"
-              />
-            </button>
+          
+          <div className="border-l-2 border-accent-gold pl-3 text-[11px] sm:text-xs italic text-text-secondary max-w-xs leading-relaxed">
+            "A segurança de voo é uma responsabilidade de todos nós. Previna-se."
           </div>
         </div>
-        {/* Abstract Background Element */}
-        <div className="absolute -bottom-12 -right-12 h-64 w-64 bg-accent-gold/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="space-y-4">
-        <h3 className="text-military-gold font-black uppercase text-xs tracking-widest px-1">Estatísticas Operacionais</h3>
+      {/* Grid of Shortcuts (Highly Space-Efficient Launcher Grid) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest">
+            Painel de Acesso Rápido
+          </h3>
+          <span className="text-[9px] text-text-secondary uppercase tracking-tighter">
+            {shortcuts.length} MÓDULOS DE SEGURANÇA
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-11 gap-2 sm:gap-3">
+          {shortcuts.map((item) => {
+            const Icon = item.icon;
+            const isAction = typeof item.action === "function";
+            return (
+              <motion.button
+                key={item.id}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (isAction && item.action) {
+                    item.action();
+                  } else {
+                    onTabChange(item.id as any);
+                  }
+                }}
+                className="flex flex-col items-center justify-center p-2 sm:p-3.5 rounded-xl bg-bg-panel border border-border-theme hover:bg-accent-gold/10 hover:border-accent-gold/40 transition-all text-center aspect-square group shadow-lg cursor-pointer"
+              >
+                {/* Compact Circular Icon */}
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-accent-gold/10 flex items-center justify-center text-accent-gold group-hover:bg-accent-gold group-hover:text-bg-deep transition-all duration-200 mb-1.5 shadow-inner">
+                  <Icon size={16} className="sm:size-20 transition-transform duration-200 group-hover:scale-110" />
+                </div>
+                
+                {/* Module Label */}
+                <span className="text-[9px] sm:text-[11px] font-bold text-white tracking-wide uppercase leading-tight line-clamp-1 max-w-full">
+                  {item.name}
+                </span>
+                
+                {/* Secondary subtitle description - Hidden on Mobile to save valuable real estate */}
+                <span className="hidden sm:block text-[8px] text-text-secondary mt-1 tracking-tight leading-none opacity-75 line-clamp-1 max-w-full">
+                  {item.desc}
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Operative Statistics */}
+      <div className="space-y-3">
+        <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest px-1">
+          Estatísticas Operacionais
+        </h3>
         <AdminStatsDashboard 
           fgrs={fgrs} 
           abortivas={abortivas} 
@@ -4036,45 +4061,12 @@ function InicioSection({
         />
       </div>
 
-      <ImageCarousel />
-
-      {/* Grid Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <QuickCard
-          icon={FileSearch}
-          title="Reportar RELPREV"
-          desc="Registro de relato preventivo."
-          color="blue"
-          onClick={() => onTabChange("RELPREV")}
-        />
-        <QuickCard
-          icon={ShieldCheck}
-          title="Novo FGR"
-          desc="Gerenciamento de risco operacional."
-          color="blue"
-          onClick={() => onTabChange("FGR")}
-        />
-        <QuickCard
-          icon={Zap}
-          title="Abortiva de Voo"
-          desc="Relato de interrupção de missão."
-          color="orange"
-          onClick={() => onTabChange("Abortiva")}
-        />
-        <QuickCard
-          icon={Search}
-          title="Consultar FGR"
-          desc="Visualizar arquivos gerados."
-          color="blue"
-          onClick={onConsultFgr}
-        />
-        <QuickCard
-          icon={Lightbulb}
-          title="Sugestões"
-          desc="Sugira sugestões para o aplicativo da SIPAA."
-          color="gold"
-          onClick={() => onTabChange("Sugestoes")}
-        />
+      {/* Photographic Highlights / Image Carousel */}
+      <div className="space-y-3">
+        <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest px-1">
+          Destaques Fotográficos
+        </h3>
+        <ImageCarousel />
       </div>
     </div>
   );
