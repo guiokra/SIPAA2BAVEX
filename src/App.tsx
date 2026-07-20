@@ -4215,14 +4215,26 @@ function InicioSection({
           </span>
         </div>
 
-        {/* Embedded PDF iframe */}
-        <div className="w-full aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
-          <iframe
-            src="https://drive.google.com/file/d/1mvJ-jwBdtbxMYa6yc_QsWK9GYyqLyRse/preview"
-            className="w-full h-full border-none"
-            allow="autoplay"
-            title="Folder Oficial Jornada de Segurança de Voo 2026"
-          />
+        {/* Scrollable Container representing a Multi-Page Folder (Folder + Quadro de Atividades) */}
+        <div className="w-full aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-y-auto bg-black/50 shadow-2xl relative snap-y snap-mandatory scroll-smooth space-y-4 p-1.5 scrollbar-thin scrollbar-thumb-military-gold">
+          {/* Page 1: Folder Oficial */}
+          <div className="w-full h-full snap-start flex-shrink-0">
+            <iframe
+              src="https://drive.google.com/file/d/1mvJ-jwBdtbxMYa6yc_QsWK9GYyqLyRse/preview"
+              className="w-full h-full border-none rounded-xl"
+              allow="autoplay"
+              title="Folder Oficial Jornada de Segurança de Voo 2026 - Página 1"
+            />
+          </div>
+          {/* Page 2: Quadro de Atividades */}
+          <div className="w-full h-full snap-start flex-shrink-0">
+            <iframe
+              src="https://drive.google.com/file/d/1czP0dR4WduujRKYYLhj2a8XGzsw7fVbF/preview"
+              className="w-full h-full border-none rounded-xl"
+              allow="autoplay"
+              title="Folder Oficial Jornada de Segurança de Voo 2026 - Página 2"
+            />
+          </div>
         </div>
 
         {/* Como Chegar & Pesquisa de Opinião Buttons */}
