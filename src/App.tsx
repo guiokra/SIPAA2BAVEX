@@ -4415,6 +4415,27 @@ function InicioSection({
         </div>
       </div>
 
+      {/* Cartazes 2026 */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest">
+            Cartazes 2026
+          </h3>
+          <span className="text-[9px] text-text-secondary uppercase tracking-tighter">
+            DIVULGAÇÃO E PREVENÇÃO
+          </span>
+        </div>
+        
+        <div className="w-full max-w-[480px] mx-auto aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
+          <iframe
+            src="https://drive.google.com/file/d/12QrZ2iEQuHA0u6oEcpcryk8OnoxDzL9m/preview"
+            className="w-full h-full border-none"
+            allow="autoplay"
+            title="Cartazes 2026 - Prevenção de Acidentes"
+          />
+        </div>
+      </div>
+
       {/* Operative Statistics */}
       <div className="space-y-3">
         <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest px-1">
@@ -4425,14 +4446,6 @@ function InicioSection({
           abortivas={abortivas} 
           launches={launches} 
         />
-      </div>
-
-      {/* Photographic Highlights / Image Carousel */}
-      <div className="space-y-3">
-        <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest px-1">
-          Destaques Fotográficos
-        </h3>
-        <ImageCarousel />
       </div>
     </div>
   );
