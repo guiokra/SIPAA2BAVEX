@@ -61,6 +61,7 @@ import {
   Pill,
   Database,
   Phone,
+  Globe,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -3873,26 +3874,224 @@ function ImageCarousel() {
   );
 }
 
+function PdfFlyerRenderer({ pdfUrl }: { pdfUrl: string }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [numPages, setNumPages] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pdfInstance, setPdfInstance] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    const loadPdf = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const pdfjsLib = (window as any).pdfjsLib || pdfjs;
+        const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
+        const pdf = await loadingTask.promise;
+        if (!active) return;
+        setPdfInstance(pdf);
+        setNumPages(pdf.numPages);
+        setLoading(false);
+      } catch (err: any) {
+        console.error("Erro ao carregar PDF no visualizador:", err);
+        if (active) {
+          setError("Não foi possível renderizar o PDF diretamente no seu navegador. Você pode usar o link para baixar ou visualizar em outra aba.");
+          setLoading(false);
+        }
+      }
+    };
+    loadPdf();
+    return () => {
+      active = false;
+    };
+  }, [pdfUrl]);
+
+  useEffect(() => {
+    if (!pdfInstance) return;
+    let active = true;
+    
+    const renderPage = async () => {
+      try {
+        const page = await pdfInstance.getPage(currentPage);
+        if (!active) return;
+        
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        
+        // Render at 2x resolution for retina-crisp look, scaled down via CSS width
+        const viewport = page.getViewport({ scale: 2.0 });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport,
+        };
+        
+        await page.render(renderContext).promise;
+      } catch (err) {
+        console.error("Erro ao renderizar página do PDF:", err);
+      }
+    };
+    
+    renderPage();
+    return () => {
+      active = false;
+    };
+  }, [pdfInstance, currentPage]);
+
+  return (
+    <div className="flex flex-col items-center justify-center bg-bg-panel/25 border border-border-theme rounded-2xl p-3 sm:p-5 overflow-hidden w-full h-full max-w-[500px] mx-auto">
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-16 space-y-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-gold" />
+          <span className="text-xs text-text-secondary">Carregando visualização do PDF original...</span>
+        </div>
+      )}
+      
+      {error && (
+        <div className="text-center py-12 px-4 space-y-4">
+          <p className="text-xs text-red-400 leading-relaxed">{error}</p>
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-military-gold text-military-black text-xs font-black uppercase tracking-wider"
+          >
+            <ExternalLink size={14} />
+            <span>Visualizar em Nova Guia</span>
+          </a>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <div className="w-full flex flex-col items-center">
+          <div className="w-full overflow-hidden rounded-xl shadow-2xl border border-border-theme bg-bg-deep">
+            <canvas ref={canvasRef} className="w-full h-auto block" />
+          </div>
+          
+          {numPages > 1 && (
+            <div className="flex items-center gap-4 mt-4 bg-bg-deep/80 px-3 py-1.5 rounded-lg border border-border-theme">
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="px-2 py-1 rounded bg-bg-panel border border-border-theme text-[10px] uppercase font-bold text-white hover:bg-accent-gold/10 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+              >
+                Anterior
+              </button>
+              <span className="text-[10px] text-text-secondary font-mono">
+                Página {currentPage} de {numPages}
+              </span>
+              <button
+                disabled={currentPage >= numPages}
+                onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))}
+                className="px-2 py-1 rounded bg-bg-panel border border-border-theme text-[10px] uppercase font-bold text-white hover:bg-accent-gold/10 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+              >
+                Próxima
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InicioSection({
   onTabChange,
   onConsultFgr,
   launches,
   fgrs,
   abortivas,
+  isAdminAuthenticated,
 }: {
   onTabChange: (tab: SectionKey) => void;
   onConsultFgr: () => void;
   launches: any[];
   fgrs: any[];
   abortivas: any[];
+  isAdminAuthenticated?: boolean;
 }) {
+  const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
+  const [isLoadingFlyer, setIsLoadingFlyer] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Opinion survey states for the event
+  const [showOpinionForm, setShowOpinionForm] = useState(false);
+  const [opinionText, setOpinionText] = useState("");
+  const [isOpinionSubmitting, setIsOpinionSubmitting] = useState(false);
+  const [opinionSubmitted, setOpinionSubmitted] = useState(false);
+
+  useEffect(() => {
+    const fetchFlyer = async () => {
+      try {
+        const docRef = doc(db, "configs", "home_flyer");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setFlyerUrl(docSnap.data().pdfUrl || null);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar flyer:", err);
+      } finally {
+        setIsLoadingFlyer(false);
+      }
+    };
+    fetchFlyer();
+  }, []);
+
+  const handleFileUpload = async (file: File) => {
+    if (!file || file.type !== "application/pdf") {
+      alert("Por favor, selecione um arquivo PDF válido.");
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const fileName = `home_flyer_${Date.now()}.pdf`;
+      const storageRef = ref(storage, `configs/${fileName}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      
+      await setDoc(doc(db, "configs", "home_flyer"), {
+        pdfUrl: downloadUrl,
+        uploadedAt: new Date().toISOString(),
+      });
+      
+      setFlyerUrl(downloadUrl);
+    } catch (err) {
+      console.error("Erro ao enviar PDF:", err);
+      alert("Erro ao enviar o PDF. Verifique sua conexão e tente novamente.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
   const shortcuts = [
-    {
-      id: "RELPREV",
-      name: "RELPREV",
-      desc: "Preenchimento de relato",
-      icon: FileSearch,
-    },
     {
       id: "FGR",
       name: "FGR",
@@ -3900,17 +4099,23 @@ function InicioSection({
       icon: ShieldCheck,
     },
     {
-      id: "Abortiva",
-      name: "Abortiva",
-      desc: "Interrupção de missão",
-      icon: Zap,
-    },
-    {
       id: "ConsultarFGR",
       name: "CONSULTAR FGR",
       desc: "Buscar arquivos FGR",
       icon: Search,
       action: onConsultFgr,
+    },
+    {
+      id: "RELPREV",
+      name: "RELPREV",
+      desc: "Preenchimento de relato",
+      icon: FileSearch,
+    },
+    {
+      id: "Abortiva",
+      name: "Abortiva",
+      desc: "Interrupção de missão",
+      icon: Zap,
     },
     {
       id: "Mapa de Risco",
@@ -3997,6 +4202,155 @@ function InicioSection({
           <div className="border-l-2 border-accent-gold pl-3 text-[11px] sm:text-xs italic text-text-secondary max-w-xs leading-relaxed">
             "A segurança de voo é uma responsabilidade de todos nós. Previna-se."
           </div>
+        </div>
+      </div>
+
+      {/* Official Event PDF Flyer (Google Drive Embed) & Map Button */}
+      <div className="flex flex-col items-center justify-center w-full max-w-[500px] mx-auto py-2 space-y-4">
+        {/* Header indicator */}
+        <div className="flex items-center gap-2 select-none">
+          <span className="animate-pulse w-2 h-2 rounded-full bg-accent-gold" />
+          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-accent-gold">
+            Folder Oficial do Evento • Visualização do PDF
+          </span>
+        </div>
+
+        {/* Embedded PDF iframe */}
+        <div className="w-full aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
+          <iframe
+            src="https://drive.google.com/file/d/1mvJ-jwBdtbxMYa6yc_QsWK9GYyqLyRse/preview"
+            className="w-full h-full border-none"
+            allow="autoplay"
+            title="Folder Oficial Jornada de Segurança de Voo 2026"
+          />
+        </div>
+
+        {/* Como Chegar & Pesquisa de Opinião Buttons */}
+        <div className="w-full space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <a
+              href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-2 px-3 bg-military-gold hover:bg-military-gold/90 text-military-black rounded-lg flex items-center justify-center gap-1.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer"
+            >
+              <MapIcon size={12} className="animate-bounce" />
+              <span>Como Chegar</span>
+              <ExternalLink size={10} className="opacity-80" />
+            </a>
+
+            <button
+              onClick={() => {
+                setShowOpinionForm(!showOpinionForm);
+                if (opinionSubmitted) {
+                  setOpinionSubmitted(false);
+                }
+              }}
+              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer ${
+                showOpinionForm
+                  ? "bg-white/10 hover:bg-white/15 border border-white/10 text-white"
+                  : "bg-black/40 hover:bg-black/60 border border-military-gold/30 hover:border-military-gold text-military-gold"
+              }`}
+            >
+              <MessageSquarePlus size={12} />
+              <span>Pesquisa de Opinião</span>
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {showOpinionForm && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden w-full bg-military-black/60 border border-[#b5dc3e]/20 rounded-xl p-4 shadow-xl space-y-3"
+              >
+                {opinionSubmitted ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-4 space-y-2"
+                  >
+                    <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mx-auto border border-green-500/30">
+                      <Check size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Opinião Enviada!</h4>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                        Sua opinião foi enviada com sucesso e aparecerá nas sugestões do administrador. Obrigado!
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setOpinionSubmitted(false)}
+                      className="text-military-gold font-bold uppercase text-[9px] tracking-widest hover:underline pt-1"
+                    >
+                      Enviar outro comentário
+                    </button>
+                  </motion.div>
+                ) : (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!opinionText.trim()) return;
+                      setIsOpinionSubmitting(true);
+                      try {
+                        await addDoc(collection(db, "suggestions"), {
+                          text: `[PESQUISA DE OPINIÃO - JORNADA 2026] ${opinionText.trim()}`,
+                          submittedBy: auth.currentUser?.email || auth.currentUser?.uid || "Anônimo",
+                          createdAt: new Date().toISOString(),
+                        });
+                        setOpinionSubmitted(true);
+                        setOpinionText("");
+                      } catch (err) {
+                        console.error("Erro ao enviar opinião:", err);
+                        alert("Erro ao enviar sua opinião. Tente novamente mais tarde.");
+                      } finally {
+                        setIsOpinionSubmitting(false);
+                      }
+                    }}
+                    className="space-y-3"
+                  >
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-black text-[#b5dc3e] uppercase tracking-widest flex items-center gap-1.5">
+                        <MessageSquarePlus size={10} /> O que você achou do evento? (Texto Livre)
+                      </label>
+                      <textarea
+                        value={opinionText}
+                        onChange={(e) => setOpinionText(e.target.value)}
+                        placeholder="Escreva aqui seu feedback, sugestão, ou avaliação sobre a Jornada de Segurança de Voo 2026..."
+                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-[#b5dc3e] outline-none transition-all min-h-[90px] text-[11px] leading-relaxed placeholder:text-slate-600 italic"
+                        disabled={isOpinionSubmitting}
+                        required
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isOpinionSubmitting || !opinionText.trim()}
+                      className="w-full py-2 px-3 bg-[#b5dc3e] hover:bg-[#a4ca33] disabled:opacity-45 text-black font-black text-[10px] uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer"
+                    >
+                      {isOpinionSubmitting ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>Enviando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={11} />
+                          <span>Enviar Opinião</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <p className="text-[9px] text-text-secondary text-center uppercase tracking-wide select-none leading-normal">
+            📍 Auditório do Museu Mazzaropi • Taubaté-SP <br />
+            Estr. Amácio Mazzaropi, 249 - Itaim, Taubaté-SP
+          </p>
         </div>
       </div>
 
