@@ -15,11 +15,18 @@ window.addEventListener("unhandledrejection", (event) => {
 
 // Ensure service worker bypasses /api requests (Network-only for /api)
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      registration.update();
-    }
-  });
+  try {
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => {
+        for (const registration of registrations) {
+          registration.update().catch(() => {});
+        }
+      })
+      .catch(() => {});
+  } catch (err) {
+    console.warn("ServiceWorker registrations ignored:", err);
+  }
 }
 
 createRoot(document.getElementById("root")!).render(

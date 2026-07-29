@@ -24,31 +24,21 @@ html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   height: 100%;
-  height: -webkit-fill-available;
 }
 
 body {
   @apply bg-bg-deep text-[#e6e9ef] font-sans antialiased;
   min-height: 100%;
-  min-height: -webkit-fill-available;
   min-height: 100dvh;
   touch-action: manipulation;
-  overscroll-behavior-y: none;
 }
 
 #root {
   min-height: 100%;
-  min-height: -webkit-fill-available;
   min-height: 100dvh;
 }
 
-/* Enable iOS Momentum Smooth Scrolling on Scrollable Containers */
-.overflow-y-auto,
-.overflow-x-auto,
-.overflow-auto,
-.custom-scrollbar {
-  -webkit-overflow-scrolling: touch;
-}
+/* Remove -webkit-overflow-scrolling to prevent WebKit compositor locks in iOS 13+ */
 
 /* Prevent iOS Auto-Zoom on Form Inputs / Selects / Textareas on Mobile */
 @media screen and (max-width: 767px) {

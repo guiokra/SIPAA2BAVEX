@@ -3127,7 +3127,7 @@ function AppLayoutContent({
         if (mainScrollRef.current) {
           mainScrollRef.current.scrollTop = 0;
         }
-        window.scrollTo({ top: 0, left: 0, behavior: "instant" as any });
+        window.scrollTo(0, 0);
       });
     }, 60);
 
@@ -3882,13 +3882,19 @@ export default function App() {
   const [isConsultFgrModalOpen, setIsConsultFgrModalOpen] = useState(false);
 
   useEffect(() => {
+    let lastIsMobile = window.innerWidth < 1024;
+    setIsMobile(lastIsMobile);
+    setIsSidebarOpen(!lastIsMobile);
+
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
-      setIsMobile(mobile);
-      if (mobile) setIsSidebarOpen(false);
-      else setIsSidebarOpen(true);
+      if (mobile !== lastIsMobile) {
+        lastIsMobile = mobile;
+        setIsMobile(mobile);
+        setIsSidebarOpen(!mobile);
+      }
     };
-    checkMobile();
+
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
@@ -11915,26 +11921,6 @@ function OptionGroup({
   value: string;
   onChange: (val: string) => void;
 }) {
-  const handleSelect = (opt: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Find the parent scroll container or window scroll position
-    const scrollElem = (e.currentTarget as HTMLElement).closest(".overflow-y-auto") as HTMLElement | null;
-    const currentScrollTop = scrollElem ? scrollElem.scrollTop : window.scrollY;
-
-    onChange(opt);
-
-    // Keep scroll position exactly as it was
-    requestAnimationFrame(() => {
-      if (scrollElem) {
-        scrollElem.scrollTop = currentScrollTop;
-      } else {
-        window.scrollTo(0, currentScrollTop);
-      }
-    });
-  };
-
   return (
     <div className="space-y-3 p-5 rounded-xl bg-white/2 border border-white/5 hover:border-military-gold/20 transition-all text-left">
       <div className="text-xs sm:text-sm font-bold text-white flex items-start gap-2.5 leading-snug select-none">
@@ -11947,13 +11933,11 @@ function OptionGroup({
         {options.map((opt) => {
           const isSelected = value === opt;
           return (
-            <div
+            <button
               key={opt}
-              role="button"
-              tabIndex={0}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => handleSelect(opt, e)}
-              className={`py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-colors duration-150 border cursor-pointer flex items-center justify-center gap-2 select-none ${
+              type="button"
+              onClick={() => onChange(opt)}
+              className={`py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-colors duration-150 border cursor-pointer flex items-center justify-center gap-2 select-none touch-manipulation ${
                 isSelected
                   ? "bg-military-gold text-military-black border-military-gold shadow-md shadow-military-gold/10"
                   : "bg-military-black/60 text-slate-300 border-white/10 hover:border-military-gold/40 hover:text-white hover:bg-white/5"
@@ -11971,7 +11955,7 @@ function OptionGroup({
                 )}
               </div>
               <span>{opt}</span>
-            </div>
+            </button>
           );
         })}
       </div>
