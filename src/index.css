@@ -1,22 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-bg-deep: #0a0f1d;
-  --color-bg-panel: rgba(15, 23, 42, 0.75);
-  --color-bg-sidebar: #0f172a;
-  --color-accent-gold: #fbbf24;
-  --color-accent-gold-dark: #d97706;
-  --color-accent-blue: #3b82f6;
-  --color-military-gold: #fbbf24;
-  --color-military-gold-dark: #d97706;
-  --color-military-blue: #3b82f6;
-  --color-military-black: #0a0f1d;
-  --color-text-secondary: #94a3b8;
-  --color-border-theme: rgba(251, 191, 36, 0.2);
+  --color-bg-deep: #05070a;
+  --color-bg-panel: #0d121d;
+  --color-bg-sidebar: #090d16;
+  --color-accent-gold: #c5a059;
+  --color-accent-gold-dark: #8e6d2d;
+  --color-accent-blue: #1e4b8a;
+  --color-military-gold: #c5a059;
+  --color-military-gold-dark: #8e6d2d;
+  --color-military-blue: #1e4b8a;
+  --color-military-black: #05070a;
+  --color-text-secondary: #8a94a6;
+  --color-border-theme: rgba(197, 160, 89, 0.2);
 }
 
 /* iOS Safari & Touch Device Optimization */
@@ -24,29 +24,30 @@ html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   height: 100%;
+  height: -webkit-fill-available;
 }
 
 body {
-  @apply bg-[#0a0f1d] text-[#f8fafc] font-sans antialiased;
+  @apply bg-bg-deep text-[#e6e9ef] font-sans antialiased;
   min-height: 100%;
+  min-height: -webkit-fill-available;
   min-height: 100dvh;
   touch-action: manipulation;
+  overscroll-behavior-y: none;
 }
 
 #root {
   min-height: 100%;
+  min-height: -webkit-fill-available;
   min-height: 100dvh;
 }
 
-/* Force hardware layer isolation on scrollable containers */
+/* Enable iOS Momentum Smooth Scrolling on Scrollable Containers */
 .overflow-y-auto,
 .overflow-x-auto,
 .overflow-auto,
-.custom-scrollbar,
-.gpu-scroll {
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  will-change: scroll-position;
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Prevent iOS Auto-Zoom on Form Inputs / Selects / Textareas on Mobile */
@@ -83,8 +84,8 @@ iframe {
 @layer base {
   /* Custom Scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 4px;
+    height: 4px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
@@ -92,21 +93,21 @@ iframe {
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-amber-500/20 rounded-full hover:bg-amber-400/40 transition-colors;
+    @apply bg-border-theme rounded-full hover:bg-accent-gold/40 transition-colors;
   }
 }
 
 @layer components {
   .btn-military {
-    @apply px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10 cursor-pointer border border-amber-300/40;
+    @apply px-4 py-2 bg-accent-gold hover:bg-accent-gold-dark text-bg-deep font-semibold rounded-sm transition-all duration-200 flex items-center justify-center gap-2;
   }
   
   .card-military {
-    @apply border border-slate-800/80 bg-slate-900/70 backdrop-blur-md rounded-2xl p-5 shadow-2xl;
+    @apply border border-border-theme bg-bg-panel rounded-lg p-5 shadow-lg;
   }
 
   .input-military {
-    @apply w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-[#f8fafc] placeholder:text-slate-500 focus:border-amber-400 outline-none transition-colors;
+    @apply w-full bg-bg-deep border border-border-theme rounded p-2.5 text-[#e6e9ef] focus:border-accent-gold outline-none transition-colors;
   }
 
   .logo-hex {

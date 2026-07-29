@@ -76,7 +76,6 @@ import {
   Globe,
   Sparkles,
   RefreshCw,
-  ClipboardList,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -2552,8 +2551,7 @@ type SectionKey =
   | "Normas CAvEx"
   | "Telefones"
   | "Admin"
-  | "Sugestoes"
-  | "JSV";
+  | "Sugestoes";
 
 const MONTHS_MAP: Record<string, string> = {
   JANEIRO: "01",
@@ -3078,7 +3076,6 @@ const TAB_TO_PATH: Record<string, string> = {
   Telefones: "/telefones",
   Admin: "/admin",
   Sugestoes: "/sugestoes",
-  JSV: "/pesquisa-jsv",
 };
 
 const PATH_TO_TAB: Record<string, string> = {
@@ -3093,7 +3090,6 @@ const PATH_TO_TAB: Record<string, string> = {
   "/telefones": "Telefones",
   "/admin": "Admin",
   "/sugestoes": "Sugestoes",
-  "/pesquisa-jsv": "JSV",
 };
 
 function AppLayoutContent({
@@ -3127,7 +3123,7 @@ function AppLayoutContent({
         if (mainScrollRef.current) {
           mainScrollRef.current.scrollTop = 0;
         }
-        window.scrollTo(0, 0);
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" as any });
       });
     }, 60);
 
@@ -3142,32 +3138,23 @@ function AppLayoutContent({
       );
       return;
     }
-    if (tab === "Admin") {
-      if (!isAdminAuthenticated) {
-        setIsAdminModalOpen(true);
+    if (tab === "Admin" && !isAdminAuthenticated) {
+      setIsAdminModalOpen(true);
+      return;
+    }
+
+    if (tab === "Inicio" || tab === "BACK") {
+      if (window.history.length > 1 && location.pathname !== "/") {
+        navigate(-1);
       } else {
-        window.location.href = "/admin";
+        navigate("/");
       }
       return;
     }
 
     const path = TAB_TO_PATH[tab] || "/";
-    if (window.location.pathname !== path) {
-      window.location.href = path;
-    }
+    navigate(path);
     if (isMobile) setIsSidebarOpen(false);
-  };
-
-  const onAdminLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminPassword === "sipaa2bavex") {
-      setIsAdminAuthenticated(true);
-      setIsAdminModalOpen(false);
-      setAdminPassword("");
-      navigate("/admin");
-    } else {
-      alert("Senha incorreta");
-    }
   };
 
   const navItems = [
@@ -3181,7 +3168,6 @@ function AppLayoutContent({
     { id: "Normas CAvEx", path: "/normas-cavex", name: "Normas CAvEx", icon: Gavel },
     { id: "Telefones", path: "/telefones", name: "Telefones", icon: Phone },
     { id: "Sugestoes", path: "/sugestoes", name: "Sugestões", icon: MessageSquarePlus },
-    { id: "JSV", path: "/pesquisa-jsv", name: "Pesquisa de Opinião", icon: ClipboardList },
   ];
 
   const sectionProps = {
@@ -3198,9 +3184,6 @@ function AppLayoutContent({
     fgrs,
     abortivas,
     isAdminAuthenticated,
-    setIsAdminAuthenticated,
-    adminPassword,
-    setAdminPassword,
   };
 
   const isNavActive = (itemPath: string) => {
@@ -3213,169 +3196,257 @@ function AppLayoutContent({
   const isAdminActive = location.pathname.startsWith("/admin");
 
   return (
-    <div className="flex flex-col h-[100dvh] min-h-[100dvh] w-full bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
+    <div className="flex h-[100dvh] min-h-[100dvh] w-full bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
       {/* Admin Password Modal */}
-      {isAdminModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
-          <div className="card-military max-w-sm w-full p-6 sm:p-8 space-y-6 max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="flex flex-col items-center gap-4 text-center mb-4">
-              <img
-                src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
-                alt="2º BAvEx Logo"
-                className="w-16 h-16 object-contain"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  e.currentTarget.src =
-                    "https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png";
-                }}
-              />
-              <div className="flex justify-between items-center w-full">
-                <h3 className="text-military-gold font-black uppercase text-xs tracking-widest flex items-center gap-2">
-                  <Lock size={14} />
-                  Acesso Administrativo
-                </h3>
-                <button
-                  onClick={() => setIsAdminModalOpen(false)}
-                  className="text-text-secondary hover:text-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-            <form onSubmit={onAdminLoginSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-bold text-text-secondary">
-                  Senha de Acesso
-                </label>
-                <input
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  className="w-full bg-military-black border border-border-theme rounded p-3 text-white focus:border-military-gold outline-none"
-                  placeholder="••••••••"
-                  autoFocus
+      <AnimatePresence>
+        {isAdminModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/80 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="card-military max-w-sm w-full p-6 sm:p-8 space-y-6 max-h-[90dvh] overflow-y-auto my-auto"
+            >
+              <div className="flex flex-col items-center gap-4 text-center mb-4">
+                <img
+                  src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
+                  alt="2º BAvEx Logo"
+                  className="w-16 h-16 object-contain"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.src =
+                      "https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png";
+                  }}
                 />
+                <div className="flex justify-between items-center w-full">
+                  <h3 className="text-military-gold font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                    <Lock size={14} />
+                    Acesso Administrativo
+                  </h3>
+                  <button
+                    onClick={() => setIsAdminModalOpen(false)}
+                    className="text-text-secondary hover:text-white"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
-              <button
-                type="submit"
-                className="btn-military w-full py-3 text-xs font-black uppercase"
-              >
-                AUTENTICAR
-              </button>
-            </form>
+              <form onSubmit={handleAdminLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-text-secondary">
+                    Senha de Acesso
+                  </label>
+                  <input
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    className="w-full bg-military-black border border-border-theme rounded p-3 text-white focus:border-military-gold outline-none transition-colors"
+                    placeholder="••••••••"
+                    autoFocus
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="btn-military w-full py-3 text-xs"
+                >
+                  AUTENTICAR
+                </button>
+              </form>
+            </motion.div>
           </div>
-        </div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Backdrop Overlay */}
+      {isMobile && isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden transition-opacity"
+        />
       )}
 
-      {/* Header */}
-      <header className="h-[56px] md:h-[64px] border-b border-slate-800/80 bg-[#0f172a]/85 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30 shadow-lg sticky top-0">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <button
-            onClick={() => handleTabChange("Inicio")}
-            className="flex items-center gap-2.5 group text-left cursor-pointer"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-amber-400/20 to-yellow-600/10 flex items-center justify-center rounded-xl border border-amber-400/40 group-hover:border-amber-400 group-hover:shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all">
-              <img
-                src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
-                className="w-6 h-6 sm:w-7 sm:h-7 object-contain"
-                alt="2º BAvEx Logo"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                  const parent = e.currentTarget.parentElement;
-                  if (parent) {
-                    const fallback = document.createElement("div");
-                    fallback.className = "text-amber-400 text-lg font-bold";
-                    fallback.innerText = "2";
-                    parent.appendChild(fallback);
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <span className="text-sm sm:text-base font-black tracking-wider text-amber-400 group-hover:text-white transition-colors leading-none block uppercase">
-                2º BAvEx
-              </span>
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mt-0.5">
-                SIPAA • Aviação do Exército
-              </span>
-            </div>
-          </button>
-
-          <div className="h-5 w-[1px] bg-slate-800 hidden sm:block mx-1" />
-
-          <button
-            onClick={() => handleTabChange("Inicio")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 backdrop-blur-md border border-slate-700/60 hover:border-amber-400/80 text-slate-200 hover:text-amber-400 text-xs font-bold uppercase transition-all cursor-pointer shadow-sm"
-          >
-            <Home size={14} className="text-amber-400" />
-            <span>Início</span>
-          </button>
+      {/* Sidebar */}
+      <motion.aside
+        initial={false}
+        animate={{
+          width: isSidebarOpen ? (isMobile ? "280px" : "240px") : "0px",
+          x: isSidebarOpen ? 0 : isMobile ? -300 : -240,
+        }}
+        className={`fixed lg:relative inset-y-0 left-0 z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-[100dvh] max-h-[100dvh] shadow-2xl transition-all duration-300 ease-in-out`}
+      >
+        <div className="p-6 flex items-center gap-3 border-b border-border-theme">
+          <div className="w-10 h-10 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30">
+            <img
+              src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
+              className="w-8 h-8 object-contain"
+              alt="2º BAvEx Logo"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  const fallback = document.createElement("div");
+                  fallback.className = "text-accent-gold text-xl font-bold";
+                  fallback.innerText = "2";
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-lg font-bold tracking-widest text-accent-gold leading-none">
+              2º BAvEx
+            </span>
+            <span className="text-[10px] text-text-secondary font-medium mt-1 uppercase tracking-widest">
+              Exército Brasileiro
+            </span>
+          </div>
+          {isMobile && (
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="ml-auto text-slate-400 hover:text-white transition-colors"
+            >
+              <X size={24} />
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-6 text-xs text-slate-400">
-          <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>SIPAA Operacional</span>
-          </div>
+        {/* Scrollable Menu Area */}
+        <div className="flex-1 overflow-y-auto py-4 custom-scrollbar">
+          <nav className="space-y-0.5">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = isNavActive(item.path);
+              return (
+                <NavLink
+                  key={item.id}
+                  to={item.path}
+                  onClick={() => {
+                    if (isMobile) setIsSidebarOpen(false);
+                  }}
+                  className={({ isActive: linkActive }) =>
+                    `w-full flex items-center gap-4 px-6 py-3 transition-all duration-200 group relative border-l-[3px] ${
+                      linkActive || active
+                        ? "bg-accent-gold/10 text-accent-gold border-l-accent-gold"
+                        : "text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent"
+                    }`
+                  }
+                >
+                  <div className="flex-shrink-0 w-5 flex justify-center">
+                    <Icon
+                      size={16}
+                      className={
+                        active
+                          ? "text-accent-gold"
+                          : "text-text-secondary group-hover:text-white"
+                      }
+                    />
+                  </div>
+                  <span className="text-[13px] font-medium text-left leading-tight block flex-1">
+                    {item.name}
+                  </span>
+                </NavLink>
+              );
+            })}
+          </nav>
+        </div>
 
+        {/* User profile & Admin Section at Bottom */}
+        <div className="px-4 py-4 border-t border-border-theme space-y-4">
           <button
             onClick={() => handleTabChange("Admin")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest ${
               isAdminActive
-                ? "bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20"
-                : "bg-amber-400/10 text-amber-400 border border-amber-400/30 hover:bg-amber-400 hover:text-slate-950"
+                ? "bg-accent-gold text-bg-deep shadow-lg shadow-accent-gold/10"
+                : "text-accent-gold border border-accent-gold/20 hover:bg-accent-gold/10"
             }`}
           >
-            {isAdminAuthenticated ? <Unlock size={13} /> : <Lock size={13} />}
-            <span className="hidden sm:inline">Portal Administrativo</span>
-            <span className="sm:hidden">Admin</span>
+            <div className="flex-shrink-0 w-4 flex justify-center">
+              {isAdminAuthenticated ? <Unlock size={12} /> : <Lock size={12} />}
+            </div>
+            <span className="text-left flex-1">Área Administrativa</span>
           </button>
-
-          <span className="hidden lg:block text-[11px] font-mono font-medium text-slate-400">
-            Taubaté, SP | {new Date().toLocaleDateString("pt-BR")} |{" "}
-            {new Date().toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}{" "}
-            Z
-          </span>
         </div>
-      </header>
+      </motion.aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-h-0 bg-bg-deep relative overflow-hidden">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-full bg-bg-deep relative overflow-hidden">
+        {/* Header */}
+        <header className="h-[50px] md:h-[60px] border-b border-border-theme bg-bg-panel/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30 shadow-sm">
+          <div className="flex items-center gap-4">
+            {!isSidebarOpen && (
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded transition-all"
+              >
+                <Menu size={18} />
+              </button>
+            )}
+            <button
+              onClick={() => handleTabChange("Admin")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[10px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black transition-all cursor-pointer"
+            >
+              <Lock size={12} />
+              <span className="hidden sm:inline">Portal Administrativo</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-6 text-[12px] text-text-secondary">
+            <span className="hidden md:block">
+              Taubaté, SP | {new Date().toLocaleDateString("pt-BR")} |{" "}
+              {new Date().toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}{" "}
+              Z
+            </span>
+          </div>
+        </header>
 
         {/* Content Area */}
-        <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar gpu-scroll">
-          <div key={location.pathname} className="max-w-7xl mx-auto w-full pb-20">
-            <Routes>
-              <Route path="/" element={<InicioSection {...sectionProps} />} />
-              <Route path="/relprev" element={<RelprevSection {...sectionProps} />} />
-              <Route path="/relprev/:id" element={<RelprevSection {...sectionProps} />} />
-              <Route path="/fgr" element={<FgrSection {...sectionProps} />} />
-              <Route path="/fgr/:id" element={<FgrSection {...sectionProps} />} />
-              <Route path="/abortiva" element={<AbortivaSection {...sectionProps} />} />
-              <Route path="/abortiva/:id" element={<AbortivaSection {...sectionProps} />} />
-              <Route path="/mapa-de-risco" element={<MapaRiscoSection {...sectionProps} />} />
-              <Route path="/abastecimento" element={<AbastecimentoSection {...sectionProps} />} />
-              <Route path="/medicamentos" element={<MedicamentosSection {...sectionProps} />} />
-              <Route path="/normas-cavex" element={<NormasSection {...sectionProps} />} />
-              <Route path="/telefones" element={<TelefonesSection {...sectionProps} />} />
-              <Route path="/sugestoes" element={<SugestoesSection {...sectionProps} />} />
-              <Route path="/pesquisa-jsv" element={<JsvSurveySection {...sectionProps} />} />
-              <Route path="/admin" element={<AdminSection {...sectionProps} />} />
-              <Route path="/admin/:sub" element={<AdminSection {...sectionProps} />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </div>
+        <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full pb-20"
+            >
+              <Routes>
+                <Route path="/" element={<InicioSection {...sectionProps} />} />
+                <Route path="/relprev" element={<RelprevSection {...sectionProps} />} />
+                <Route path="/relprev/:id" element={<RelprevSection {...sectionProps} />} />
+                <Route path="/fgr" element={<FgrSection {...sectionProps} />} />
+                <Route path="/fgr/:id" element={<FgrSection {...sectionProps} />} />
+                <Route path="/abortiva" element={<AbortivaSection {...sectionProps} />} />
+                <Route path="/abortiva/:id" element={<AbortivaSection {...sectionProps} />} />
+                <Route path="/mapa-de-risco" element={<MapaRiscoSection {...sectionProps} />} />
+                <Route path="/abastecimento" element={<AbastecimentoSection {...sectionProps} />} />
+                <Route path="/medicamentos" element={<MedicamentosSection {...sectionProps} />} />
+                <Route path="/normas-cavex" element={<NormasSection {...sectionProps} />} />
+                <Route path="/telefones" element={<TelefonesSection {...sectionProps} />} />
+                <Route path="/sugestoes" element={<SugestoesSection {...sectionProps} />} />
+                <Route path="/admin" element={<AdminSection {...sectionProps} />} />
+                <Route path="/admin/:sub" element={<AdminSection {...sectionProps} />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
 
       {/* Consult FGR Modal */}
-      {isConsultFgrModalOpen && (
-        <div className="fixed inset-0 z-[60] bg-military-black/95 flex items-center justify-center p-4 overflow-y-auto gpu-scroll">
-          <div className="bg-military-black border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col shadow-2xl my-auto">
+      <AnimatePresence>
+        {isConsultFgrModalOpen && (
+          <div className="fixed inset-0 z-[60] bg-military-black/95 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-military-black border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col shadow-2xl my-auto"
+            >
               <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-military-gold flex items-center justify-center text-military-black">
@@ -3657,9 +3728,10 @@ function AppLayoutContent({
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -3804,19 +3876,13 @@ export default function App() {
   const [isConsultFgrModalOpen, setIsConsultFgrModalOpen] = useState(false);
 
   useEffect(() => {
-    let lastIsMobile = window.innerWidth < 1024;
-    setIsMobile(lastIsMobile);
-    setIsSidebarOpen(!lastIsMobile);
-
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
-      if (mobile !== lastIsMobile) {
-        lastIsMobile = mobile;
-        setIsMobile(mobile);
-        setIsSidebarOpen(!mobile);
-      }
+      setIsMobile(mobile);
+      if (mobile) setIsSidebarOpen(false);
+      else setIsSidebarOpen(true);
     };
-
+    checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
@@ -3885,23 +3951,35 @@ function ImageCarousel() {
 
   return (
     <div className="relative w-full h-[400px] lg:h-[500px] overflow-hidden rounded-lg group border border-border-theme bg-[#0a0f18] select-none">
-      {/* Background */}
-      <div
-        key={`bg-${CAROUSEL_IMAGES[currentIndex]}`}
-        className="absolute inset-0 z-0 bg-center bg-cover opacity-20"
-        style={{ backgroundImage: `url(${CAROUSEL_IMAGES[currentIndex]})` }}
-      />
+      {/* Blurred Background */}
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={`bg-${CAROUSEL_IMAGES[currentIndex]}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.3 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8 }}
+          className="absolute inset-0 z-0 bg-center bg-cover blur-2xl scale-110"
+          style={{ backgroundImage: `url(${CAROUSEL_IMAGES[currentIndex]})` }}
+        />
+      </AnimatePresence>
 
       {/* Main Content */}
       <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-4">
         {/* Active Image Container */}
         <div className="relative w-full max-w-4xl h-[75%] flex items-center justify-center">
-          <img
-            key={CAROUSEL_IMAGES[currentIndex]}
-            src={CAROUSEL_IMAGES[currentIndex]}
-            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-            referrerPolicy="no-referrer"
-          />
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={CAROUSEL_IMAGES[currentIndex]}
+              src={CAROUSEL_IMAGES[currentIndex]}
+              initial={{ opacity: 0, scale: 0.95, x: 20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 1.05, x: -20 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              referrerPolicy="no-referrer"
+            />
+          </AnimatePresence>
 
           {/* Navigation Arrows */}
           <button
@@ -4099,72 +4177,6 @@ function InicioSection({
   const [isOpinionSubmitting, setIsOpinionSubmitting] = useState(false);
   const [opinionSubmitted, setOpinionSubmitted] = useState(false);
 
-  const mainNavModules = [
-    {
-      id: "RELPREV",
-      name: "PREENCHIMENTO DE RELPREV",
-      icon: FileSearch,
-      desc: "Relato de Prevenção de Acidentes Aeronáuticos — notificação identificada ou confidencial.",
-      tag: "Relato Prev",
-    },
-    {
-      id: "FGR",
-      name: "FGR — Ficha de Gerenciamento de Risco",
-      icon: ShieldCheck,
-      desc: "Formulário e consulta de análises operacionais de risco de missão.",
-      tag: "Gerenciamento",
-    },
-    {
-      id: "Abortiva",
-      name: "Abortiva — Relato de Ocorrência Abortiva",
-      icon: Zap,
-      desc: "Registro e estatísticas operacionais de missões interrompidas.",
-      tag: "Ocorrência",
-    },
-    {
-      id: "Mapa de Risco",
-      name: "Mapa de Risco Operacional",
-      icon: MapIcon,
-      desc: "Matriz dinâmica e visualização territorial de fatores de risco.",
-      tag: "Mapeamento",
-    },
-    {
-      id: "Abastecimento",
-      name: "Abastecimento — Controle e Laudos",
-      icon: Droplets,
-      desc: "Controle de qualidade de combustível de aviação e boletins de amostragem.",
-      tag: "Combustível",
-    },
-    {
-      id: "Medicamentos",
-      name: "Medicamentos de Uso Restritivo",
-      icon: Pill,
-      desc: "Consulta de remédios e prazos de afastamento temporário do voo.",
-      tag: "Saúde Operacional",
-    },
-    {
-      id: "Normas CAvEx",
-      name: "Normas CAvEx",
-      icon: Gavel,
-      desc: "Manuais, diretrizes e normas do Comando de Aviação do Exército.",
-      tag: "Publicações",
-    },
-    {
-      id: "Telefones",
-      name: "Telefones e Emergência",
-      icon: Phone,
-      desc: "Ramais diretos da SIPAA/2º BAvEx e contatos do Facão de Segurança.",
-      tag: "Contatos",
-    },
-    {
-      id: "Sugestoes",
-      name: "Sugestões de Segurança",
-      icon: MessageSquarePlus,
-      desc: "Canal direto para envio de propostas e ideias de melhorias.",
-      tag: "Participação",
-    },
-  ];
-
   useEffect(() => {
     const fetchFlyer = async () => {
       try {
@@ -4229,47 +4241,55 @@ function InicioSection({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* Sleek, Compact Glassmorphic Welcome Banner */}
-      <div className="card-military bg-slate-900/70 backdrop-blur-md border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl relative overflow-hidden">
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
+      {/* Sleek, Compact Welcome Banner */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0d121d] to-[#080b12] border border-border-theme p-4 sm:p-5 shadow-xl">
+        <div className="absolute top-1/2 -translate-y-1/2 right-6 opacity-5 pointer-events-none hidden sm:block">
+          <img
+            src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
+            className="w-24 h-24 object-contain"
+            alt=""
+            referrerPolicy="no-referrer"
+          />
+        </div>
+        
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400/20 to-yellow-600/10 border border-amber-400/40 flex items-center justify-center p-2 shadow-lg flex-shrink-0">
+            <div className="w-11 h-11 bg-accent-gold/15 flex items-center justify-center rounded-lg border border-accent-gold/20 flex-shrink-0">
               <img
                 src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
+                className="w-8 h-8 object-contain"
                 alt="2º BAvEx Logo"
-                className="w-full h-full object-contain"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/30">
-                  SIPAA 2026
+                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-accent-gold bg-accent-gold/10 px-1.5 py-0.5 rounded">
+                  SIPAA
                 </span>
-                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
+                <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
                   Exército Brasileiro
                 </span>
               </div>
-              <h1 className="text-base sm:text-xl font-black text-white tracking-wider mt-1 uppercase">
+              <h1 className="text-base sm:text-lg font-bold text-white tracking-wider mt-0.5">
                 Segurança de Voo - 2º BAvEx
               </h1>
             </div>
           </div>
           
-          <div className="border-l-2 border-amber-400/60 pl-3 text-[11px] sm:text-xs italic text-slate-300 max-w-xs leading-relaxed">
+          <div className="border-l-2 border-accent-gold pl-3 text-[11px] sm:text-xs italic text-text-secondary max-w-xs leading-relaxed">
             "A segurança de voo é uma responsabilidade de todos nós. Previna-se."
           </div>
         </div>
       </div>
 
       {/* Official Event PDF Flyer (Google Drive Embed) & Map Button */}
-      <div className="flex flex-col items-center justify-center w-full max-w-[520px] mx-auto py-2 space-y-4">
+      <div className="flex flex-col items-center justify-center w-full max-w-[500px] mx-auto py-2 space-y-4">
         {/* Header indicator */}
         <div className="flex items-center justify-between w-full select-none px-1">
           <div className="flex items-center gap-2">
-            <span className="animate-pulse w-2 h-2 rounded-full bg-amber-400" />
-            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-amber-400">
+            <span className="animate-pulse w-2 h-2 rounded-full bg-accent-gold" />
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-accent-gold">
               Folder Oficial do Evento
             </span>
           </div>
@@ -4277,116 +4297,150 @@ function InicioSection({
             href="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/view?usp=drivesdk"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[9px] font-bold text-amber-400 hover:underline uppercase tracking-wider"
+            className="flex items-center gap-1 text-[9px] font-bold text-military-gold hover:underline uppercase tracking-wider"
           >
             Abrir PDF <ExternalLink size={10} />
           </a>
         </div>
 
         {/* Official Event PDF Flyer (Google Drive Embed) */}
-        <div className="w-full min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-amber-400/30 overflow-hidden bg-slate-950/80 backdrop-blur-md shadow-2xl relative">
+        <div className="w-full min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
           <iframe
             src="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/preview"
-            className="w-full h-full border-none pointer-events-auto"
+            className="w-full h-full border-none"
             allow="autoplay"
-            loading="lazy"
             title="Folder Oficial Jornada de Segurança de Voo 2026"
           />
         </div>
 
-        {/* Actions / Buttons below Folder */}
+        {/* Como Chegar & Pesquisa de Opinião Buttons */}
         <div className="w-full space-y-3">
-          <a
-            href="/pesquisa-jsv"
-            onClick={(e) => {
-              e.preventDefault();
-              window.location.href = "/pesquisa-jsv";
-            }}
-            className="w-full py-4 px-5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-2xl flex items-center justify-between gap-3 font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-xl shadow-amber-500/10 cursor-pointer border border-amber-300/50 select-none touch-manipulation"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <ClipboardList size={22} className="text-slate-950 flex-shrink-0" />
-              <div className="text-left min-w-0">
-                <span className="block font-black text-xs sm:text-sm leading-tight truncate">Pesquisa de Opinião - JSV 2026</span>
-                <span className="block text-[10px] opacity-90 font-bold uppercase tracking-wider mt-0.5 truncate">Jornada de Segurança de Voo • Formulário de Avaliação</span>
-              </div>
-            </div>
-            <ChevronRight size={18} className="flex-shrink-0" />
-          </a>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <a
+              href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-2 px-3 bg-military-gold hover:bg-military-gold/90 text-military-black rounded-lg flex items-center justify-center gap-1.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer"
+            >
+              <MapIcon size={12} className="animate-bounce" />
+              <span>Como Chegar</span>
+              <ExternalLink size={10} className="opacity-80" />
+            </a>
 
-          <a
-            href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-3.5 px-4 bg-slate-900/80 backdrop-blur-md hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-lg cursor-pointer"
-          >
-            <MapIcon size={16} className="animate-bounce text-amber-400" />
-            <span>Como Chegar ao Local do Evento</span>
-            <ExternalLink size={14} className="opacity-80" />
-          </a>
+            <button
+              type="button"
+              onClick={() => {
+                setShowOpinionForm(!showOpinionForm);
+                if (opinionSubmitted) {
+                  setOpinionSubmitted(false);
+                }
+              }}
+              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer ${
+                showOpinionForm
+                  ? "bg-white/10 hover:bg-white/15 border border-white/10 text-white"
+                  : "bg-black/40 hover:bg-black/60 border border-military-gold/30 hover:border-military-gold text-military-gold"
+              }`}
+            >
+              <MessageSquarePlus size={12} />
+              <span>Pesquisa de Opinião</span>
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {showOpinionForm && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden w-full bg-military-black/60 border border-[#b5dc3e]/20 rounded-xl p-4 shadow-xl space-y-3"
+              >
+                {opinionSubmitted ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-4 space-y-2"
+                  >
+                    <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mx-auto border border-green-500/30">
+                      <Check size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Opinião Enviada!</h4>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                        Sua opinião foi enviada com sucesso e aparecerá nas sugestões do administrador. Obrigado!
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOpinionSubmitted(false)}
+                      className="text-military-gold font-bold uppercase text-[9px] tracking-widest hover:underline pt-1 cursor-pointer"
+                    >
+                      Enviar outro comentário
+                    </button>
+                  </motion.div>
+                ) : (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!opinionText.trim()) return;
+                      setIsOpinionSubmitting(true);
+                      try {
+                        await addDoc(collection(db, "suggestions"), {
+                          text: `[PESQUISA DE OPINIÃO - JORNADA 2026] ${opinionText.trim()}`,
+                          submittedBy: auth.currentUser?.email || auth.currentUser?.uid || "Anônimo",
+                          createdAt: new Date().toISOString(),
+                        });
+                        setOpinionSubmitted(true);
+                        setOpinionText("");
+                      } catch (err) {
+                        console.error("Erro ao enviar opinião:", err);
+                        alert("Erro ao enviar sua opinião. Tente novamente mais tarde.");
+                      } finally {
+                        setIsOpinionSubmitting(false);
+                      }
+                    }}
+                    className="space-y-3"
+                  >
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-black text-[#b5dc3e] uppercase tracking-widest flex items-center gap-1.5">
+                        <MessageSquarePlus size={10} /> O que você achou do evento? (Texto Livre)
+                      </label>
+                      <textarea
+                        value={opinionText}
+                        onChange={(e) => setOpinionText(e.target.value)}
+                        placeholder="Escreva aqui seu feedback, sugestão, ou avaliação sobre a Jornada de Segurança de Voo 2026..."
+                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-[#b5dc3e] outline-none transition-all min-h-[90px] text-[11px] leading-relaxed placeholder:text-slate-600 italic"
+                        disabled={isOpinionSubmitting}
+                        required
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isOpinionSubmitting || !opinionText.trim()}
+                      className="w-full py-2 px-3 bg-[#b5dc3e] hover:bg-[#a4ca33] disabled:opacity-45 text-black font-black text-[10px] uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer"
+                    >
+                      {isOpinionSubmitting ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>Enviando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={11} />
+                          <span>Enviar Opinião</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
           
-          <p className="text-[10px] text-slate-400 text-center uppercase tracking-wide select-none leading-normal">
+          <p className="text-[9px] text-text-secondary text-center uppercase tracking-wide select-none leading-normal">
             📍 Auditório do Museu Mazzaropi • Taubaté-SP <br />
             Estr. Amácio Mazzaropi, 249 - Itaim, Taubaté-SP
           </p>
-        </div>
-      </div>
-
-      {/* MÓDULOS DO MENU PRINCIPAL NA TELA INICIAL (LOGO ABAIXO DA JSV) */}
-      <div className="w-full space-y-4 pt-6 border-t border-slate-800/80">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="text-amber-400" size={20} />
-            <h3 className="text-amber-400 font-black uppercase text-xs sm:text-sm tracking-widest">
-              Menu de Módulos e Serviços de Segurança
-            </h3>
-          </div>
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-bold">
-            Acesso Direto
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3">
-          {mainNavModules.map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id as SectionKey)}
-                className="w-full text-left p-4 sm:p-5 bg-slate-900/60 backdrop-blur-md hover:bg-slate-800/80 border border-slate-800 hover:border-amber-400/80 rounded-2xl transition-all duration-200 shadow-xl hover:shadow-2xl hover:shadow-amber-500/5 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer group relative overflow-hidden"
-              >
-                {/* Visual side highlight strip */}
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400/40 group-hover:bg-amber-400 transition-colors" />
-
-                <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 pl-1.5 flex-1 min-w-0">
-                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 group-hover:bg-amber-400 group-hover:text-slate-950 group-hover:scale-105 transition-all duration-200 flex-shrink-0 shadow-sm mt-0.5 sm:mt-0">
-                    <Icon size={22} />
-                  </div>
-                  
-                  <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono font-black text-amber-400 uppercase tracking-wider">
-                        ITEM {String(idx + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-                    <h4 className="text-xs sm:text-sm md:text-base font-black text-white group-hover:text-amber-400 transition-colors tracking-wide uppercase leading-snug break-words">
-                      {item.name}
-                    </h4>
-                    <p className="text-[11px] sm:text-xs text-slate-400 group-hover:text-slate-200 leading-relaxed break-words">
-                      {item.desc}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 text-slate-400 group-hover:text-amber-400 transition-colors flex-shrink-0 pl-1 sm:pl-2 self-center">
-                  <span className="hidden md:inline-block text-[10px] font-black uppercase tracking-widest bg-amber-400/10 text-amber-400 px-3 py-1.5 rounded-xl border border-amber-400/30 group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors">
-                    Acessar
-                  </span>
-                  <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
-                </div>
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -5705,7 +5759,7 @@ function FgrSection({
       </div>
 
       {launches.length > 0 && (
-        <div className="card-military p-5 border-2 border-military-gold bg-military-gold/10 shadow-[0_0_15px_rgba(197,160,89,0.15)]">
+        <div className="card-military p-5 border-2 border-military-gold bg-military-gold/10 shadow-[0_0_15px_rgba(197,160,89,0.15)] animate-in fade-in slide-in-from-top-2 duration-500">
           <div className="flex flex-col gap-2">
             <label className="text-xs font-black text-military-gold uppercase tracking-[0.25em] flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 bg-military-gold rounded-full shadow-[0_0_10px_#c5a059]" />
@@ -6465,9 +6519,15 @@ function FgrSection({
                           </span>
                         </button>
 
-                        {showMitigationSuggestions && (
-                          <div className="absolute bottom-full right-0 mb-2 w-80 max-h-[400px] overflow-y-auto bg-bg-deep border border-accent-gold/20 rounded shadow-2xl z-50 p-4 custom-scrollbar gpu-scroll">
-                            <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                        <AnimatePresence>
+                          {showMitigationSuggestions && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                              className="absolute bottom-full right-0 mb-2 w-80 max-h-[400px] overflow-y-auto bg-bg-deep border border-accent-gold/20 rounded shadow-2xl z-50 p-4 custom-scrollbar"
+                            >
+                              <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
                                 <span className="text-[10px] font-black text-accent-gold uppercase tracking-widest">
                                   Sugestões de Ações
                                 </span>
@@ -6511,7 +6571,7 @@ function FgrSection({
                                               if (parts.length >= 2) {
                                                 return (
                                                   <div className="flex flex-col gap-1.5">
-                                                    <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover/item:text-military-gold">
+                                                    <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover/item:text-military-gold transition-colors">
                                                       {parts[0]}
                                                     </span>
                                                     <span className="text-[10px] text-text-secondary leading-normal pl-2 border-l border-military-gold/20 italic">
@@ -6529,8 +6589,9 @@ function FgrSection({
                                   ),
                                 )}
                               </div>
-                            </div>
+                            </motion.div>
                           )}
+                        </AnimatePresence>
                       </div>
                     </div>
                     <textarea
@@ -6542,37 +6603,42 @@ function FgrSection({
                   </div>
 
                   <div id="validation-errors-anchor" className="scroll-mt-20">
-                    {validationErrors.length > 0 && (
-                      <div
-                        className="bg-red-500/10 border border-red-500/30 rounded-sm p-4 mb-4"
-                      >
-                        <div className="flex items-center gap-2 mb-3">
-                          <AlertTriangle className="text-red-500" size={16} />
-                          <span className="text-[10px] font-black uppercase text-red-500 tracking-[0.2em]">
-                            Erros de Validação
-                          </span>
-                        </div>
-                        <ul className="space-y-1 mb-4">
-                          {validationErrors.map((err, idx) => (
-                            <li
-                              key={idx}
-                              className="text-[10px] text-text-primary flex items-start gap-2"
-                            >
-                              <span className="text-red-500 font-bold">
-                                •
-                              </span>
-                              {err}
-                            </li>
-                          ))}
-                        </ul>
-                        <button
-                          onClick={() => handleSave(true)}
-                          className="w-full py-2 bg-red-500/20 border border-red-500/40 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/30"
+                    <AnimatePresence>
+                      {validationErrors.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="bg-red-500/10 border border-red-500/30 rounded-sm p-4 mb-4"
                         >
-                          Enviar mesmo assim
-                        </button>
-                      </div>
-                    )}
+                          <div className="flex items-center gap-2 mb-3">
+                            <AlertTriangle className="text-red-500" size={16} />
+                            <span className="text-[10px] font-black uppercase text-red-500 tracking-[0.2em]">
+                              Erros de Validação
+                            </span>
+                          </div>
+                          <ul className="space-y-1 mb-4">
+                            {validationErrors.map((err, idx) => (
+                              <li
+                                key={idx}
+                                className="text-[10px] text-text-primary flex items-start gap-2"
+                              >
+                                <span className="text-red-500 font-bold">
+                                  •
+                                </span>
+                                {err}
+                              </li>
+                            ))}
+                          </ul>
+                          <button
+                            onClick={() => handleSave(true)}
+                            className="w-full py-2 bg-red-500/20 border border-red-500/40 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/30 transition-all"
+                          >
+                            Enviar mesmo assim
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   <button
@@ -6779,16 +6845,13 @@ Forneça uma análise técnica concisa (3 a 4 tópicos) com orientações preven
       let activeUserUid = user?.uid;
       if (!activeUserUid) {
         try {
-          let authTimer: any;
-          const timeoutAuth = new Promise<never>((_, reject) => {
-            authTimer = setTimeout(() => reject(new Error("Auth Timeout")), 5000);
-          });
-          timeoutAuth.catch(() => {});
+          const timeoutAuth = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Auth Timeout")), 5000)
+          );
           const cred = (await Promise.race([
             signInAnonymously(auth),
             timeoutAuth,
           ])) as any;
-          clearTimeout(authTimer);
           activeUserUid = cred?.user?.uid || "public-abortiva";
         } catch (e) {
           activeUserUid = "public-abortiva";
@@ -6893,7 +6956,7 @@ Forneça uma análise técnica concisa (3 a 4 tópicos) com orientações preven
       </div>
 
       {launches.length > 0 && (
-        <div className="card-military p-5 border-2 border-orange-500 bg-orange-500/10 shadow-[0_0_15px_rgba(249,115,22,0.15)]">
+        <div className="card-military p-5 border-2 border-orange-500 bg-orange-500/10 shadow-[0_0_15px_rgba(249,115,22,0.15)] animate-in fade-in slide-in-from-top-2 duration-500">
           <div className="flex flex-col gap-2">
             <label className="text-xs font-black text-orange-400 uppercase tracking-[0.25em] flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 bg-orange-500 rounded-full shadow-[0_0_10px_#f97316]" />
@@ -7252,7 +7315,7 @@ function MapaRiscoSection({
   onTabChange: (tab: SectionKey) => void;
 }) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
         <button
@@ -8117,9 +8180,6 @@ function AdminSection({
   fgrs: propFgrs,
   abortivas: propAbortivas,
   isAdminAuthenticated,
-  setIsAdminAuthenticated,
-  adminPassword,
-  setAdminPassword,
 }: {
   user: FirebaseUser | null;
   onTabChange: (tab: SectionKey) => void;
@@ -8130,9 +8190,6 @@ function AdminSection({
   fgrs: any[];
   abortivas: any[];
   isAdminAuthenticated?: boolean;
-  setIsAdminAuthenticated?: (val: boolean) => void;
-  adminPassword?: string;
-  setAdminPassword?: (val: string) => void;
 }) {
   const [stats, setStats] = useState({ relprevs: 0, fgrs: 0, abortivas: 0, trash: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
@@ -8149,7 +8206,6 @@ function AdminSection({
 
   const [trashItems, setTrashItems] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [jsvSurveys, setJsvSurveys] = useState<any[]>([]);
   const [selectedView, setSelectedView] = useState<
     | "stats"
     | "relprevs"
@@ -8159,7 +8215,6 @@ function AdminSection({
     | "pdv"
     | "trash"
     | "suggestions"
-    | "jsv"
     | "database"
   >("pdv");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -8370,10 +8425,6 @@ function AdminSection({
       collection(db, "suggestions"),
       orderBy("createdAt", "desc"),
     );
-    const qJsv = query(
-      collection(db, "jsv_surveys"),
-      orderBy("createdAt", "desc"),
-    );
 
     const unsubRelprev = onSnapshot(
       qRelprev,
@@ -8414,21 +8465,10 @@ function AdminSection({
       },
     );
 
-    const unsubJsv = onSnapshot(
-      qJsv,
-      (snap) => {
-        setJsvSurveys(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      },
-      (err) => {
-        console.error("Erro no listener de JSV:", err);
-      },
-    );
-
     return () => {
       unsubRelprev();
       unsubTrash();
       unsubSuggestions();
-      unsubJsv();
     };
   }, [user, propFgrs.length, propAbortivas.length]);
 
@@ -8939,65 +8979,6 @@ function AdminSection({
     }
   };
 
-  if (!isAdminAuthenticated) {
-    return (
-      <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
-        <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
-          <button
-            onClick={() => onTabChange("Inicio")}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
-          >
-            <ArrowLeft size={16} />
-            <span>Voltar ao Início</span>
-          </button>
-        </div>
-
-        <div className="min-h-[60vh] flex items-center justify-center p-4">
-          <div className="card-military max-w-md w-full p-6 sm:p-8 text-center space-y-6">
-            <div className="w-16 h-16 bg-accent-gold/20 rounded-2xl border border-accent-gold/40 flex items-center justify-center mx-auto text-accent-gold shadow-lg">
-              <Lock size={32} />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-white uppercase tracking-wider">
-                Acesso Administrativo Restrito
-              </h2>
-              <p className="text-xs text-text-secondary mt-1">
-                Digite a senha de segurança para acessar o Painel Administrativo.
-              </p>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (adminPassword === "sipaa2bavex") {
-                  if (setIsAdminAuthenticated) setIsAdminAuthenticated(true);
-                  if (setAdminPassword) setAdminPassword("");
-                } else {
-                  alert("Senha incorreta");
-                }
-              }}
-              className="space-y-4"
-            >
-              <input
-                type="password"
-                value={adminPassword || ""}
-                onChange={(e) => setAdminPassword && setAdminPassword(e.target.value)}
-                className="w-full bg-military-black border border-border-theme rounded p-3 text-white text-center font-bold text-lg focus:border-military-gold outline-none"
-                placeholder="••••••••"
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="btn-military w-full py-3 text-xs font-black uppercase tracking-wider"
-              >
-                AUTENTICAR
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
       {/* Top Navigation Bar */}
@@ -9110,13 +9091,6 @@ function AdminSection({
         >
           <Lightbulb size={10} />
           Sugestões ({suggestions.length} {suggestions.length === 1 ? 'sugestão' : 'sugestões'})
-        </button>
-        <button
-          onClick={() => setSelectedView("jsv")}
-          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "jsv" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white flex items-center gap-1.5"}`}
-        >
-          <ClipboardList size={10} />
-          JSV ({jsvSurveys.length} {jsvSurveys.length === 1 ? 'pesquisa' : 'pesquisas'})
         </button>
         <button
           onClick={() => setSelectedView("stats")}
@@ -9935,7 +9909,7 @@ function AdminSection({
       )}
 
       {selectedView === "pdv" && (
-        <div className="space-y-6 max-w-2xl">
+        <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="card-military p-8 text-left">
              <h1 className="text-2xl font-black text-white uppercase mb-8 tracking-tight border-b border-white/10 pb-4">
                Extrator de lançamentos do PDV
@@ -10160,7 +10134,7 @@ function AdminSection({
                 );
               })()}
               {viewingBatchId && (
-                <div className="mt-6 space-y-4">
+                <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="flex items-center justify-between border-b border-white/10 pb-2">
                     <h5 className="text-[10px] font-black text-military-gold uppercase tracking-widest">
                       Lançamentos do Arquivo
@@ -10353,17 +10327,13 @@ function AdminSection({
                                     <Edit size={12} />
                                   </button>
                                   <button
-                                    onClick={async () => {
+                                    onClick={() => {
                                       if (
                                         window.confirm(
                                           "Excluir este lançamento?",
                                         )
                                       ) {
-                                        try {
-                                          await deleteDoc(doc(db, "Lancamentos", l.id));
-                                        } catch (err) {
-                                          console.error("Erro ao excluir lançamento:", err);
-                                        }
+                                        deleteDoc(doc(db, "Lancamentos", l.id));
                                       }
                                     }}
                                     className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
@@ -10565,201 +10535,6 @@ function AdminSection({
           </div>
         </div>
       )}
-      {selectedView === "jsv" && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center bg-military-gold/10 p-4 rounded-xl border border-military-gold/20">
-            <div>
-              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
-                <ClipboardList size={18} className="text-military-gold" />
-                Pesquisa de Opinião JSV ({jsvSurveys.length} {jsvSurveys.length === 1 ? 'resposta' : 'respostas'})
-              </h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
-                Jornada de Segurança de Voo — Respostas registradas dos participantes
-              </p>
-            </div>
-            {jsvSurveys.length > 0 && (
-              <button
-                onClick={async () => {
-                  if (jsvSurveys.length === 0) return;
-                  if (!window.confirm(`Deseja apagar DEFINITIVAMENTE todas as ${jsvSurveys.length} respostas da Pesquisa JSV?`)) return;
-                  try {
-                    const batch = writeBatch(db);
-                    jsvSurveys.forEach((s) => {
-                      batch.delete(doc(db, "jsv_surveys", s.id));
-                    });
-                    await batch.commit();
-                    alert("Todas as respostas da Pesquisa JSV foram excluídas com sucesso.");
-                  } catch (error: any) {
-                    alert("Erro ao excluir respostas: " + error.message);
-                  }
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600 border border-red-500/30 hover:border-red-500 text-red-400 hover:text-white rounded-lg text-[10px] font-black uppercase transition-all shadow-lg cursor-pointer shrink-0"
-              >
-                <Trash2 size={12} />
-                Apagar Todas
-              </button>
-            )}
-          </div>
-
-          {/* Quick Metrics */}
-          {jsvSurveys.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-military-black/80 border border-white/5 p-4 rounded-xl">
-                <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Total de Respostas</span>
-                <span className="text-2xl font-black text-military-gold font-mono">{jsvSurveys.length}</span>
-              </div>
-              <div className="bg-military-black/80 border border-white/5 p-4 rounded-xl">
-                <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Local Adequado (Sim)</span>
-                <span className="text-2xl font-black text-green-400 font-mono">
-                  {Math.round((jsvSurveys.filter(s => s.q1_local === "Sim").length / jsvSurveys.length) * 100)}%
-                </span>
-              </div>
-              <div className="bg-military-black/80 border border-white/5 p-4 rounded-xl">
-                <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Tempo Evento (Ideal)</span>
-                <span className="text-2xl font-black text-blue-400 font-mono">
-                  {Math.round((jsvSurveys.filter(s => s.q2_tempo_evento === "Ideal").length / jsvSurveys.length) * 100)}%
-                </span>
-              </div>
-              <div className="bg-military-black/80 border border-white/5 p-4 rounded-xl">
-                <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Temas Importantes (Sim)</span>
-                <span className="text-2xl font-black text-amber-400 font-mono">
-                  {Math.round((jsvSurveys.filter(s => s.q3_temas_importantes === "Sim").length / jsvSurveys.length) * 100)}%
-                </span>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {jsvSurveys.length === 0 ? (
-              <div className="card-military p-12 text-center text-slate-500 uppercase font-black text-[10px] italic">
-                Nenhuma resposta de pesquisa JSV recebida até o momento.
-              </div>
-            ) : (
-              jsvSurveys.map((s, index) => (
-                <div key={s.id} className="card-military p-6 relative group overflow-hidden space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold border border-military-gold/20 font-black text-xs font-mono">
-                        #{jsvSurveys.length - index}
-                      </div>
-                      <div>
-                        <span className="text-xs font-black text-white uppercase tracking-wider block">
-                          Resposta de {s.submittedBy || "Anônimo"}
-                        </span>
-                        <p className="text-[9px] text-slate-500 font-mono italic">
-                          {s.createdAt ? new Date(s.createdAt).toLocaleString("pt-BR") : "Data não informada"}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={async (e) => {
-                        e.preventDefault();
-                        if (window.confirm("Excluir esta resposta da pesquisa JSV?")) {
-                          try {
-                            await deleteDoc(doc(db, "jsv_surveys", s.id));
-                          } catch (err: any) {
-                            alert("Erro ao excluir: " + err.message);
-                          }
-                        }
-                      }}
-                      className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-all rounded-lg cursor-pointer bg-military-black border border-white/5"
-                      title="Excluir Resposta"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-
-                  {/* Multiple choice responses summary */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
-                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase block">1. Local Adequado?</span>
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        s.q1_local === "Sim" ? "bg-green-500/20 text-green-400" : s.q1_local === "Não" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"
-                      }`}>
-                        {s.q1_local || "Não respondeu"}
-                      </span>
-                    </div>
-
-                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase block">2. Tempo do Evento?</span>
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        s.q2_tempo_evento === "Ideal" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
-                      }`}>
-                        {s.q2_tempo_evento || "Não respondeu"}
-                      </span>
-                    </div>
-
-                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase block">3. Temas Importantes?</span>
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        s.q3_temas_importantes === "Sim" ? "bg-green-500/20 text-green-400" : s.q3_temas_importantes === "Não" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"
-                      }`}>
-                        {s.q3_temas_importantes || "Não respondeu"}
-                      </span>
-                    </div>
-
-                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase block">4. Qtd. Apresentações?</span>
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        s.q4_qtd_apresentacoes === "Ideal" ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400"
-                      }`}>
-                        {s.q4_qtd_apresentacoes || "Não respondeu"}
-                      </span>
-                    </div>
-
-                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1 sm:col-span-2 lg:col-span-1">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase block">5. Tempo/Apresentação?</span>
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        s.q5_tempo_apresentacao === "Ideal" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
-                      }`}>
-                        {s.q5_tempo_apresentacao || "Não respondeu"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Text Answers */}
-                  {(s.q6_melhorias || s.q7_piorias || s.q8_sugestoes_temas) && (
-                    <div className="space-y-3 pt-2">
-                      {s.q6_melhorias && (
-                        <div className="bg-military-black/60 p-3.5 rounded-xl border border-white/5 space-y-1">
-                          <span className="text-[9px] font-black text-green-400 uppercase tracking-wider block">
-                            6. O que melhorou em relação a edições anteriores:
-                          </span>
-                          <p className="text-xs text-slate-200 leading-relaxed italic whitespace-pre-wrap">
-                            "{s.q6_melhorias}"
-                          </p>
-                        </div>
-                      )}
-
-                      {s.q7_piorias && (
-                        <div className="bg-military-black/60 p-3.5 rounded-xl border border-white/5 space-y-1">
-                          <span className="text-[9px] font-black text-red-400 uppercase tracking-wider block">
-                            7. O que piorou em relação a edições anteriores:
-                          </span>
-                          <p className="text-xs text-slate-200 leading-relaxed italic whitespace-pre-wrap">
-                            "{s.q7_piorias}"
-                          </p>
-                        </div>
-                      )}
-
-                      {s.q8_sugestoes_temas && (
-                        <div className="bg-military-black/60 p-3.5 rounded-xl border border-white/5 space-y-1">
-                          <span className="text-[9px] font-black text-military-gold uppercase tracking-wider block">
-                            8. Sugestões de temas ou palestrantes para a próxima edição:
-                          </span>
-                          <p className="text-xs text-slate-200 leading-relaxed italic whitespace-pre-wrap">
-                            "{s.q8_sugestoes_temas}"
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
       {selectedView === "database" && (
         <div className="space-y-6">
           <div className="pb-4 border-b border-white/5">
@@ -10904,213 +10679,238 @@ function AdminSection({
         </div>
       )}
       {/* Batch Delete Confirmation Modal */}
-      {batchDeleteTarget && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
-          <div className="card-military max-w-sm w-full p-8 text-center space-y-6 border-red-500/30 max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="w-20 h-20 rounded-full bg-red-500/10 text-red-500 mx-auto flex items-center justify-center border border-red-500/20">
-              <AlertTriangle size={40} className="animate-pulse" />
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-xl font-black text-white uppercase tracking-tighter">
-                Excluir Lote Inteiro?
-              </h3>
-              <div className="p-3 bg-red-500/5 rounded border border-red-500/10">
-                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
-                  Arquivo Selecionado:
-                </p>
-                <p className="text-xs text-military-gold font-black truncate">
-                  "{batchDeleteTarget.name}"
-                </p>
-                <p className="text-[10px] text-slate-500 mt-2">
-                  Contém {batchDeleteTarget.count} lançamentos
+      <AnimatePresence>
+        {batchDeleteTarget && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="card-military max-w-sm w-full p-8 text-center space-y-6 border-red-500/30 max-h-[90dvh] overflow-y-auto my-auto"
+            >
+              <div className="w-20 h-20 rounded-full bg-red-500/10 text-red-500 mx-auto flex items-center justify-center border border-red-500/20">
+                <AlertTriangle size={40} className="animate-pulse" />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">
+                  Excluir Lote Inteiro?
+                </h3>
+                <div className="p-3 bg-red-500/5 rounded border border-red-500/10">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                    Arquivo Selecionado:
+                  </p>
+                  <p className="text-xs text-military-gold font-black truncate">
+                    "{batchDeleteTarget.name}"
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-2">
+                    Contém {batchDeleteTarget.count} lançamentos
+                  </p>
+                </div>
+                <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest bg-red-500/10 py-2 rounded">
+                  Esta ação removerá tudo permanentemente
                 </p>
               </div>
-              <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest bg-red-500/10 py-2 rounded">
-                Esta ação removerá tudo permanentemente
-              </p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setBatchDeleteTarget(null)}
-                className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors border border-white/5"
-                disabled={isUploading}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDeleteBatch}
-                className="flex-1 px-4 py-3 rounded bg-red-600 text-white font-bold text-[10px] uppercase hover:bg-red-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Trash2 size={14} />
-                )}
-                {isUploading ? "EXCLUINDO..." : "SIM, EXCLUIR"}
-              </button>
-            </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setBatchDeleteTarget(null)}
+                  className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors border border-white/5"
+                  disabled={isUploading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteBatch}
+                  className="flex-1 px-4 py-3 rounded bg-red-600 text-white font-bold text-[10px] uppercase hover:bg-red-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                  {isUploading ? "EXCLUINDO..." : "SIM, EXCLUIR"}
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
-      {deleteId && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-military-black/90 overflow-y-auto gpu-scroll">
-          <div className="card-military max-w-sm w-full p-6 text-center space-y-6 max-h-[90dvh] overflow-y-auto my-auto">
-            <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-500 mx-auto flex items-center justify-center">
-              <Trash2 size={32} />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-black text-white uppercase tracking-tight">
-                Mover para Lixeira
-              </h3>
-              <p className="text-xs text-text-secondary">
-                Deseja realmente mover este registro para a lixeira?
-                Ele poderá ser recuperado posteriormente se necessário.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setDeleteId(null);
-                  setDeleteColl(null);
-                }}
-                className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex-1 px-4 py-3 rounded bg-red-500 text-white font-bold text-[10px] uppercase hover:bg-red-600 transition-colors"
-              >
-                Sim, Excluir
-              </button>
-            </div>
+      <AnimatePresence>
+        {deleteId && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="card-military max-w-sm w-full p-6 text-center space-y-6 max-h-[90dvh] overflow-y-auto my-auto"
+            >
+              <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-500 mx-auto flex items-center justify-center">
+                <Trash2 size={32} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                  Mover para Lixeira
+                </h3>
+                <p className="text-xs text-text-secondary">
+                  Deseja realmente mover este registro para a lixeira?
+                  Ele poderá ser recuperado posteriormente se necessário.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setDeleteId(null);
+                    setDeleteColl(null);
+                  }}
+                  className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 px-4 py-3 rounded bg-red-500 text-white font-bold text-[10px] uppercase hover:bg-red-600 transition-colors"
+                >
+                  Sim, Excluir
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Relprev Multi-line Details Modal */}
-      {selectedRelprev && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-military-black/90 overflow-y-auto gpu-scroll">
-          <div className="card-military max-w-2xl w-full max-h-[90dvh] overflow-y-auto p-6 sm:p-8 space-y-6 my-auto">
-            <div className="flex justify-between items-start border-b border-border-theme pb-4">
-              <div>
-                <span className="text-[10px] font-mono text-military-gold uppercase tracking-[0.2em]">
-                  RELPREV #{selectedRelprev.codigo}
-                </span>
-                <h3 className="text-xl font-black text-white">
-                  Anexos do Relato
-                </h3>
+      <AnimatePresence>
+        {selectedRelprev && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card-military max-w-2xl w-full max-h-[90dvh] overflow-y-auto p-6 sm:p-8 space-y-6 my-auto"
+            >
+              <div className="flex justify-between items-start border-b border-border-theme pb-4">
+                <div>
+                  <span className="text-[10px] font-mono text-military-gold uppercase tracking-[0.2em]">
+                    RELPREV #{selectedRelprev.codigo}
+                  </span>
+                  <h3 className="text-xl font-black text-white">
+                    Anexos do Relato
+                  </h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedRelprev(null);
+                    setShowAnexos(false);
+                  }}
+                  className="text-text-secondary hover:text-white border border-white/10 rounded p-1"
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setSelectedRelprev(null);
-                  setShowAnexos(false);
-                }}
-                className="text-text-secondary hover:text-white border border-white/10 rounded p-1"
-              >
-                <X size={20} />
-              </button>
-            </div>
 
-            <div className="space-y-6">
-              {(selectedRelprev.images &&
-                selectedRelprev.images.length > 0) ||
-              (selectedRelprev.extraFiles &&
-                selectedRelprev.extraFiles.length > 0) ? (
-                <div className="space-y-6">
-                  {selectedRelprev.images &&
-                    selectedRelprev.images.length > 0 && (
-                      <div className="space-y-3">
-                        <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">
-                          Fotos Anexadas
-                        </span>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {selectedRelprev.images.map(
-                            (img: string, i: number) => (
-                              <button
-                                key={i}
-                                onClick={() => openBase64InNewTab(img)}
-                                className="block group relative overflow-hidden rounded border border-white/10 hover:border-accent-gold transition-colors aspect-square"
-                              >
-                                <img
-                                  src={img}
-                                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                  alt="Anexo"
-                                />
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Search size={18} className="text-white" />
-                                </div>
-                              </button>
-                            ),
-                          )}
+              <div className="space-y-6">
+                {(selectedRelprev.images &&
+                  selectedRelprev.images.length > 0) ||
+                (selectedRelprev.extraFiles &&
+                  selectedRelprev.extraFiles.length > 0) ? (
+                  <div className="space-y-6">
+                    {selectedRelprev.images &&
+                      selectedRelprev.images.length > 0 && (
+                        <div className="space-y-3">
+                          <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">
+                            Fotos Anexadas
+                          </span>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {selectedRelprev.images.map(
+                              (img: string, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => openBase64InNewTab(img)}
+                                  className="block group relative overflow-hidden rounded border border-white/10 hover:border-accent-gold transition-colors aspect-square"
+                                >
+                                  <img
+                                    src={img}
+                                    className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                    alt="Anexo"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Search size={18} className="text-white" />
+                                  </div>
+                                </button>
+                              ),
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                  {selectedRelprev.extraFiles &&
-                    selectedRelprev.extraFiles.length > 0 && (
-                      <div className="space-y-3">
-                        <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">
-                          Documentos Extras
-                        </span>
-                        <div className="space-y-2">
-                          {selectedRelprev.extraFiles.map(
-                            (file: string, i: number) => (
-                              <button
-                                key={i}
-                                onClick={() => openBase64InNewTab(file)}
-                                className="w-full flex items-center gap-3 p-4 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-[10px] text-white font-bold uppercase text-left"
-                              >
-                                <FileText
-                                  size={18}
-                                  className="text-military-gold"
-                                />
-                                <span>Download Arquivo Anexo {i + 1}</span>
-                              </button>
-                            ),
-                          )}
+                    {selectedRelprev.extraFiles &&
+                      selectedRelprev.extraFiles.length > 0 && (
+                        <div className="space-y-3">
+                          <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">
+                            Documentos Extras
+                          </span>
+                          <div className="space-y-2">
+                            {selectedRelprev.extraFiles.map(
+                              (file: string, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => openBase64InNewTab(file)}
+                                  className="w-full flex items-center gap-3 p-4 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-[10px] text-white font-bold uppercase text-left"
+                                >
+                                  <FileText
+                                    size={18}
+                                    className="text-military-gold"
+                                  />
+                                  <span>Download Arquivo Anexo {i + 1}</span>
+                                </button>
+                              ),
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                </div>
-              ) : (
-                <div className="py-20 text-center text-text-secondary italic text-sm border border-dashed border-white/10 rounded">
-                  Este relato não possui anexos.
-                </div>
-              )}
-            </div>
+                      )}
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-text-secondary italic text-sm border border-dashed border-white/10 rounded">
+                    Este relato não possui anexos.
+                  </div>
+                )}
+              </div>
 
-            <div className="flex gap-3 pt-6 border-t border-white/5">
-              <button
-                onClick={() => {
-                  const doc = generateRelprevPDF(selectedRelprev);
-                  window.open(doc.output("bloburl"), "_blank");
-                }}
-                className="flex-1 btn-military py-4 flex items-center justify-center gap-2"
-              >
-                <FileText size={16} /> VER DADOS COMPLETOS (PDF)
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedRelprev(null);
-                  setShowAnexos(false);
-                }}
-                className="px-8 py-4 rounded border border-border-theme text-white font-bold text-xs hover:bg-white/5 transition-all uppercase"
-              >
-                Voltar
-              </button>
-            </div>
+              <div className="flex gap-3 pt-6 border-t border-white/5">
+                <button
+                  onClick={() => {
+                    const doc = generateRelprevPDF(selectedRelprev);
+                    window.open(doc.output("bloburl"), "_blank");
+                  }}
+                  className="flex-1 btn-military py-4 flex items-center justify-center gap-2"
+                >
+                  <FileText size={16} /> VER DADOS COMPLETOS (PDF)
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedRelprev(null);
+                    setShowAnexos(false);
+                  }}
+                  className="px-8 py-4 rounded border border-border-theme text-white font-bold text-xs hover:bg-white/5 transition-all uppercase"
+                >
+                  Voltar
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Manual Flight Modal */}
-      {isManualModalOpen && (
-        <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
-          <div className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto">
+      <AnimatePresence>
+        {isManualModalOpen && (
+          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto"
+            >
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold">
@@ -11271,14 +11071,21 @@ function AdminSection({
                   </button>
                 </div>
               </form>
-            </div>
+            </motion.div>
           </div>
         )}
+      </AnimatePresence>
 
       {/* Link FGR Modal */}
-      {isLinkFgrModalOpen && launchToLink && (
-        <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
-          <div className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto">
+      <AnimatePresence>
+        {isLinkFgrModalOpen && launchToLink && (
+          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto"
+            >
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
@@ -11441,9 +11248,10 @@ function AdminSection({
                   </button>
                 )}
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -11458,16 +11266,17 @@ function QuickCard({ icon: Icon, title, desc, color, onClick }: any) {
   };
 
   return (
-    <div
+    <motion.div
+      whileHover={{ y: -2 }}
       onClick={onClick}
-      className={`card-military p-5 cursor-pointer group text-center ${colorMap[color]}`}
+      className={`card-military p-5 cursor-pointer group transition-all text-center ${colorMap[color]}`}
     >
       <div className="flex flex-col items-center gap-3">
         {Icon && <Icon size={20} className="text-accent-gold" />}
         <h3 className="font-bold text-sm tracking-wide">{title}</h3>
         <p className="text-[11px] text-text-secondary leading-tight">{desc}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -11912,7 +11721,11 @@ function SugestoesSection({
 
       <div className="card-military p-8">
         {submitted ? (
-          <div className="text-center py-12 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-12 space-y-6"
+          >
             <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-green-500 mx-auto border border-green-500/30">
               <Check size={40} />
             </div>
@@ -11928,7 +11741,7 @@ function SugestoesSection({
             >
               Enviar outra sugestão
             </button>
-          </div>
+          </motion.div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -11968,355 +11781,6 @@ function SugestoesSection({
   );
 }
 
-function OptionGroup({
-  questionNum,
-  title,
-  options,
-  value,
-  onChange,
-}: {
-  questionNum: number;
-  title: string;
-  options: string[];
-  value: string;
-  onChange: (val: string) => void;
-}) {
-  return (
-    <div className="space-y-3 p-5 rounded-xl bg-white/2 border border-white/5 hover:border-military-gold/20 transition-all text-left">
-      <div className="text-xs sm:text-sm font-bold text-white flex items-start gap-2.5 leading-snug select-none">
-        <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
-          {questionNum}
-        </span>
-        <span>{title}</span>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-        {options.map((opt) => {
-          const isSelected = value === opt;
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => onChange(opt)}
-              className={`py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-colors duration-150 border cursor-pointer flex items-center justify-center gap-2 select-none touch-manipulation ${
-                isSelected
-                  ? "bg-military-gold text-military-black border-military-gold shadow-md shadow-military-gold/10"
-                  : "bg-military-black/60 text-slate-300 border-white/10 hover:border-military-gold/40 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <div
-                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                  isSelected
-                    ? "border-military-black bg-military-black"
-                    : "border-slate-500"
-                }`}
-              >
-                {isSelected && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-military-gold" />
-                )}
-              </div>
-              <span>{opt}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function JsvSurveySection({
-  onTabChange,
-}: {
-  onTabChange?: (tab: SectionKey) => void;
-}) {
-  const [formData, setFormData] = useState({
-    q1_local: "",
-    q2_tempo_evento: "",
-    q3_temas_importantes: "",
-    q4_qtd_apresentacoes: "",
-    q5_tempo_apresentacao: "",
-    q6_melhorias: "",
-    q7_piorias: "",
-    q8_sugestoes_temas: "",
-  });
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (
-      !formData.q1_local ||
-      !formData.q2_tempo_evento ||
-      !formData.q3_temas_importantes ||
-      !formData.q4_qtd_apresentacoes ||
-      !formData.q5_tempo_apresentacao
-    ) {
-      alert("Por favor, responda a todas as perguntas de múltipla escolha (Questões 1 a 5).");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await addDoc(collection(db, "jsv_surveys"), {
-        ...formData,
-        q6_melhorias: formData.q6_melhorias.trim(),
-        q7_piorias: formData.q7_piorias.trim(),
-        q8_sugestoes_temas: formData.q8_sugestoes_temas.trim(),
-        submittedBy: auth.currentUser?.email || auth.currentUser?.uid || "Anônimo",
-        createdAt: new Date().toISOString(),
-      });
-      setSubmitted(true);
-    } catch (error: any) {
-      console.error("Erro ao enviar pesquisa JSV:", error);
-      alert("Erro ao enviar sua avaliação. Tente novamente: " + error.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleReset = () => {
-    setFormData({
-      q1_local: "",
-      q2_tempo_evento: "",
-      q3_temas_importantes: "",
-      q4_qtd_apresentacoes: "",
-      q5_tempo_apresentacao: "",
-      q6_melhorias: "",
-      q7_piorias: "",
-      q8_sugestoes_temas: "",
-    });
-    setSubmitted(false);
-  };
-
-  return (
-    <div className="max-w-3xl mx-auto space-y-8 pb-12">
-      {/* Top Navigation Bar */}
-      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
-        <a
-          href="/"
-          onClick={(e) => {
-            e.preventDefault();
-            window.location.href = "/";
-          }}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm select-none touch-manipulation"
-        >
-          <ArrowLeft size={16} />
-          <span>Voltar ao Início</span>
-        </a>
-        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest hidden sm:inline-block">
-          Página do Módulo • Pesquisa de Opinião JSV
-        </span>
-      </div>
-
-      {/* Header Banner */}
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 bg-gradient-to-br from-military-gold/20 to-amber-500/10 rounded-2xl flex items-center justify-center text-military-gold mx-auto border border-military-gold/30 shadow-2xl relative">
-          <ClipboardList size={32} />
-        </div>
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-military-gold bg-military-gold/10 px-3 py-1 rounded-full border border-military-gold/20">
-            2º BAvEx • SIPAA
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight mt-3">
-            JORNADA DE SEGURANÇA DE VOO
-          </h2>
-          <h3 className="text-lg font-bold text-military-gold uppercase tracking-widest mt-0.5">
-            PESQUISA DE OPINIÃO
-          </h3>
-        </div>
-        <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-          Sua avaliação sincera é de extrema importância para aprimorarmos as próximas edições da Jornada de Segurança de Voo.
-        </p>
-      </div>
-
-      <div className="card-military p-6 sm:p-8">
-        {submitted ? (
-          <div className="text-center py-12 space-y-6">
-            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mx-auto border border-green-500/30 shadow-2xl">
-              <Check size={40} />
-            </div>
-            <div className="space-y-3 max-w-md mx-auto">
-              <h3 className="text-2xl font-black text-white uppercase tracking-tight">
-                Pesquisa Enviada!
-              </h3>
-              <p className="text-slate-300 text-sm leading-relaxed">
-                Obrigado pela sua contribuição! Sua pesquisa foi salva no painel administrativo da SIPAA.
-              </p>
-            </div>
-            <div className="pt-4 flex flex-col sm:flex-row justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="px-6 py-3 rounded-xl bg-military-gold text-military-black font-black uppercase text-xs tracking-wider hover:bg-military-gold/90 transition-all cursor-pointer shadow-lg"
-              >
-                Enviar nova avaliação
-              </button>
-              <button
-                type="button"
-                onClick={() => onTabChange?.("Inicio")}
-                className="px-6 py-3 rounded-xl bg-white/5 text-slate-300 font-bold uppercase text-xs tracking-wider hover:bg-white/10 hover:text-white transition-all cursor-pointer border border-white/10"
-              >
-                Voltar ao Início
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Section 1: Multiple Choice */}
-            <div className="space-y-4">
-              <div className="pb-2 border-b border-white/10 flex items-center justify-between">
-                <h4 className="text-xs font-black uppercase text-military-gold tracking-widest flex items-center gap-2">
-                  <CheckSquare size={14} />
-                  Parte 1 — Avaliação Geral do Evento
-                </h4>
-                <span className="text-[10px] text-slate-400 font-bold uppercase">
-                  Obrigatório (1 a 5)
-                </span>
-              </div>
-
-              <OptionGroup
-                questionNum={1}
-                title="Você considera o local do evento adequado?"
-                options={["Sim", "Parcialmente", "Não"]}
-                value={formData.q1_local}
-                onChange={(val) => setFormData((p) => ({ ...p, q1_local: val }))}
-              />
-
-              <OptionGroup
-                questionNum={2}
-                title="Como você considera o tempo destinado ao evento?"
-                options={["Extenso", "Ideal", "Curto"]}
-                value={formData.q2_tempo_evento}
-                onChange={(val) =>
-                  setFormData((p) => ({ ...p, q2_tempo_evento: val }))
-                }
-              />
-
-              <OptionGroup
-                questionNum={3}
-                title="Você considera os temas abordados importantes?"
-                options={["Sim", "Parcialmente", "Não"]}
-                value={formData.q3_temas_importantes}
-                onChange={(val) =>
-                  setFormData((p) => ({ ...p, q3_temas_importantes: val }))
-                }
-              />
-
-              <OptionGroup
-                questionNum={4}
-                title="Como você considera a quantidade de apresentações realizadas?"
-                options={["Excessiva", "Ideal", "Reduzida"]}
-                value={formData.q4_qtd_apresentacoes}
-                onChange={(val) =>
-                  setFormData((p) => ({ ...p, q4_qtd_apresentacoes: val }))
-                }
-              />
-
-              <OptionGroup
-                questionNum={5}
-                title="Como você considera o tempo destinado a cada apresentação?"
-                options={["Extenso", "Ideal", "Curto"]}
-                value={formData.q5_tempo_apresentacao}
-                onChange={(val) =>
-                  setFormData((p) => ({ ...p, q5_tempo_apresentacao: val }))
-                }
-              />
-            </div>
-
-            {/* Section 2: Text Feedback */}
-            <div className="space-y-6 pt-4 border-t border-white/10">
-              <div className="p-4 rounded-xl bg-military-gold/10 border border-military-gold/20 text-center sm:text-left">
-                <p className="text-xs font-bold text-military-gold italic">
-                  Caso já tenha participado de alguma edição da Jornada de Segurança de Voo do BAvEx:
-                </p>
-              </div>
-
-              <div className="space-y-2 text-left">
-                <div className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug select-none">
-                  <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
-                    6
-                  </span>
-                  <span>O que considera ter melhorado em relação às edições anteriores?</span>
-                </div>
-                <textarea
-                  value={formData.q6_melhorias}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, q6_melhorias: e.target.value }))
-                  }
-                  placeholder="Descreva aqui os pontos positivos e melhorias percebidas..."
-                  className="w-full bg-military-black border border-white/10 rounded-xl p-4 text-white focus:border-military-gold outline-none transition-all min-h-[100px] text-xs leading-relaxed placeholder:text-slate-600 italic"
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="space-y-2 text-left">
-                <div className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug select-none">
-                  <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
-                    7
-                  </span>
-                  <span>O que considera ter piorado em relação às edições anteriores?</span>
-                </div>
-                <textarea
-                  value={formData.q7_piorias}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, q7_piorias: e.target.value }))
-                  }
-                  placeholder="Descreva aqui pontos que necessitam de correção ou ajustes..."
-                  className="w-full bg-military-black border border-white/10 rounded-xl p-4 text-white focus:border-military-gold outline-none transition-all min-h-[100px] text-xs leading-relaxed placeholder:text-slate-600 italic"
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="space-y-2 text-left">
-                <div className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug select-none">
-                  <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
-                    8
-                  </span>
-                  <span>Quais temas ou palestrantes sugere para serem abordados ou participarem da próxima edição do evento?</span>
-                </div>
-                <textarea
-                  value={formData.q8_sugestoes_temas}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, q8_sugestoes_temas: e.target.value }))
-                  }
-                  placeholder="Escreva sugestões de novos temas, oficinas, palestrantes ou instrutores..."
-                  className="w-full bg-military-black border border-white/10 rounded-xl p-4 text-white focus:border-military-gold outline-none transition-all min-h-[120px] text-xs leading-relaxed placeholder:text-slate-600 italic"
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
-
-            {/* Footer Thank You Note */}
-            <div className="text-center py-3 bg-white/2 rounded-xl border border-white/5">
-              <p className="text-xs font-bold text-military-gold uppercase tracking-wider">
-                Obrigado pela sua contribuição! Ela é muito importante para nós!
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn-military w-full py-4 text-xs flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer shadow-xl"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  ENVIANDO PESQUISA...
-                </>
-              ) : (
-                <>
-                  <Send size={16} />
-                  ENVIAR PESQUISA DE OPINIÃO
-                </>
-              )}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
-
 const sectionComponents: Record<string, FC<any>> = {
   Inicio: InicioSection,
   RELPREV: RelprevSection,
@@ -12330,5 +11794,4 @@ const sectionComponents: Record<string, FC<any>> = {
   Telefones: TelefonesSection,
   Admin: AdminSection,
   Sugestoes: SugestoesSection,
-  JSV: JsvSurveySection,
 };
