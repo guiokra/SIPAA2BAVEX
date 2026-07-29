@@ -63,6 +63,8 @@ import {
   Database,
   Phone,
   Globe,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -1200,14 +1202,14 @@ const AdminStatsDashboard = ({ fgrs, abortivas, launches }: { fgrs: any[], abort
   const [selectedRiskCategory, setSelectedRiskCategory] = useState<string | null>(null);
   const [selectedMotiveCategory, setSelectedMotiveCategory] = useState<string | null>(null);
 
-  const parseOperationalDate = (dateStr: string) => {
-    if (!dateStr) return null;
+  const parseOperationalDate = (dateStr: any) => {
+    if (!dateStr || typeof dateStr !== "string") return null;
     if (dateStr.includes("-")) {
       const parts = dateStr.split("-");
       // Handle YYYY-MM-DD
-      if (parts[0].length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+      if (parts[0]?.length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
       // Handle DD-MM-YYYY
-      if (parts[2].length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+      if (parts[2]?.length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
     }
     if (dateStr.includes("/")) {
       const parts = dateStr.split("/");
@@ -2333,12 +2335,12 @@ const generateMonthlyStatsPDF = (
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
   ];
-  const parseDateLocal = (dateStr: string) => {
-    if (!dateStr) return null;
+  const parseDateLocal = (dateStr: any) => {
+    if (!dateStr || typeof dateStr !== "string") return null;
     if (dateStr.includes("-")) {
       const parts = dateStr.split("-");
-      if (parts[0].length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
-      if (parts[2].length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+      if (parts[0]?.length === 4) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+      if (parts[2]?.length === 4) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
     }
     if (dateStr.includes("/")) {
       const parts = dateStr.split("/");
@@ -3563,12 +3565,14 @@ export default function App() {
                         if (a === "SEM DATA") return 1;
                         if (b === "SEM DATA") return -1;
                         
-                        const parseDate = (dStr: string) => {
+                        const parseDate = (dStr: any) => {
+                          if (!dStr || typeof dStr !== "string") return 0;
                           if (dStr.includes("/")) {
                             const [d, m, y] = dStr.split("/").map(Number);
                             return new Date(y, m - 1, d).getTime();
                           }
-                          return new Date(dStr).getTime();
+                          const dt = new Date(dStr).getTime();
+                          return isNaN(dt) ? 0 : dt;
                         };
 
                         return parseDate(b) - parseDate(a);
@@ -6690,6 +6694,15 @@ function AbortivaSection({
 }) {
   const [selectedLaunchId, setSelectedLaunchId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<string | null>(null);
+  const [aiAnalysisError, setAiAnalysisError] = useState<{
+    name: string;
+    message: string;
+    status?: number;
+    body?: string;
+  } | null>(null);
+
   const [formData, setFormData] = useState({
     dataVoo: new Date().toISOString().split("T")[0],
     numLancamento: "",
@@ -6698,6 +6711,7 @@ function AbortivaSection({
     destino: "",
     motivo: "",
     preenchidoPor: "",
+    tripulacao: "",
   });
 
   const handleLaunchSelectAbortiva = (launchId: string) => {
@@ -6722,7 +6736,7 @@ function AbortivaSection({
           : "",
         numLancamento: launch.num || "",
         modeloAnv: detectedModel || prev.modeloAnv,
-        mv: launch.missao || "", // Using launch.missao for mission description
+        mv: launch.missao || "",
         destino: launch.dest || launch.adDest || "",
         tripulacao:
           `${launch.p1 || ""}/${launch.p2 || ""}/${launch.mv !== "---" ? launch.mv : ""}`
@@ -6730,9 +6744,96 @@ function AbortivaSection({
             .split("/")
             .filter(Boolean)
             .join("/"),
-        motivo: "DCM", // Default per request
+        motivo: "DCM",
         preenchidoPor: launch.p1 || "",
       }));
+    }
+  };
+
+  const handleAiAnalysis = async () => {
+    if (!formData.motivo || !formData.modeloAnv) {
+      alert("Por favor, selecione ao menos o Modelo da Anv e o Motivo para a análise com IA.");
+      return;
+    }
+
+    setIsAiAnalyzing(true);
+    setAiAnalysisError(null);
+    setAiAnalysisResult(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+    try {
+      const prompt = `Atue como um Especialista em Segurança de Voo do Exército Brasileiro (SIPAA 2º BAvEx).
+Análise de Abortiva de Voo:
+- Modelo de Aeronave: ${formData.modeloAnv}
+- Motivo: ${formData.motivo}
+- Missão: ${formData.mv || "Não informado"}
+- Destino: ${formData.destino || "Não informado"}
+
+Forneça uma análise técnica concisa (3 a 4 tópicos) com orientações preventivas para a tripulação e prevenção de novos eventos de abortiva de voo.`;
+
+      const response = await fetch("/api/gemini", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+          model: "gemini-2.5-flash",
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        let errorBody = "";
+        try {
+          errorBody = await response.text();
+        } catch (e) {
+          errorBody = "Não foi possível ler o corpo do erro";
+        }
+
+        const errInfo = {
+          name: "HTTP_ERROR",
+          message: `O servidor retornou código de erro HTTP ${response.status}`,
+          status: response.status,
+          body: errorBody,
+        };
+
+        console.error("ERRO HTTP NA CHAMADA DA API GEMINI:", errInfo);
+        setAiAnalysisError(errInfo);
+        return;
+      }
+
+      const data = await response.json();
+      if (data.status === "success" && data.text) {
+        setAiAnalysisResult(data.text);
+      } else {
+        throw new Error(data.message || "Resposta inválida recebida do servidor de IA.");
+      }
+    } catch (error: any) {
+      const isTimeout = error.name === "AbortError";
+      const errInfo = {
+        name: error.name || "UNEXPECTED_ERROR",
+        message: isTimeout
+          ? "Tempo limite excedido (30 segundos). O servidor não respondeu a tempo."
+          : error.message || "Ocorreu uma falha na comunicação com o servidor de IA.",
+        status: error.status || 0,
+        body: error.stack || "",
+      };
+
+      console.error("ERRO NA ANÁLISE IA (LOG COMPLETO CONSOLE):", {
+        name: errInfo.name,
+        message: errInfo.message,
+        stack: error.stack,
+        status: errInfo.status,
+        body: errInfo.body,
+      });
+
+      setAiAnalysisError(errInfo);
+    } finally {
+      clearTimeout(timeoutId);
+      setIsAiAnalyzing(false); // Sempre redefine o estado de carregamento para false no bloco finally
     }
   };
 
@@ -6753,8 +6854,14 @@ function AbortivaSection({
       let activeUserUid = user?.uid;
       if (!activeUserUid) {
         try {
-          const cred = await signInAnonymously(auth);
-          activeUserUid = cred.user.uid;
+          const timeoutAuth = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Auth Timeout")), 5000)
+          );
+          const cred = (await Promise.race([
+            signInAnonymously(auth),
+            timeoutAuth,
+          ])) as any;
+          activeUserUid = cred?.user?.uid || "public-abortiva";
         } catch (e) {
           activeUserUid = "public-abortiva";
         }
@@ -6782,8 +6889,10 @@ function AbortivaSection({
         destino: "",
         motivo: "",
         preenchidoPor: "",
+        tripulacao: "",
       });
       setSelectedLaunchId("");
+      setAiAnalysisResult(null);
 
       // 2. Gerar e Upload do PDF em background (Não bloqueia o UI)
       (async () => {
@@ -7086,6 +7195,78 @@ function AbortivaSection({
             />
           </div>
 
+          {/* AI Analysis Component (Server-Side Gemini Integration) */}
+          <div className="card-military p-5 border border-military-gold/30 bg-military-gold/5 space-y-4 rounded-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-military-gold animate-pulse shrink-0" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-military-gold">
+                  Análise Preventiva com Inteligência Artificial
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={handleAiAnalysis}
+                disabled={isAiAnalyzing}
+                className="px-3.5 py-2 bg-military-gold/20 hover:bg-military-gold/30 text-military-gold border border-military-gold/40 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                {isAiAnalyzing ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" />
+                    <span>Analisando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={12} />
+                    <span>Analisar Fatores (IA)</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {isAiAnalyzing && (
+              <div className="flex items-center justify-center gap-3 py-6 text-military-gold text-xs font-bold uppercase tracking-widest bg-black/20 rounded-lg border border-military-gold/10">
+                <Loader2 size={20} className="animate-spin" />
+                <span>Processando análise no servidor SIPAA...</span>
+              </div>
+            )}
+
+            {aiAnalysisError && !isAiAnalyzing && (
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-left">
+                    <h5 className="text-xs font-bold uppercase text-red-400">
+                      Falha na Análise de IA
+                    </h5>
+                    <p className="text-[11px] text-red-200/90 leading-relaxed">
+                      {aiAnalysisError.message}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAiAnalysis}
+                  className="w-full py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw size={14} />
+                  <span>Tentar Novamente</span>
+                </button>
+              </div>
+            )}
+
+            {aiAnalysisResult && !isAiAnalyzing && (
+              <div className="p-4 bg-slate-900/90 border border-military-gold/20 rounded-xl space-y-2 text-left">
+                <span className="text-[9px] font-black uppercase text-military-gold tracking-[0.2em]">
+                  Análise Técnica do Gemini Server:
+                </span>
+                <div className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-mono bg-black/40 p-3 rounded-lg border border-white/5">
+                  {aiAnalysisResult}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="pt-4 flex gap-4">
             <button
               onClick={handleSend}
@@ -7105,6 +7286,8 @@ function AbortivaSection({
                   dataVoo: new Date().toISOString().split("T")[0],
                   numLancamento: "",
                   modeloAnv: "",
+                  mv: "",
+                  destino: "",
                   motivo: "",
                   preenchidoPor: "",
                   tripulacao: "",
@@ -9260,12 +9443,14 @@ function AdminSection({
                       if (a === "SEM DATA") return 1;
                       if (b === "SEM DATA") return -1;
                       
-                      const parseDate = (dStr: string) => {
+                      const parseDate = (dStr: any) => {
+                        if (!dStr || typeof dStr !== "string") return 0;
                         if (dStr.includes("/")) {
                           const [d, m, y] = dStr.split("/").map(Number);
                           return new Date(y, m - 1, d).getTime();
                         }
-                        return new Date(dStr).getTime();
+                        const dt = new Date(dStr).getTime();
+                        return isNaN(dt) ? 0 : dt;
                       };
 
                       return parseDate(b) - parseDate(a);
@@ -9420,12 +9605,14 @@ function AdminSection({
                       if (a === "SEM DATA") return 1;
                       if (b === "SEM DATA") return -1;
                       
-                      const parseDate = (dStr: string) => {
+                      const parseDate = (dStr: any) => {
+                        if (!dStr || typeof dStr !== "string") return 0;
                         if (dStr.includes("/")) {
                           const [d, m, y] = dStr.split("/").map(Number);
                           return new Date(y, m - 1, d).getTime();
                         }
-                        return new Date(dStr).getTime();
+                        const dt = new Date(dStr).getTime();
+                        return isNaN(dt) ? 0 : dt;
                       };
 
                       return parseDate(b) - parseDate(a);
@@ -10954,8 +11141,8 @@ function AdminSection({
                     })
                     .sort((a, b) => {
                       // 1. Prioridade por data (Decrescente - mais recente primeiro)
-                      const parseD = (s: string) => {
-                        if (!s) return 0;
+                      const parseD = (s: any) => {
+                        if (!s || typeof s !== "string") return 0;
                         if (s.includes('/')) {
                           const parts = s.split('/');
                           if (parts.length === 3) {
