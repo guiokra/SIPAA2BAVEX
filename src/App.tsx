@@ -4242,12 +4242,14 @@ function InicioSection({
   const shortcuts = [
     {
       id: "FGR",
+      path: "/fgr",
       name: "FGR",
       desc: "Gerenciamento de risco",
       icon: ShieldCheck,
     },
     {
       id: "ConsultarFGR",
+      path: "/fgr",
       name: "CONSULTAR FGR",
       desc: "Buscar arquivos FGR",
       icon: Search,
@@ -4255,54 +4257,64 @@ function InicioSection({
     },
     {
       id: "RELPREV",
+      path: "/relprev",
       name: "RELPREV",
       desc: "Preenchimento de relato",
       icon: FileSearch,
     },
     {
       id: "Abortiva",
+      path: "/abortiva",
       name: "Abortiva",
       desc: "Interrupção de missão",
       icon: Zap,
     },
     {
       id: "Mapa de Risco",
+      path: "/mapa-de-risco",
       name: "Mapa Risco",
       desc: "Visualizar mapa de risco",
       icon: MapIcon,
     },
     {
       id: "Abastecimento",
+      path: "/abastecimento",
       name: "Abastecer",
       desc: "Controle de combustível",
       icon: Droplets,
     },
     {
       id: "Medicamentos",
+      path: "/medicamentos",
       name: "Medicamentos",
       desc: "Uso restritivo",
       icon: Pill,
     },
     {
       id: "Normas CAvEx",
+      path: "/normas-cavex",
       name: "Normas",
       desc: "Normas CAvEx",
       icon: Gavel,
     },
     {
       id: "Telefones",
+      path: "/telefones",
       name: "Telefones",
       desc: "Contatos e ramais úteis",
       icon: Phone,
     },
     {
       id: "Portal Único de Notificação",
+      isExternal: true,
+      url: "https://santosdumont.anac.gov.br/menu/r/api/portal_unico_notificacao/selecao-do-tipo-de-evento?clear=103&session=111703245409353",
       name: "Portal ANAC",
       desc: "Notificação externa ANAC",
       icon: ExternalLink,
     },
     {
       id: "Sugestoes",
+      path: "/sugestoes",
       name: "Sugestões",
       desc: "Enviar feedback à SIPAA",
       icon: MessageSquarePlus,
@@ -4398,6 +4410,7 @@ function InicioSection({
             </a>
 
             <button
+              type="button"
               onClick={() => {
                 setShowOpinionForm(!showOpinionForm);
                 if (opinionSubmitted) {
@@ -4439,8 +4452,9 @@ function InicioSection({
                       </p>
                     </div>
                     <button
+                      type="button"
                       onClick={() => setOpinionSubmitted(false)}
-                      className="text-military-gold font-bold uppercase text-[9px] tracking-widest hover:underline pt-1"
+                      className="text-military-gold font-bold uppercase text-[9px] tracking-widest hover:underline pt-1 cursor-pointer"
                     >
                       Enviar outro comentário
                     </button>
@@ -4526,36 +4540,45 @@ function InicioSection({
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-11 gap-2 sm:gap-3">
           {shortcuts.map((item) => {
             const Icon = item.icon;
-            const isAction = typeof item.action === "function";
+            if (item.isExternal) {
+              return (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center justify-center p-2 sm:p-3.5 rounded-xl bg-bg-panel border border-border-theme hover:bg-accent-gold/10 hover:border-accent-gold/40 transition-all text-center aspect-square group shadow-lg cursor-pointer hover:scale-[1.03] active:scale-[0.97]"
+                >
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-accent-gold/10 flex items-center justify-center text-accent-gold group-hover:bg-accent-gold group-hover:text-bg-deep transition-all duration-200 mb-1.5 shadow-inner">
+                    <Icon size={16} className="sm:size-20 transition-transform duration-200 group-hover:scale-110" />
+                  </div>
+                  <span className="text-[9px] sm:text-[11px] font-bold text-white tracking-wide uppercase leading-tight line-clamp-1 max-w-full">
+                    {item.name}
+                  </span>
+                  <span className="hidden sm:block text-[8px] text-text-secondary mt-1 tracking-tight leading-none opacity-75 line-clamp-1 max-w-full">
+                    {item.desc}
+                  </span>
+                </a>
+              );
+            }
+
             return (
-              <motion.button
+              <Link
                 key={item.id}
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  if (isAction && item.action) {
-                    item.action();
-                  } else {
-                    onTabChange(item.id as any);
-                  }
-                }}
-                className="flex flex-col items-center justify-center p-2 sm:p-3.5 rounded-xl bg-bg-panel border border-border-theme hover:bg-accent-gold/10 hover:border-accent-gold/40 transition-all text-center aspect-square group shadow-lg cursor-pointer"
+                to={item.path!}
+                onClick={item.action}
+                className="flex flex-col items-center justify-center p-2 sm:p-3.5 rounded-xl bg-bg-panel border border-border-theme hover:bg-accent-gold/10 hover:border-accent-gold/40 transition-all text-center aspect-square group shadow-lg cursor-pointer hover:scale-[1.03] active:scale-[0.97]"
               >
-                {/* Compact Circular Icon */}
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-accent-gold/10 flex items-center justify-center text-accent-gold group-hover:bg-accent-gold group-hover:text-bg-deep transition-all duration-200 mb-1.5 shadow-inner">
                   <Icon size={16} className="sm:size-20 transition-transform duration-200 group-hover:scale-110" />
                 </div>
-                
-                {/* Module Label */}
                 <span className="text-[9px] sm:text-[11px] font-bold text-white tracking-wide uppercase leading-tight line-clamp-1 max-w-full">
                   {item.name}
                 </span>
-                
-                {/* Secondary subtitle description - Hidden on Mobile to save valuable real estate */}
                 <span className="hidden sm:block text-[8px] text-text-secondary mt-1 tracking-tight leading-none opacity-75 line-clamp-1 max-w-full">
                   {item.desc}
                 </span>
-              </motion.button>
+              </Link>
             );
           })}
         </div>
