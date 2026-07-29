@@ -1,6 +1,7 @@
 import React, { FC, useState, useEffect, useRef } from "react";
 import * as pdfjs from "pdfjs-dist";
 import {
+  ArrowLeft,
   Home,
   FileText,
   Scale,
@@ -3056,6 +3057,15 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(false);
   const [abastecimentoConfig, setAbastecimentoConfig] = useState<any>(null);
   const [abastecimentoFiles, setAbastecimentoFiles] = useState<any[]>([]);
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll to top whenever changing sections/tabs
+  useEffect(() => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTop = 0;
+    }
+    window.scrollTo({ top: 0, behavior: "instant" as any });
+  }, [activeTab]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "config", "abastecimento"), (snap) => {
@@ -3242,6 +3252,11 @@ export default function App() {
     }
     setActiveTab(tab);
     if (isMobile) setIsSidebarOpen(false);
+
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTop = 0;
+    }
+    window.scrollTo({ top: 0, behavior: "instant" as any });
   };
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -3461,7 +3476,7 @@ export default function App() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar">
+        <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -3474,7 +3489,10 @@ export default function App() {
               {React.createElement(sectionComponents[activeTab], {
                 user,
                 onTabChange: handleTabChange,
-                onConsultFgr: () => setIsConsultFgrModalOpen(true),
+                onConsultFgr: () => {
+                  handleTabChange("FGR");
+                  setIsConsultFgrModalOpen(true);
+                },
                 abastecimentoConfig,
                 abastecimentoFiles,
                 launches,
@@ -5010,6 +5028,20 @@ function RelprevSection({
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • RELPREV
+        </span>
+      </div>
+
       <div className="card-military overflow-hidden">
         <div className="p-10 text-center border-b border-white/5 bg-white/2">
           <h2 className="text-3xl font-black text-white tracking-tight mb-1 uppercase">
@@ -5688,6 +5720,20 @@ function FgrSection({
 
   return (
     <div className="space-y-6 pb-20">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • FGR Gerenciamento de Risco
+        </span>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-left">
         <div>
           <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">
@@ -6625,10 +6671,12 @@ function AbortivaSection({
   user,
   launches,
   onConsultFgr,
+  onTabChange,
 }: {
   user: FirebaseUser | null;
   launches: any[];
   onConsultFgr?: () => void;
+  onTabChange?: (tab: SectionKey) => void;
 }) {
   const [selectedLaunchId, setSelectedLaunchId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -6772,6 +6820,20 @@ function AbortivaSection({
 
   return (
     <div className="space-y-6 pb-20 text-left">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange?.("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • Abortiva de Voo
+        </span>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-white mb-1 uppercase tracking-tight">
@@ -7070,6 +7132,20 @@ function MapaRiscoSection({
 }) {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • Mapa de Risco
+        </span>
+      </div>
+
       <div className="pb-4 border-b border-slate-800">
         <h2 className="text-2xl font-bold text-white mb-1">Mapa de Risco</h2>
         <p className="text-slate-400 text-sm">
@@ -7254,6 +7330,20 @@ function AbastecimentoSection({
 }) {
   return (
     <div className="space-y-6">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • Abastecimento
+        </span>
+      </div>
+
       <div className="pb-4 border-b border-slate-800">
         <h2 className="text-2xl font-bold text-white mb-1">Abastecimento</h2>
         <p className="text-slate-400 text-sm">
@@ -7519,9 +7609,27 @@ function FaunaSection({
   );
 }
 
-function MedicamentosSection() {
+function MedicamentosSection({
+  onTabChange,
+}: {
+  onTabChange?: (tab: SectionKey) => void;
+}) {
   return (
     <div className="space-y-6">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange?.("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • Medicamentos
+        </span>
+      </div>
+
       <div className="pb-4 border-b border-slate-800">
         <h2 className="text-2xl font-bold text-white mb-1">
           Medicamentos de Uso Restritivo
@@ -7719,6 +7827,20 @@ function NormasSection({
 
   return (
     <div className="space-y-8">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • Normas CAvEx
+        </span>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-slate-800">
         <div>
           <h2 className="text-2xl font-bold text-white mb-1">
@@ -8675,6 +8797,20 @@ function AdminSection({
 
   return (
     <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • Painel Administrativo
+        </span>
+      </div>
+
       <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 md:pb-6 border-b border-slate-800 gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-military-gold/20 border border-military-gold flex items-center justify-center text-military-gold shrink-0">
@@ -11229,7 +11365,11 @@ function AdminStat({ label, value, trend, onClick }: any) {
   );
 }
 
-function TelefonesSection() {
+function TelefonesSection({
+  onTabChange,
+}: {
+  onTabChange?: (tab: SectionKey) => void;
+}) {
   const contacts = [
     {
       role: "Ch SIPAA",
@@ -11253,6 +11393,20 @@ function TelefonesSection() {
 
   return (
     <div className="space-y-6">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange?.("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • Telefones Úteis
+        </span>
+      </div>
+
       <div className="pb-4 border-b border-white/5">
         <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
           <Phone className="text-military-gold animate-bounce" size={24} />
@@ -11319,7 +11473,11 @@ function TelefonesSection() {
   );
 }
 
-function SugestoesSection() {
+function SugestoesSection({
+  onTabChange,
+}: {
+  onTabChange?: (tab: SectionKey) => void;
+}) {
   const [suggestion, setSuggestion] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -11347,6 +11505,20 @@ function SugestoesSection() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange?.("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-text-secondary tracking-widest hidden sm:inline-block">
+          Página do Módulo • Sugestões
+        </span>
+      </div>
+
       <div className="text-center space-y-4">
         <div className="w-16 h-16 bg-military-gold/10 rounded-2xl flex items-center justify-center text-military-gold mx-auto border border-military-gold/20 shadow-2xl">
           <Lightbulb size={32} />
