@@ -3172,7 +3172,7 @@ function AppLayoutContent({
     { id: "Normas CAvEx", path: "/normas-cavex", name: "Normas CAvEx", icon: Gavel },
     { id: "Telefones", path: "/telefones", name: "Telefones", icon: Phone },
     { id: "Sugestoes", path: "/sugestoes", name: "Sugestões", icon: MessageSquarePlus },
-    { id: "JSV", path: "/pesquisa-jsv", name: "Pesquisa JSV", icon: ClipboardList },
+    { id: "JSV", path: "/pesquisa-jsv", name: "Pesquisa de Opinião", icon: ClipboardList },
   ];
 
   const sectionProps = {
@@ -4319,34 +4319,18 @@ function InicioSection({
           />
         </div>
 
-        {/* Como Chegar & Pesquisa de Opinião Buttons */}
+        {/* Como Chegar Button */}
         <div className="w-full space-y-3">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <a
-              href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 py-3 px-4 bg-military-gold hover:bg-military-gold/90 text-military-black rounded-xl flex items-center justify-center gap-2 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer"
-            >
-              <MapIcon size={14} className="animate-bounce" />
-              <span>Como Chegar</span>
-              <ExternalLink size={12} className="opacity-80" />
-            </a>
-
-            <Link
-              to="/pesquisa-jsv"
-              className="flex-1 py-3 px-4 rounded-xl flex items-center justify-center gap-2.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg cursor-pointer bg-gradient-to-r from-military-gold via-amber-400 to-military-gold text-military-black border-2 border-military-gold shadow-military-gold/20"
-            >
-              <div className="w-6 h-6 rounded-lg bg-military-black text-military-gold flex items-center justify-center shrink-0 shadow-inner">
-                <ClipboardList size={14} />
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="leading-tight font-black">PESQUISA DE OPINIÃO</span>
-                <span className="text-[8px] opacity-90 font-bold tracking-tight">JORNADA DE SEGURANÇA DE VOO</span>
-              </div>
-              <ChevronRight size={14} className="ml-auto opacity-80" />
-            </Link>
-          </div>
+          <a
+            href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3.5 px-4 bg-military-gold hover:bg-military-gold/90 text-military-black rounded-xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer"
+          >
+            <MapIcon size={16} className="animate-bounce" />
+            <span>Como Chegar</span>
+            <ExternalLink size={14} className="opacity-80" />
+          </a>
           
           <p className="text-[9px] text-text-secondary text-center uppercase tracking-wide select-none leading-normal">
             📍 Auditório do Museu Mazzaropi • Taubaté-SP <br />
@@ -6756,13 +6740,16 @@ Forneça uma análise técnica concisa (3 a 4 tópicos) com orientações preven
       let activeUserUid = user?.uid;
       if (!activeUserUid) {
         try {
-          const timeoutAuth = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Auth Timeout")), 5000)
-          );
+          let authTimer: any;
+          const timeoutAuth = new Promise<never>((_, reject) => {
+            authTimer = setTimeout(() => reject(new Error("Auth Timeout")), 5000);
+          });
+          timeoutAuth.catch(() => {});
           const cred = (await Promise.race([
             signInAnonymously(auth),
             timeoutAuth,
           ])) as any;
+          clearTimeout(authTimer);
           activeUserUid = cred?.user?.uid || "public-abortiva";
         } catch (e) {
           activeUserUid = "public-abortiva";
@@ -10262,13 +10249,17 @@ function AdminSection({
                                     <Edit size={12} />
                                   </button>
                                   <button
-                                    onClick={() => {
+                                    onClick={async () => {
                                       if (
                                         window.confirm(
                                           "Excluir este lançamento?",
                                         )
                                       ) {
-                                        deleteDoc(doc(db, "Lancamentos", l.id));
+                                        try {
+                                          await deleteDoc(doc(db, "Lancamentos", l.id));
+                                        } catch (err) {
+                                          console.error("Erro ao excluir lançamento:", err);
+                                        }
                                       }
                                     }}
                                     className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
