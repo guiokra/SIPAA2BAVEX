@@ -11924,29 +11924,47 @@ function OptionGroup({
   value: string;
   onChange: (val: string) => void;
 }) {
+  const handleSelect = (opt: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Find the parent scroll container or window scroll position
+    const scrollElem = (e.currentTarget as HTMLElement).closest(".overflow-y-auto") as HTMLElement | null;
+    const currentScrollTop = scrollElem ? scrollElem.scrollTop : window.scrollY;
+
+    onChange(opt);
+
+    // Keep scroll position exactly as it was
+    requestAnimationFrame(() => {
+      if (scrollElem) {
+        scrollElem.scrollTop = currentScrollTop;
+      } else {
+        window.scrollTo(0, currentScrollTop);
+      }
+    });
+  };
+
   return (
     <div className="space-y-3 p-5 rounded-xl bg-white/2 border border-white/5 hover:border-military-gold/20 transition-all text-left">
-      <label className="text-xs sm:text-sm font-bold text-white flex items-start gap-2.5 leading-snug">
+      <div className="text-xs sm:text-sm font-bold text-white flex items-start gap-2.5 leading-snug select-none">
         <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
           {questionNum}
         </span>
         <span>{title}</span>
-      </label>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
         {options.map((opt) => {
           const isSelected = value === opt;
           return (
-            <button
+            <div
               key={opt}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onChange(opt);
-              }}
-              className={`py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 border cursor-pointer flex items-center justify-center gap-2 ${
+              role="button"
+              tabIndex={0}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => handleSelect(opt, e)}
+              className={`py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-colors duration-150 border cursor-pointer flex items-center justify-center gap-2 select-none ${
                 isSelected
-                  ? "bg-military-gold text-military-black border-military-gold shadow-md shadow-military-gold/10 scale-[1.02]"
+                  ? "bg-military-gold text-military-black border-military-gold shadow-md shadow-military-gold/10"
                   : "bg-military-black/60 text-slate-300 border-white/10 hover:border-military-gold/40 hover:text-white hover:bg-white/5"
               }`}
             >
@@ -11962,7 +11980,7 @@ function OptionGroup({
                 )}
               </div>
               <span>{opt}</span>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -12179,12 +12197,12 @@ function JsvSurveySection({
               </div>
 
               <div className="space-y-2 text-left">
-                <label className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug">
+                <div className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug select-none">
                   <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
                     6
                   </span>
                   <span>O que considera ter melhorado em relação às edições anteriores?</span>
-                </label>
+                </div>
                 <textarea
                   value={formData.q6_melhorias}
                   onChange={(e) =>
@@ -12197,12 +12215,12 @@ function JsvSurveySection({
               </div>
 
               <div className="space-y-2 text-left">
-                <label className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug">
+                <div className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug select-none">
                   <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
                     7
                   </span>
                   <span>O que considera ter piorado em relação às edições anteriores?</span>
-                </label>
+                </div>
                 <textarea
                   value={formData.q7_piorias}
                   onChange={(e) =>
@@ -12215,12 +12233,12 @@ function JsvSurveySection({
               </div>
 
               <div className="space-y-2 text-left">
-                <label className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug">
+                <div className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug select-none">
                   <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
                     8
                   </span>
                   <span>Quais temas ou palestrantes sugere para serem abordados ou participarem da próxima edição do evento?</span>
-                </label>
+                </div>
                 <textarea
                   value={formData.q8_sugestoes_temas}
                   onChange={(e) =>
