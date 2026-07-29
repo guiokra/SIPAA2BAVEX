@@ -3257,16 +3257,16 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
+    <div className="flex h-[100dvh] min-h-[100dvh] w-full bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
       {/* Admin Password Modal */}
       <AnimatePresence>
         {isAdminModalOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/80 backdrop-blur-sm overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="card-military max-w-sm w-full p-8 space-y-6"
+              className="card-military max-w-sm w-full p-6 sm:p-8 space-y-6 max-h-[90dvh] overflow-y-auto my-auto"
             >
               <div className="flex flex-col items-center gap-4 text-center mb-4">
                 <img
@@ -3318,6 +3318,14 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Mobile Backdrop Overlay */}
+      {isMobile && isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden transition-opacity"
+        />
+      )}
+
       {/* Sidebar */}
       <motion.aside
         initial={false}
@@ -3325,7 +3333,7 @@ export default function App() {
           width: isSidebarOpen ? (isMobile ? "280px" : "240px") : "0px",
           x: isSidebarOpen ? 0 : isMobile ? -300 : -240,
         }}
-        className={`fixed lg:relative z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-full shadow-2xl transition-all duration-300 ease-in-out`}
+        className={`fixed lg:relative inset-y-0 left-0 z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-[100dvh] max-h-[100dvh] shadow-2xl transition-all duration-300 ease-in-out`}
       >
         <div className="p-6 flex items-center gap-3 border-b border-border-theme">
           <div className="w-10 h-10 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30">
@@ -3483,12 +3491,12 @@ export default function App() {
       {/* Consult FGR Modal */}
       <AnimatePresence>
         {isConsultFgrModalOpen && (
-          <div className="fixed inset-0 z-[60] bg-military-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] bg-military-black/95 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-military-black border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+              className="bg-military-black border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col shadow-2xl my-auto"
             >
               <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
                 <div className="flex items-center gap-4">
@@ -4208,15 +4216,25 @@ function InicioSection({
       {/* Official Event PDF Flyer (Google Drive Embed) & Map Button */}
       <div className="flex flex-col items-center justify-center w-full max-w-[500px] mx-auto py-2 space-y-4">
         {/* Header indicator */}
-        <div className="flex items-center gap-2 select-none">
-          <span className="animate-pulse w-2 h-2 rounded-full bg-accent-gold" />
-          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-accent-gold">
-            Folder Oficial do Evento • Visualização do PDF
-          </span>
+        <div className="flex items-center justify-between w-full select-none px-1">
+          <div className="flex items-center gap-2">
+            <span className="animate-pulse w-2 h-2 rounded-full bg-accent-gold" />
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-accent-gold">
+              Folder Oficial do Evento
+            </span>
+          </div>
+          <a
+            href="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/view?usp=drivesdk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[9px] font-bold text-military-gold hover:underline uppercase tracking-wider"
+          >
+            Abrir PDF <ExternalLink size={10} />
+          </a>
         </div>
 
         {/* Official Event PDF Flyer (Google Drive Embed) */}
-        <div className="w-full aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
+        <div className="w-full min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
           <iframe
             src="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/preview"
             className="w-full h-full border-none"
@@ -4409,12 +4427,17 @@ function InicioSection({
           <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest">
             Cartazes 2026
           </h3>
-          <span className="text-[9px] text-text-secondary uppercase tracking-tighter">
-            DIVULGAÇÃO E PREVENÇÃO
-          </span>
+          <a
+            href="https://drive.google.com/file/d/12QrZ2iEQuHA0u6oEcpcryk8OnoxDzL9m/view?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[9px] font-bold text-military-gold hover:underline uppercase tracking-wider"
+          >
+            Abrir PDF <ExternalLink size={10} />
+          </a>
         </div>
         
-        <div className="w-full max-w-[480px] mx-auto aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
+        <div className="w-full max-w-[480px] mx-auto min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
           <iframe
             src="https://drive.google.com/file/d/12QrZ2iEQuHA0u6oEcpcryk8OnoxDzL9m/preview"
             className="w-full h-full border-none"
@@ -10334,12 +10357,12 @@ function AdminSection({
       {/* Batch Delete Confirmation Modal */}
       <AnimatePresence>
         {batchDeleteTarget && (
-          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md">
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="card-military max-w-sm w-full p-8 text-center space-y-6 border-red-500/30"
+              className="card-military max-w-sm w-full p-8 text-center space-y-6 border-red-500/30 max-h-[90dvh] overflow-y-auto my-auto"
             >
               <div className="w-20 h-20 rounded-full bg-red-500/10 text-red-500 mx-auto flex items-center justify-center border border-red-500/20">
                 <AlertTriangle size={40} className="animate-pulse" />
@@ -10392,11 +10415,11 @@ function AdminSection({
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {deleteId && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-sm overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="card-military max-w-sm w-full p-6 text-center space-y-6"
+              className="card-military max-w-sm w-full p-6 text-center space-y-6 max-h-[90dvh] overflow-y-auto my-auto"
             >
               <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-500 mx-auto flex items-center justify-center">
                 <Trash2 size={32} />
@@ -10435,11 +10458,11 @@ function AdminSection({
       {/* Relprev Multi-line Details Modal */}
       <AnimatePresence>
         {selectedRelprev && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-md">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-md overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="card-military max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 space-y-6"
+              className="card-military max-w-2xl w-full max-h-[90dvh] overflow-y-auto p-6 sm:p-8 space-y-6 my-auto"
             >
               <div className="flex justify-between items-start border-b border-border-theme pb-4">
                 <div>
@@ -10557,12 +10580,12 @@ function AdminSection({
       {/* Manual Flight Modal */}
       <AnimatePresence>
         {isManualModalOpen && (
-          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md">
+          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="card-military max-w-lg w-full p-8 space-y-6 overflow-y-auto max-h-[90vh]"
+              className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto"
             >
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div className="flex items-center gap-3">
@@ -10732,12 +10755,12 @@ function AdminSection({
       {/* Link FGR Modal */}
       <AnimatePresence>
         {isLinkFgrModalOpen && launchToLink && (
-          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md">
+          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="card-military max-w-lg w-full p-8 space-y-6 overflow-y-auto max-h-[90vh]"
+              className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto"
             >
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div className="flex items-center gap-3">

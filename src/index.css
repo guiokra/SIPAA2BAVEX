@@ -19,6 +19,46 @@
   --color-border-theme: rgba(197, 160, 89, 0.2);
 }
 
+/* iOS Safari & Touch Device Optimization */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  height: 100%;
+  height: -webkit-fill-available;
+}
+
+body {
+  @apply bg-bg-deep text-[#e6e9ef] font-sans antialiased;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
+}
+
+/* Enable iOS Momentum Smooth Scrolling on Scrollable Containers */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto,
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent iOS Auto-Zoom on Form Inputs / Selects / Textareas on Mobile */
+@media screen and (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Fix iOS iframe Sizing in Flex/Absolute Containers */
+iframe {
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -27,13 +67,15 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }
 
 @layer base {
-  body {
-    @apply bg-bg-deep text-[#e6e9ef] font-sans antialiased;
-  }
-
   /* Custom Scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
     width: 4px;
