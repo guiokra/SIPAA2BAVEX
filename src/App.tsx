@@ -3142,23 +3142,35 @@ function AppLayoutContent({
       );
       return;
     }
-    if (tab === "Admin" && !isAdminAuthenticated) {
-      setIsAdminModalOpen(true);
+    if (tab === "Admin") {
+      if (!isAdminAuthenticated) {
+        setIsAdminModalOpen(true);
+      } else {
+        navigate("/admin");
+      }
       return;
     }
 
     if (tab === "Inicio" || tab === "BACK") {
-      if (window.history.length > 1 && location.pathname !== "/") {
-        navigate(-1);
-      } else {
-        navigate("/");
-      }
+      navigate("/");
       return;
     }
 
     const path = TAB_TO_PATH[tab] || "/";
     navigate(path);
     if (isMobile) setIsSidebarOpen(false);
+  };
+
+  const onAdminLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassword === "sipaa2bavex") {
+      setIsAdminAuthenticated(true);
+      setIsAdminModalOpen(false);
+      setAdminPassword("");
+      navigate("/admin");
+    } else {
+      alert("Senha incorreta");
+    }
   };
 
   const navItems = [
@@ -3189,6 +3201,9 @@ function AppLayoutContent({
     fgrs,
     abortivas,
     isAdminAuthenticated,
+    setIsAdminAuthenticated,
+    adminPassword,
+    setAdminPassword,
   };
 
   const isNavActive = (itemPath: string) => {
@@ -3201,7 +3216,7 @@ function AppLayoutContent({
   const isAdminActive = location.pathname.startsWith("/admin");
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] w-full bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
+    <div className="flex flex-col h-[100dvh] min-h-[100dvh] w-full bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
       {/* Admin Password Modal */}
       {isAdminModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
@@ -3230,7 +3245,7 @@ function AppLayoutContent({
                 </button>
               </div>
             </div>
-            <form onSubmit={handleAdminLogin} className="space-y-4">
+            <form onSubmit={onAdminLoginSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] uppercase font-bold text-text-secondary">
                   Senha de Acesso
@@ -3246,7 +3261,7 @@ function AppLayoutContent({
               </div>
               <button
                 type="submit"
-                className="btn-military w-full py-3 text-xs"
+                className="btn-military w-full py-3 text-xs font-black uppercase"
               >
                 AUTENTICAR
               </button>
@@ -3255,148 +3270,79 @@ function AppLayoutContent({
         </div>
       )}
 
-      {/* Mobile Backdrop Overlay */}
-      {isMobile && isSidebarOpen && (
-        <div
-          onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-black/80 lg:hidden"
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`fixed lg:relative inset-y-0 left-0 z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-[100dvh] max-h-[100dvh] shadow-2xl ${
-          isSidebarOpen ? "w-[280px] lg:w-[240px]" : "w-0 overflow-hidden hidden lg:flex lg:w-[240px]"
-        }`}
-      >
-        <div className="p-6 flex items-center gap-3 border-b border-border-theme">
-          <div className="w-10 h-10 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30">
-            <img
-              src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
-              className="w-8 h-8 object-contain"
-              alt="2º BAvEx Logo"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-                const parent = e.currentTarget.parentElement;
-                if (parent) {
-                  const fallback = document.createElement("div");
-                  fallback.className = "text-accent-gold text-xl font-bold";
-                  fallback.innerText = "2";
-                  parent.appendChild(fallback);
-                }
-              }}
-            />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-widest text-accent-gold leading-none">
-              2º BAvEx
-            </span>
-            <span className="text-[10px] text-text-secondary font-medium mt-1 uppercase tracking-widest">
-              Exército Brasileiro
-            </span>
-          </div>
-          {isMobile && (
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="ml-auto text-slate-400 hover:text-white"
-            >
-              <X size={24} />
-            </button>
-          )}
-        </div>
-
-        {/* Scrollable Menu Area */}
-        <div className="flex-1 overflow-y-auto py-4 custom-scrollbar gpu-scroll">
-          <nav className="space-y-0.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = isNavActive(item.path);
-              return (
-                <NavLink
-                  key={item.id}
-                  to={item.path}
-                  onClick={() => {
-                    if (isMobile) setIsSidebarOpen(false);
-                  }}
-                  className={({ isActive: linkActive }) =>
-                    `w-full flex items-center gap-4 px-6 py-3 group relative border-l-[3px] ${
-                      linkActive || active
-                        ? "bg-accent-gold/10 text-accent-gold border-l-accent-gold"
-                        : "text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent"
-                    }`
-                  }
-                >
-                  <div className="flex-shrink-0 w-5 flex justify-center">
-                    <Icon
-                      size={16}
-                      className={
-                        active
-                          ? "text-accent-gold"
-                          : "text-text-secondary group-hover:text-white"
-                      }
-                    />
-                  </div>
-                  <span className="text-[13px] font-medium text-left leading-tight block flex-1">
-                    {item.name}
-                  </span>
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* User profile & Admin Section at Bottom */}
-        <div className="px-4 py-4 border-t border-border-theme space-y-4">
+      {/* Header */}
+      <header className="h-[54px] md:h-[64px] border-b border-border-theme bg-bg-panel flex items-center justify-between px-4 md:px-8 z-30 shadow-md">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button
-            onClick={() => handleTabChange("Admin")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded text-[10px] font-black uppercase tracking-widest ${
-              isAdminActive
-                ? "bg-accent-gold text-bg-deep shadow-lg shadow-accent-gold/10"
-                : "text-accent-gold border border-accent-gold/20 hover:bg-accent-gold/10"
-            }`}
+            onClick={() => handleTabChange("Inicio")}
+            className="flex items-center gap-2.5 group text-left cursor-pointer"
           >
-            <div className="flex-shrink-0 w-4 flex justify-center">
-              {isAdminAuthenticated ? <Unlock size={12} /> : <Lock size={12} />}
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30 group-hover:border-accent-gold transition-colors">
+              <img
+                src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
+                className="w-6 h-6 sm:w-7 sm:h-7 object-contain"
+                alt="2º BAvEx Logo"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                  const parent = e.currentTarget.parentElement;
+                  if (parent) {
+                    const fallback = document.createElement("div");
+                    fallback.className = "text-accent-gold text-lg font-bold";
+                    fallback.innerText = "2";
+                    parent.appendChild(fallback);
+                  }
+                }}
+              />
             </div>
-            <span className="text-left flex-1">Área Administrativa</span>
+            <div>
+              <span className="text-sm sm:text-base font-black tracking-wider text-accent-gold group-hover:text-white transition-colors leading-none block uppercase">
+                2º BAvEx
+              </span>
+              <span className="text-[9px] text-text-secondary font-bold uppercase tracking-widest block mt-0.5">
+                SIPAA • Aviação do Exército
+              </span>
+            </div>
+          </button>
+
+          <div className="h-5 w-[1px] bg-border-theme hidden sm:block mx-1" />
+
+          <button
+            onClick={() => handleTabChange("Inicio")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-deep border border-[#2e3e59] hover:border-accent-gold text-slate-200 hover:text-accent-gold text-xs font-bold uppercase transition-all cursor-pointer"
+          >
+            <Home size={14} className="text-accent-gold" />
+            <span>Início</span>
           </button>
         </div>
-      </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full bg-bg-deep relative overflow-hidden">
-        {/* Header */}
-        <header className="h-[50px] md:h-[60px] border-b border-border-theme bg-bg-panel flex items-center justify-between px-4 md:px-8 z-30 shadow-sm">
-          <div className="flex items-center gap-4">
-            {!isSidebarOpen && (
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded"
-              >
-                <Menu size={18} />
-              </button>
-            )}
-            <button
-              onClick={() => handleTabChange("Admin")}
-              className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[10px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black cursor-pointer"
-            >
-              <Lock size={12} />
-              <span className="hidden sm:inline">Portal Administrativo</span>
-            </button>
-          </div>
+        <div className="flex items-center gap-3 sm:gap-6 text-xs text-text-secondary">
+          <button
+            onClick={() => handleTabChange("Admin")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+              isAdminActive
+                ? "bg-accent-gold text-[#0f172a] shadow-md"
+                : "bg-military-gold/15 text-military-gold border border-military-gold/30 hover:bg-military-gold hover:text-military-black"
+            }`}
+          >
+            {isAdminAuthenticated ? <Unlock size={13} /> : <Lock size={13} />}
+            <span className="hidden sm:inline">Portal Administrativo</span>
+            <span className="sm:hidden">Admin</span>
+          </button>
 
-          <div className="flex items-center gap-6 text-[12px] text-text-secondary">
-            <span className="hidden md:block">
-              Taubaté, SP | {new Date().toLocaleDateString("pt-BR")} |{" "}
-              {new Date().toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}{" "}
-              Z
-            </span>
-          </div>
-        </header>
+          <span className="hidden lg:block text-[11px] font-mono font-medium text-slate-400">
+            Taubaté, SP | {new Date().toLocaleDateString("pt-BR")} |{" "}
+            {new Date().toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}{" "}
+            Z
+          </span>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col min-h-0 bg-bg-deep relative overflow-hidden">
 
         {/* Content Area */}
         <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar gpu-scroll">
@@ -4151,6 +4097,72 @@ function InicioSection({
   const [isOpinionSubmitting, setIsOpinionSubmitting] = useState(false);
   const [opinionSubmitted, setOpinionSubmitted] = useState(false);
 
+  const mainNavModules = [
+    {
+      id: "RELPREV",
+      name: "PREENCHIMENTO DE RELPREV",
+      icon: FileSearch,
+      desc: "Relato de Prevenção de Acidentes Aeronáuticos — notificação identificada ou confidencial.",
+      tag: "Relato Prev",
+    },
+    {
+      id: "FGR",
+      name: "FGR — Ficha de Gerenciamento de Risco",
+      icon: ShieldCheck,
+      desc: "Formulário e consulta de análises operacionais de risco de missão.",
+      tag: "Gerenciamento",
+    },
+    {
+      id: "Abortiva",
+      name: "Abortiva — Relato de Ocorrência Abortiva",
+      icon: Zap,
+      desc: "Registro e estatísticas operacionais de missões interrompidas.",
+      tag: "Ocorrência",
+    },
+    {
+      id: "Mapa de Risco",
+      name: "Mapa de Risco Operacional",
+      icon: MapIcon,
+      desc: "Matriz dinâmica e visualização territorial de fatores de risco.",
+      tag: "Mapeamento",
+    },
+    {
+      id: "Abastecimento",
+      name: "Abastecimento — Controle e Laudos",
+      icon: Droplets,
+      desc: "Controle de qualidade de combustível de aviação e boletins de amostragem.",
+      tag: "Combustível",
+    },
+    {
+      id: "Medicamentos",
+      name: "Medicamentos de Uso Restritivo",
+      icon: Pill,
+      desc: "Consulta de remédios e prazos de afastamento temporário do voo.",
+      tag: "Saúde Operacional",
+    },
+    {
+      id: "Normas CAvEx",
+      name: "Normas CAvEx",
+      icon: Gavel,
+      desc: "Manuais, diretrizes e normas do Comando de Aviação do Exército.",
+      tag: "Publicações",
+    },
+    {
+      id: "Telefones",
+      name: "Telefones e Emergência",
+      icon: Phone,
+      desc: "Ramais diretos da SIPAA/2º BAvEx e contatos do Facão de Segurança.",
+      tag: "Contatos",
+    },
+    {
+      id: "Sugestoes",
+      name: "Sugestões de Segurança",
+      icon: MessageSquarePlus,
+      desc: "Canal direto para envio de propostas e ideias de melhorias.",
+      tag: "Participação",
+    },
+  ];
+
   useEffect(() => {
     const fetchFlyer = async () => {
       try {
@@ -4291,28 +4303,91 @@ function InicioSection({
         <div className="w-full space-y-3">
           <button
             onClick={() => onTabChange("JSV")}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-accent-gold to-yellow-500 hover:from-yellow-400 hover:to-accent-gold text-military-black rounded-xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-lg cursor-pointer"
+            className="w-full py-4 px-5 bg-gradient-to-r from-accent-gold via-yellow-400 to-accent-gold hover:from-yellow-300 hover:to-accent-gold text-military-black rounded-xl flex items-center justify-between gap-3 font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-xl cursor-pointer border-2 border-yellow-300/40"
           >
-            <ClipboardList size={18} />
-            <span>Pesquisa de Opinião - JSV 2026</span>
-            <ChevronRight size={14} className="opacity-80" />
+            <div className="flex items-center gap-3">
+              <ClipboardList size={22} className="text-military-black flex-shrink-0" />
+              <div className="text-left">
+                <span className="block font-black text-xs sm:text-sm leading-tight">Pesquisa de Opinião - JSV 2026</span>
+                <span className="block text-[10px] opacity-85 font-bold uppercase tracking-wider mt-0.5">Jornada de Segurança de Voo • Formulário de Avaliação</span>
+              </div>
+            </div>
+            <ChevronRight size={18} className="flex-shrink-0" />
           </button>
 
           <a
             href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-3.5 px-4 bg-military-gold hover:bg-military-gold/90 text-military-black rounded-xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer"
+            className="w-full py-3.5 px-4 bg-bg-panel hover:bg-[#253248] border-2 border-[#2e3e59] text-white rounded-xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md cursor-pointer"
           >
-            <MapIcon size={16} className="animate-bounce" />
-            <span>Como Chegar</span>
+            <MapIcon size={16} className="animate-bounce text-accent-gold" />
+            <span>Como Chegar ao Local do Evento</span>
             <ExternalLink size={14} className="opacity-80" />
           </a>
           
-          <p className="text-[9px] text-text-secondary text-center uppercase tracking-wide select-none leading-normal">
+          <p className="text-[10px] text-text-secondary text-center uppercase tracking-wide select-none leading-normal">
             📍 Auditório do Museu Mazzaropi • Taubaté-SP <br />
             Estr. Amácio Mazzaropi, 249 - Itaim, Taubaté-SP
           </p>
+        </div>
+      </div>
+
+      {/* MÓDULOS DO MENU PRINCIPAL NA TELA INICIAL (LOGO ABAIXO DA JSV) */}
+      <div className="w-full space-y-4 pt-4 border-t-2 border-accent-gold/20">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="text-accent-gold" size={20} />
+            <h3 className="text-accent-gold font-black uppercase text-xs sm:text-sm tracking-widest">
+              Menu de Módulos e Serviços de Segurança
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-text-secondary uppercase tracking-wider font-bold">
+            Acesso Direto
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          {mainNavModules.map((item, idx) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onTabChange(item.id as SectionKey)}
+                className="w-full text-left p-3.5 sm:p-5 bg-bg-panel hover:bg-[#25334a] border-2 border-[#2e3e59] hover:border-accent-gold rounded-xl transition-all duration-200 shadow-md hover:shadow-2xl flex items-center justify-between gap-3 sm:gap-4 cursor-pointer group relative overflow-hidden"
+              >
+                {/* Visual side highlight strip */}
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-accent-gold/40 group-hover:bg-accent-gold transition-colors" />
+
+                <div className="flex items-start sm:items-center gap-3 sm:gap-4 pl-1 sm:pl-2 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-gold/15 border border-accent-gold/30 flex items-center justify-center text-accent-gold group-hover:bg-accent-gold group-hover:text-[#0f172a] group-hover:scale-105 transition-all duration-200 flex-shrink-0 shadow-sm mt-0.5 sm:mt-0">
+                    <Icon size={22} />
+                  </div>
+                  
+                  <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono font-black text-accent-gold uppercase tracking-wider">
+                        ITEM {String(idx + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <h4 className="text-xs sm:text-sm md:text-base font-black text-white group-hover:text-accent-gold transition-colors tracking-wide uppercase leading-snug break-words">
+                      {item.name}
+                    </h4>
+                    <p className="text-[11px] sm:text-xs text-text-secondary group-hover:text-slate-200 leading-relaxed break-words">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-text-secondary group-hover:text-accent-gold transition-colors flex-shrink-0 pl-1 sm:pl-2 self-center">
+                  <span className="hidden md:inline-block text-[10px] font-black uppercase tracking-widest bg-accent-gold/15 text-accent-gold px-3 py-1.5 rounded-lg border border-accent-gold/30 group-hover:bg-accent-gold group-hover:text-[#0f172a] transition-colors">
+                    Acessar
+                  </span>
+                  <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -8043,6 +8118,9 @@ function AdminSection({
   fgrs: propFgrs,
   abortivas: propAbortivas,
   isAdminAuthenticated,
+  setIsAdminAuthenticated,
+  adminPassword,
+  setAdminPassword,
 }: {
   user: FirebaseUser | null;
   onTabChange: (tab: SectionKey) => void;
@@ -8053,6 +8131,9 @@ function AdminSection({
   fgrs: any[];
   abortivas: any[];
   isAdminAuthenticated?: boolean;
+  setIsAdminAuthenticated?: (val: boolean) => void;
+  adminPassword?: string;
+  setAdminPassword?: (val: string) => void;
 }) {
   const [stats, setStats] = useState({ relprevs: 0, fgrs: 0, abortivas: 0, trash: 0 });
   const [relprevs, setRelprevs] = useState<any[]>([]);
@@ -8858,6 +8939,65 @@ function AdminSection({
       setUploadProgress(0);
     }
   };
+
+  if (!isAdminAuthenticated) {
+    return (
+      <div className="space-y-4 md:space-y-8 px-0 sm:px-2">
+        <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+          <button
+            onClick={() => onTabChange("Inicio")}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+          >
+            <ArrowLeft size={16} />
+            <span>Voltar ao Início</span>
+          </button>
+        </div>
+
+        <div className="min-h-[60vh] flex items-center justify-center p-4">
+          <div className="card-military max-w-md w-full p-6 sm:p-8 text-center space-y-6">
+            <div className="w-16 h-16 bg-accent-gold/20 rounded-2xl border border-accent-gold/40 flex items-center justify-center mx-auto text-accent-gold shadow-lg">
+              <Lock size={32} />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-white uppercase tracking-wider">
+                Acesso Administrativo Restrito
+              </h2>
+              <p className="text-xs text-text-secondary mt-1">
+                Digite a senha de segurança para acessar o Painel Administrativo.
+              </p>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (adminPassword === "sipaa2bavex") {
+                  if (setIsAdminAuthenticated) setIsAdminAuthenticated(true);
+                  if (setAdminPassword) setAdminPassword("");
+                } else {
+                  alert("Senha incorreta");
+                }
+              }}
+              className="space-y-4"
+            >
+              <input
+                type="password"
+                value={adminPassword || ""}
+                onChange={(e) => setAdminPassword && setAdminPassword(e.target.value)}
+                className="w-full bg-military-black border border-border-theme rounded p-3 text-white text-center font-bold text-lg focus:border-military-gold outline-none"
+                placeholder="••••••••"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="btn-military w-full py-3 text-xs font-black uppercase tracking-wider"
+              >
+                AUTENTICAR
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 md:space-y-8 px-0 sm:px-2">

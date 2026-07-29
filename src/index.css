@@ -5,18 +5,18 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-bg-deep: #05070a;
-  --color-bg-panel: #0d121d;
-  --color-bg-sidebar: #090d16;
-  --color-accent-gold: #c5a059;
-  --color-accent-gold-dark: #8e6d2d;
-  --color-accent-blue: #1e4b8a;
-  --color-military-gold: #c5a059;
-  --color-military-gold-dark: #8e6d2d;
-  --color-military-blue: #1e4b8a;
-  --color-military-black: #05070a;
-  --color-text-secondary: #8a94a6;
-  --color-border-theme: rgba(197, 160, 89, 0.2);
+  --color-bg-deep: #141c2b;
+  --color-bg-panel: #1e283a;
+  --color-bg-sidebar: #182233;
+  --color-accent-gold: #d4af37;
+  --color-accent-gold-dark: #aa8924;
+  --color-accent-blue: #2563eb;
+  --color-military-gold: #d4af37;
+  --color-military-gold-dark: #aa8924;
+  --color-military-blue: #2563eb;
+  --color-military-black: #141c2b;
+  --color-text-secondary: #94a3b8;
+  --color-border-theme: rgba(212, 175, 55, 0.25);
 }
 
 /* iOS Safari & Touch Device Optimization */
@@ -27,7 +27,7 @@ html {
 }
 
 body {
-  @apply bg-bg-deep text-[#e6e9ef] font-sans antialiased;
+  @apply bg-bg-deep text-[#f8fafc] font-sans antialiased;
   min-height: 100%;
   min-height: 100dvh;
   touch-action: manipulation;
@@ -106,15 +106,15 @@ iframe {
 
 @layer components {
   .btn-military {
-    @apply px-4 py-2 bg-accent-gold hover:bg-accent-gold-dark text-bg-deep font-semibold rounded-sm transition-all duration-200 flex items-center justify-center gap-2;
+    @apply px-4 py-2.5 bg-accent-gold hover:bg-accent-gold-dark text-[#0f172a] font-bold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md cursor-pointer;
   }
   
   .card-military {
-    @apply border border-border-theme bg-bg-panel rounded-lg p-5 shadow-lg;
+    @apply border border-border-theme bg-bg-panel rounded-xl p-5 shadow-xl;
   }
 
   .input-military {
-    @apply w-full bg-bg-deep border border-border-theme rounded p-2.5 text-[#e6e9ef] focus:border-accent-gold outline-none transition-colors;
+    @apply w-full bg-bg-deep border border-border-theme rounded-lg p-3 text-[#f8fafc] placeholder:text-slate-400 focus:border-accent-gold outline-none transition-colors;
   }
 
   .logo-hex {
