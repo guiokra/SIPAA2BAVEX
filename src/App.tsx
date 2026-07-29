@@ -3146,18 +3146,15 @@ function AppLayoutContent({
       if (!isAdminAuthenticated) {
         setIsAdminModalOpen(true);
       } else {
-        navigate("/admin");
+        window.location.href = "/admin";
       }
       return;
     }
 
-    if (tab === "Inicio" || tab === "BACK") {
-      navigate("/");
-      return;
-    }
-
     const path = TAB_TO_PATH[tab] || "/";
-    navigate(path);
+    if (window.location.pathname !== path) {
+      window.location.href = path;
+    }
     if (isMobile) setIsSidebarOpen(false);
   };
 
@@ -4299,9 +4296,12 @@ function InicioSection({
 
         {/* Actions / Buttons below Folder */}
         <div className="w-full space-y-3">
-          <Link
-            to="/pesquisa-jsv"
-            onClick={() => onTabChange("JSV")}
+          <a
+            href="/pesquisa-jsv"
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.href = "/pesquisa-jsv";
+            }}
             className="w-full py-4 px-5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-2xl flex items-center justify-between gap-3 font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-xl shadow-amber-500/10 cursor-pointer border border-amber-300/50 select-none touch-manipulation"
           >
             <div className="flex items-center gap-3 min-w-0">
@@ -4312,7 +4312,7 @@ function InicioSection({
               </div>
             </div>
             <ChevronRight size={18} className="flex-shrink-0" />
-          </Link>
+          </a>
 
           <a
             href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
@@ -5705,7 +5705,7 @@ function FgrSection({
       </div>
 
       {launches.length > 0 && (
-        <div className="card-military p-5 border-2 border-military-gold bg-military-gold/10 shadow-[0_0_15px_rgba(197,160,89,0.15)] animate-in fade-in slide-in-from-top-2 duration-500">
+        <div className="card-military p-5 border-2 border-military-gold bg-military-gold/10 shadow-[0_0_15px_rgba(197,160,89,0.15)]">
           <div className="flex flex-col gap-2">
             <label className="text-xs font-black text-military-gold uppercase tracking-[0.25em] flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 bg-military-gold rounded-full shadow-[0_0_10px_#c5a059]" />
@@ -6893,7 +6893,7 @@ Forneça uma análise técnica concisa (3 a 4 tópicos) com orientações preven
       </div>
 
       {launches.length > 0 && (
-        <div className="card-military p-5 border-2 border-orange-500 bg-orange-500/10 shadow-[0_0_15px_rgba(249,115,22,0.15)] animate-in fade-in slide-in-from-top-2 duration-500">
+        <div className="card-military p-5 border-2 border-orange-500 bg-orange-500/10 shadow-[0_0_15px_rgba(249,115,22,0.15)]">
           <div className="flex flex-col gap-2">
             <label className="text-xs font-black text-orange-400 uppercase tracking-[0.25em] flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 bg-orange-500 rounded-full shadow-[0_0_10px_#f97316]" />
@@ -7252,7 +7252,7 @@ function MapaRiscoSection({
   onTabChange: (tab: SectionKey) => void;
 }) {
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8">
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
         <button
@@ -9935,7 +9935,7 @@ function AdminSection({
       )}
 
       {selectedView === "pdv" && (
-        <div className="space-y-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="space-y-6 max-w-2xl">
           <div className="card-military p-8 text-left">
              <h1 className="text-2xl font-black text-white uppercase mb-8 tracking-tight border-b border-white/10 pb-4">
                Extrator de lançamentos do PDV
@@ -10160,7 +10160,7 @@ function AdminSection({
                 );
               })()}
               {viewingBatchId && (
-                <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="mt-6 space-y-4">
                   <div className="flex items-center justify-between border-b border-white/10 pb-2">
                     <h5 className="text-[10px] font-black text-military-gold uppercase tracking-widest">
                       Lançamentos do Arquivo
@@ -10566,7 +10566,7 @@ function AdminSection({
         </div>
       )}
       {selectedView === "jsv" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="space-y-6">
           <div className="flex justify-between items-center bg-military-gold/10 p-4 rounded-xl border border-military-gold/20">
             <div>
               <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
@@ -12092,14 +12092,17 @@ function JsvSurveySection({
     <div className="max-w-3xl mx-auto space-y-8 pb-12">
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
-        <Link
-          to="/"
-          onClick={() => onTabChange?.("Inicio")}
+        <a
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            window.location.href = "/";
+          }}
           className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm select-none touch-manipulation"
         >
           <ArrowLeft size={16} />
           <span>Voltar ao Início</span>
-        </Link>
+        </a>
         <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest hidden sm:inline-block">
           Página do Módulo • Pesquisa de Opinião JSV
         </span>
