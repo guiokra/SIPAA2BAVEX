@@ -3271,13 +3271,13 @@ function AppLayoutContent({
       )}
 
       {/* Header */}
-      <header className="h-[54px] md:h-[64px] border-b border-border-theme bg-bg-panel flex items-center justify-between px-4 md:px-8 z-30 shadow-md">
+      <header className="h-[56px] md:h-[64px] border-b border-slate-800/80 bg-[#0f172a]/85 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30 shadow-lg sticky top-0">
         <div className="flex items-center gap-3 sm:gap-4">
           <button
             onClick={() => handleTabChange("Inicio")}
             className="flex items-center gap-2.5 group text-left cursor-pointer"
           >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30 group-hover:border-accent-gold transition-colors">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-amber-400/20 to-yellow-600/10 flex items-center justify-center rounded-xl border border-amber-400/40 group-hover:border-amber-400 group-hover:shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all">
               <img
                 src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
                 className="w-6 h-6 sm:w-7 sm:h-7 object-contain"
@@ -3288,7 +3288,7 @@ function AppLayoutContent({
                   const parent = e.currentTarget.parentElement;
                   if (parent) {
                     const fallback = document.createElement("div");
-                    fallback.className = "text-accent-gold text-lg font-bold";
+                    fallback.className = "text-amber-400 text-lg font-bold";
                     fallback.innerText = "2";
                     parent.appendChild(fallback);
                   }
@@ -3296,33 +3296,38 @@ function AppLayoutContent({
               />
             </div>
             <div>
-              <span className="text-sm sm:text-base font-black tracking-wider text-accent-gold group-hover:text-white transition-colors leading-none block uppercase">
+              <span className="text-sm sm:text-base font-black tracking-wider text-amber-400 group-hover:text-white transition-colors leading-none block uppercase">
                 2º BAvEx
               </span>
-              <span className="text-[9px] text-text-secondary font-bold uppercase tracking-widest block mt-0.5">
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mt-0.5">
                 SIPAA • Aviação do Exército
               </span>
             </div>
           </button>
 
-          <div className="h-5 w-[1px] bg-border-theme hidden sm:block mx-1" />
+          <div className="h-5 w-[1px] bg-slate-800 hidden sm:block mx-1" />
 
           <button
             onClick={() => handleTabChange("Inicio")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-deep border border-[#2e3e59] hover:border-accent-gold text-slate-200 hover:text-accent-gold text-xs font-bold uppercase transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 backdrop-blur-md border border-slate-700/60 hover:border-amber-400/80 text-slate-200 hover:text-amber-400 text-xs font-bold uppercase transition-all cursor-pointer shadow-sm"
           >
-            <Home size={14} className="text-accent-gold" />
+            <Home size={14} className="text-amber-400" />
             <span>Início</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-6 text-xs text-text-secondary">
+        <div className="flex items-center gap-3 sm:gap-6 text-xs text-slate-400">
+          <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>SIPAA Operacional</span>
+          </div>
+
           <button
             onClick={() => handleTabChange("Admin")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
               isAdminActive
-                ? "bg-accent-gold text-[#0f172a] shadow-md"
-                : "bg-military-gold/15 text-military-gold border border-military-gold/30 hover:bg-military-gold hover:text-military-black"
+                ? "bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20"
+                : "bg-amber-400/10 text-amber-400 border border-amber-400/30 hover:bg-amber-400 hover:text-slate-950"
             }`}
           >
             {isAdminAuthenticated ? <Unlock size={13} /> : <Lock size={13} />}
@@ -4227,55 +4232,47 @@ function InicioSection({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* Sleek, Compact Welcome Banner */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0d121d] to-[#080b12] border border-border-theme p-4 sm:p-5 shadow-xl">
-        <div className="absolute top-1/2 -translate-y-1/2 right-6 opacity-5 pointer-events-none hidden sm:block">
-          <img
-            src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
-            className="w-24 h-24 object-contain"
-            alt=""
-            referrerPolicy="no-referrer"
-          />
-        </div>
-        
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Sleek, Compact Glassmorphic Welcome Banner */}
+      <div className="card-military bg-slate-900/70 backdrop-blur-md border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-2xl relative overflow-hidden">
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 bg-accent-gold/15 flex items-center justify-center rounded-lg border border-accent-gold/20 flex-shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400/20 to-yellow-600/10 border border-amber-400/40 flex items-center justify-center p-2 shadow-lg flex-shrink-0">
               <img
                 src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
-                className="w-8 h-8 object-contain"
                 alt="2º BAvEx Logo"
+                className="w-full h-full object-contain"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-accent-gold bg-accent-gold/10 px-1.5 py-0.5 rounded">
-                  SIPAA
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/30">
+                  SIPAA 2026
                 </span>
-                <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
                   Exército Brasileiro
                 </span>
               </div>
-              <h1 className="text-base sm:text-lg font-bold text-white tracking-wider mt-0.5">
+              <h1 className="text-base sm:text-xl font-black text-white tracking-wider mt-1 uppercase">
                 Segurança de Voo - 2º BAvEx
               </h1>
             </div>
           </div>
           
-          <div className="border-l-2 border-accent-gold pl-3 text-[11px] sm:text-xs italic text-text-secondary max-w-xs leading-relaxed">
+          <div className="border-l-2 border-amber-400/60 pl-3 text-[11px] sm:text-xs italic text-slate-300 max-w-xs leading-relaxed">
             "A segurança de voo é uma responsabilidade de todos nós. Previna-se."
           </div>
         </div>
       </div>
 
       {/* Official Event PDF Flyer (Google Drive Embed) & Map Button */}
-      <div className="flex flex-col items-center justify-center w-full max-w-[500px] mx-auto py-2 space-y-4">
+      <div className="flex flex-col items-center justify-center w-full max-w-[520px] mx-auto py-2 space-y-4">
         {/* Header indicator */}
         <div className="flex items-center justify-between w-full select-none px-1">
           <div className="flex items-center gap-2">
-            <span className="animate-pulse w-2 h-2 rounded-full bg-accent-gold" />
-            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-accent-gold">
+            <span className="animate-pulse w-2 h-2 rounded-full bg-amber-400" />
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-amber-400">
               Folder Oficial do Evento
             </span>
           </div>
@@ -4283,14 +4280,14 @@ function InicioSection({
             href="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/view?usp=drivesdk"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[9px] font-bold text-military-gold hover:underline uppercase tracking-wider"
+            className="flex items-center gap-1 text-[9px] font-bold text-amber-400 hover:underline uppercase tracking-wider"
           >
             Abrir PDF <ExternalLink size={10} />
           </a>
         </div>
 
         {/* Official Event PDF Flyer (Google Drive Embed) */}
-        <div className="w-full min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
+        <div className="w-full min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-amber-400/30 overflow-hidden bg-slate-950/80 backdrop-blur-md shadow-2xl relative">
           <iframe
             src="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/preview"
             className="w-full h-full border-none pointer-events-auto"
@@ -4305,13 +4302,13 @@ function InicioSection({
           <Link
             to="/pesquisa-jsv"
             onClick={() => onTabChange("JSV")}
-            className="w-full py-4 px-5 bg-gradient-to-r from-accent-gold via-yellow-400 to-accent-gold hover:from-yellow-300 hover:to-accent-gold text-military-black rounded-xl flex items-center justify-between gap-3 font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-xl cursor-pointer border-2 border-yellow-300/40 select-none touch-manipulation"
+            className="w-full py-4 px-5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-2xl flex items-center justify-between gap-3 font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-xl shadow-amber-500/10 cursor-pointer border border-amber-300/50 select-none touch-manipulation"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <ClipboardList size={22} className="text-military-black flex-shrink-0" />
+              <ClipboardList size={22} className="text-slate-950 flex-shrink-0" />
               <div className="text-left min-w-0">
                 <span className="block font-black text-xs sm:text-sm leading-tight truncate">Pesquisa de Opinião - JSV 2026</span>
-                <span className="block text-[10px] opacity-85 font-bold uppercase tracking-wider mt-0.5 truncate">Jornada de Segurança de Voo • Formulário de Avaliação</span>
+                <span className="block text-[10px] opacity-90 font-bold uppercase tracking-wider mt-0.5 truncate">Jornada de Segurança de Voo • Formulário de Avaliação</span>
               </div>
             </div>
             <ChevronRight size={18} className="flex-shrink-0" />
@@ -4321,14 +4318,14 @@ function InicioSection({
             href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-3.5 px-4 bg-bg-panel hover:bg-[#253248] border-2 border-[#2e3e59] text-white rounded-xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-md cursor-pointer"
+            className="w-full py-3.5 px-4 bg-slate-900/80 backdrop-blur-md hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-lg cursor-pointer"
           >
-            <MapIcon size={16} className="animate-bounce text-accent-gold" />
+            <MapIcon size={16} className="animate-bounce text-amber-400" />
             <span>Como Chegar ao Local do Evento</span>
             <ExternalLink size={14} className="opacity-80" />
           </a>
           
-          <p className="text-[10px] text-text-secondary text-center uppercase tracking-wide select-none leading-normal">
+          <p className="text-[10px] text-slate-400 text-center uppercase tracking-wide select-none leading-normal">
             📍 Auditório do Museu Mazzaropi • Taubaté-SP <br />
             Estr. Amácio Mazzaropi, 249 - Itaim, Taubaté-SP
           </p>
@@ -4336,53 +4333,53 @@ function InicioSection({
       </div>
 
       {/* MÓDULOS DO MENU PRINCIPAL NA TELA INICIAL (LOGO ABAIXO DA JSV) */}
-      <div className="w-full space-y-4 pt-4 border-t-2 border-accent-gold/20">
+      <div className="w-full space-y-4 pt-6 border-t border-slate-800/80">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="text-accent-gold" size={20} />
-            <h3 className="text-accent-gold font-black uppercase text-xs sm:text-sm tracking-widest">
+            <ShieldCheck className="text-amber-400" size={20} />
+            <h3 className="text-amber-400 font-black uppercase text-xs sm:text-sm tracking-widest">
               Menu de Módulos e Serviços de Segurança
             </h3>
           </div>
-          <span className="text-[10px] font-mono text-text-secondary uppercase tracking-wider font-bold">
+          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-bold">
             Acesso Direto
           </span>
         </div>
 
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3">
           {mainNavModules.map((item, idx) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id as SectionKey)}
-                className="w-full text-left p-3.5 sm:p-5 bg-bg-panel hover:bg-[#25334a] border-2 border-[#2e3e59] hover:border-accent-gold rounded-xl transition-all duration-200 shadow-md hover:shadow-2xl flex items-center justify-between gap-3 sm:gap-4 cursor-pointer group relative overflow-hidden"
+                className="w-full text-left p-4 sm:p-5 bg-slate-900/60 backdrop-blur-md hover:bg-slate-800/80 border border-slate-800 hover:border-amber-400/80 rounded-2xl transition-all duration-200 shadow-xl hover:shadow-2xl hover:shadow-amber-500/5 flex items-center justify-between gap-3 sm:gap-4 cursor-pointer group relative overflow-hidden"
               >
                 {/* Visual side highlight strip */}
-                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-accent-gold/40 group-hover:bg-accent-gold transition-colors" />
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400/40 group-hover:bg-amber-400 transition-colors" />
 
-                <div className="flex items-start sm:items-center gap-3 sm:gap-4 pl-1 sm:pl-2 flex-1 min-w-0">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-gold/15 border border-accent-gold/30 flex items-center justify-center text-accent-gold group-hover:bg-accent-gold group-hover:text-[#0f172a] group-hover:scale-105 transition-all duration-200 flex-shrink-0 shadow-sm mt-0.5 sm:mt-0">
+                <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 pl-1.5 flex-1 min-w-0">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 group-hover:bg-amber-400 group-hover:text-slate-950 group-hover:scale-105 transition-all duration-200 flex-shrink-0 shadow-sm mt-0.5 sm:mt-0">
                     <Icon size={22} />
                   </div>
                   
                   <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono font-black text-accent-gold uppercase tracking-wider">
+                      <span className="text-[10px] font-mono font-black text-amber-400 uppercase tracking-wider">
                         ITEM {String(idx + 1).padStart(2, "0")}
                       </span>
                     </div>
-                    <h4 className="text-xs sm:text-sm md:text-base font-black text-white group-hover:text-accent-gold transition-colors tracking-wide uppercase leading-snug break-words">
+                    <h4 className="text-xs sm:text-sm md:text-base font-black text-white group-hover:text-amber-400 transition-colors tracking-wide uppercase leading-snug break-words">
                       {item.name}
                     </h4>
-                    <p className="text-[11px] sm:text-xs text-text-secondary group-hover:text-slate-200 leading-relaxed break-words">
+                    <p className="text-[11px] sm:text-xs text-slate-400 group-hover:text-slate-200 leading-relaxed break-words">
                       {item.desc}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-text-secondary group-hover:text-accent-gold transition-colors flex-shrink-0 pl-1 sm:pl-2 self-center">
-                  <span className="hidden md:inline-block text-[10px] font-black uppercase tracking-widest bg-accent-gold/15 text-accent-gold px-3 py-1.5 rounded-lg border border-accent-gold/30 group-hover:bg-accent-gold group-hover:text-[#0f172a] transition-colors">
+                <div className="flex items-center gap-2 text-slate-400 group-hover:text-amber-400 transition-colors flex-shrink-0 pl-1 sm:pl-2 self-center">
+                  <span className="hidden md:inline-block text-[10px] font-black uppercase tracking-widest bg-amber-400/10 text-amber-400 px-3 py-1.5 rounded-xl border border-amber-400/30 group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors">
                     Acessar
                   </span>
                   <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />

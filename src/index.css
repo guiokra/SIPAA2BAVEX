@@ -1,22 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-bg-deep: #141c2b;
-  --color-bg-panel: #1e283a;
-  --color-bg-sidebar: #182233;
-  --color-accent-gold: #d4af37;
-  --color-accent-gold-dark: #aa8924;
-  --color-accent-blue: #2563eb;
-  --color-military-gold: #d4af37;
-  --color-military-gold-dark: #aa8924;
-  --color-military-blue: #2563eb;
-  --color-military-black: #141c2b;
+  --color-bg-deep: #0a0f1d;
+  --color-bg-panel: rgba(15, 23, 42, 0.75);
+  --color-bg-sidebar: #0f172a;
+  --color-accent-gold: #fbbf24;
+  --color-accent-gold-dark: #d97706;
+  --color-accent-blue: #3b82f6;
+  --color-military-gold: #fbbf24;
+  --color-military-gold-dark: #d97706;
+  --color-military-blue: #3b82f6;
+  --color-military-black: #0a0f1d;
   --color-text-secondary: #94a3b8;
-  --color-border-theme: rgba(212, 175, 55, 0.25);
+  --color-border-theme: rgba(251, 191, 36, 0.2);
 }
 
 /* iOS Safari & Touch Device Optimization */
@@ -27,7 +27,7 @@ html {
 }
 
 body {
-  @apply bg-bg-deep text-[#f8fafc] font-sans antialiased;
+  @apply bg-[#0a0f1d] text-[#f8fafc] font-sans antialiased;
   min-height: 100%;
   min-height: 100dvh;
   touch-action: manipulation;
@@ -38,15 +38,7 @@ body {
   min-height: 100dvh;
 }
 
-/* Enforce Zero Backdrop-Filter to prevent iOS WebKit collapse */
-*,
-*::before,
-*::after {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-/* Force hardware layer isolation on scrollable containers for iOS WebKit */
+/* Force hardware layer isolation on scrollable containers */
 .overflow-y-auto,
 .overflow-x-auto,
 .overflow-auto,
@@ -91,8 +83,8 @@ iframe {
 @layer base {
   /* Custom Scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 5px;
+    height: 5px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
@@ -100,21 +92,21 @@ iframe {
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-border-theme rounded-full hover:bg-accent-gold/40 transition-colors;
+    @apply bg-amber-500/20 rounded-full hover:bg-amber-400/40 transition-colors;
   }
 }
 
 @layer components {
   .btn-military {
-    @apply px-4 py-2.5 bg-accent-gold hover:bg-accent-gold-dark text-[#0f172a] font-bold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md cursor-pointer;
+    @apply px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10 cursor-pointer border border-amber-300/40;
   }
   
   .card-military {
-    @apply border border-border-theme bg-bg-panel rounded-xl p-5 shadow-xl;
+    @apply border border-slate-800/80 bg-slate-900/70 backdrop-blur-md rounded-2xl p-5 shadow-2xl;
   }
 
   .input-military {
-    @apply w-full bg-bg-deep border border-border-theme rounded-lg p-3 text-[#f8fafc] placeholder:text-slate-400 focus:border-accent-gold outline-none transition-colors;
+    @apply w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-[#f8fafc] placeholder:text-slate-500 focus:border-amber-400 outline-none transition-colors;
   }
 
   .logo-hex {
