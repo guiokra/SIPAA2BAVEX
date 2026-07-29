@@ -1,4 +1,15 @@
 import React, { FC, useState, useEffect, useRef } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  NavLink,
+  Link,
+  useNavigate,
+  useLocation,
+  useParams,
+  Navigate,
+} from "react-router-dom";
 import * as pdfjs from "pdfjs-dist";
 import {
   ArrowLeft,
@@ -3053,15 +3064,59 @@ async function processPDVFile(file: File) {
   return results;
 }
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState<SectionKey>("Inicio");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-  const [abastecimentoConfig, setAbastecimentoConfig] = useState<any>(null);
-  const [abastecimentoFiles, setAbastecimentoFiles] = useState<any[]>([]);
+const TAB_TO_PATH: Record<string, string> = {
+  Inicio: "/",
+  RELPREV: "/relprev",
+  FGR: "/fgr",
+  Abortiva: "/abortiva",
+  "Mapa de Risco": "/mapa-de-risco",
+  Abastecimento: "/abastecimento",
+  Medicamentos: "/medicamentos",
+  "Normas CAvEx": "/normas-cavex",
+  Telefones: "/telefones",
+  Admin: "/admin",
+  Sugestoes: "/sugestoes",
+};
+
+const PATH_TO_TAB: Record<string, string> = {
+  "/": "Inicio",
+  "/relprev": "RELPREV",
+  "/fgr": "FGR",
+  "/abortiva": "Abortiva",
+  "/mapa-de-risco": "Mapa de Risco",
+  "/abastecimento": "Abastecimento",
+  "/medicamentos": "Medicamentos",
+  "/normas-cavex": "Normas CAvEx",
+  "/telefones": "Telefones",
+  "/admin": "Admin",
+  "/sugestoes": "Sugestoes",
+};
+
+function AppLayoutContent({
+  user,
+  abastecimentoConfig,
+  abastecimentoFiles,
+  launches,
+  setLaunches,
+  fgrs,
+  abortivas,
+  isAdminAuthenticated,
+  setIsAdminAuthenticated,
+  isAdminModalOpen,
+  setIsAdminModalOpen,
+  adminPassword,
+  setAdminPassword,
+  handleAdminLogin,
+  isConsultFgrModalOpen,
+  setIsConsultFgrModalOpen,
+  isSidebarOpen,
+  setIsSidebarOpen,
+  isMobile,
+}: any) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const mainScrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll to top whenever changing sections/tabs with iOS WebKit safe deferral
   useEffect(() => {
     const timer = setTimeout(() => {
       requestAnimationFrame(() => {
@@ -3073,178 +3128,7 @@ export default function App() {
     }, 60);
 
     return () => clearTimeout(timer);
-  }, [activeTab]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "config", "abastecimento"), (snap) => {
-      if (snap.exists()) {
-        setAbastecimentoConfig(snap.data());
-      }
-    });
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, "documentos_abastecimento"),
-      orderBy("createdAt", "desc"),
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const files = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setAbastecimentoFiles(files);
-    });
-    return () => unsub();
-  }, []);
-
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [totalRelprev, setTotalRelprev] = useState(0);
-  const [launches, setLaunches] = useState<any[]>([]);
-  const [fgrs, setFgrs] = useState<any[]>([]);
-  const [abortivas, setAbortivas] = useState<any[]>([]);
-  const [selectedLaunchIdAbortiva, setSelectedLaunchIdAbortiva] = useState("");
-
-  const [abortivaData, setAbortivaData] = useState({
-    dataVoo: new Date().toISOString().split("T")[0],
-    numLancamento: "",
-    modeloAnv: "",
-    motivo: "", // Will be filled with DCM on selection
-    preenchidoPor: "",
-    tripulacao: "",
-  });
-
-  useEffect(() => {
-    const q = query(
-      collection(db, "Lancamentos"),
-      orderBy("createdAt", "desc"),
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setLaunches(data);
-      },
-      (err) => {
-        console.error("Erro ao buscar lançamentos:", err);
-      },
-    );
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    const qFgr = query(
-      collection(db, "fgrMissions"),
-      orderBy("createdAt", "desc"),
-    );
-    const qAbortivas = query(
-      collection(db, "abortivas"),
-      orderBy("createdAt", "desc"),
-    );
-
-    const unsubFgr = onSnapshot(
-      qFgr,
-      (snap) => {
-        setFgrs(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      },
-      (err) => {
-        console.error("Erro no listener de FGR (App):", err);
-      },
-    );
-
-    const unsubAbortivas = onSnapshot(
-      qAbortivas,
-      (snap) => {
-        setAbortivas(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      },
-      (err) => {
-        console.error("Erro no listener de Abortivas (App):", err);
-      },
-    );
-
-    return () => {
-      unsubFgr();
-      unsubAbortivas();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!user) {
-      setTotalRelprev(0);
-      return;
-    }
-    const q = query(
-      collection(db, "relprevReports"),
-      where("uid", "==", user.uid),
-    );
-    const unsubscribe = onSnapshot(q, (snap) => setTotalRelprev(snap.size));
-    return () => unsubscribe();
-  }, [user]);
-
-  // Connection Test removed as it caused permission errors
-
-  // Auth Listener
-  useEffect(() => {
-    console.log("Configurando listener de autenticação (Modo Automático)...");
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (currentUser) => {
-        if (currentUser) {
-          console.log(
-            "Usuário autenticado:",
-            currentUser.isAnonymous ? "Anônimo" : currentUser.email,
-          );
-          setUser(currentUser);
-          setIsAuthLoading(false);
-        } else {
-          console.log(
-            "Nenhum usuário detectado. Iniciando sessão automática...",
-          );
-          signInAnonymously(auth).catch((error) => {
-            console.warn(
-              "Login anônimo desativado no console ou erro de rede:",
-              error,
-            );
-            setIsAuthLoading(false);
-          });
-        }
-      },
-      (error) => {
-        console.error("Erro no onAuthStateChanged:", error);
-        setIsAuthLoading(false);
-      },
-    );
-    return () => unsubscribe();
-  }, []);
-
-  const [isConsultFgrModalOpen, setIsConsultFgrModalOpen] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 1024;
-      setIsMobile(mobile);
-      if (mobile) setIsSidebarOpen(false);
-      else setIsSidebarOpen(true);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  const navItems = [
-    { id: "Inicio", name: "Início", icon: Home },
-    { id: "RELPREV", name: "PREENCHIMENTO DE RELPREV", icon: FileSearch },
-    { id: "FGR", name: "FGR", icon: ShieldCheck },
-    { id: "Abortiva", name: "Abortiva", icon: Zap },
-    { id: "Mapa de Risco", name: "Mapa de Risco", icon: MapIcon },
-    { id: "Abastecimento", name: "Abastecimento", icon: Droplets },
-    { id: "Medicamentos", name: "Medicamentos de Uso Restritivo", icon: Pill },
-    { id: "Normas CAvEx", name: "Normas CAvEx", icon: Gavel },
-    { id: "Telefones", name: "Telefones", icon: Phone },
-    { id: "Sugestoes", name: "Sugestões", icon: MessageSquarePlus },
-  ];
+  }, [location.pathname]);
 
   const handleTabChange = (tab: any) => {
     if (tab === "Portal Único de Notificação") {
@@ -3258,30 +3142,58 @@ export default function App() {
       setIsAdminModalOpen(true);
       return;
     }
-    setActiveTab(tab);
-    if (isMobile) setIsSidebarOpen(false);
 
-    setTimeout(() => {
-      requestAnimationFrame(() => {
-        if (mainScrollRef.current) {
-          mainScrollRef.current.scrollTop = 0;
-        }
-        window.scrollTo({ top: 0, left: 0, behavior: "instant" as any });
-      });
-    }, 60);
-  };
-
-  const handleAdminLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminPassword === "sipaa2bavex") {
-      setIsAdminAuthenticated(true);
-      setIsAdminModalOpen(false);
-      setActiveTab("Admin");
-      setAdminPassword("");
-    } else {
-      alert("Senha incorreta");
+    if (tab === "Inicio" || tab === "BACK") {
+      if (window.history.length > 1 && location.pathname !== "/") {
+        navigate(-1);
+      } else {
+        navigate("/");
+      }
+      return;
     }
+
+    const path = TAB_TO_PATH[tab] || "/";
+    navigate(path);
+    if (isMobile) setIsSidebarOpen(false);
   };
+
+  const navItems = [
+    { id: "Inicio", path: "/", name: "Início", icon: Home },
+    { id: "RELPREV", path: "/relprev", name: "PREENCHIMENTO DE RELPREV", icon: FileSearch },
+    { id: "FGR", path: "/fgr", name: "FGR", icon: ShieldCheck },
+    { id: "Abortiva", path: "/abortiva", name: "Abortiva", icon: Zap },
+    { id: "Mapa de Risco", path: "/mapa-de-risco", name: "Mapa de Risco", icon: MapIcon },
+    { id: "Abastecimento", path: "/abastecimento", name: "Abastecimento", icon: Droplets },
+    { id: "Medicamentos", path: "/medicamentos", name: "Medicamentos de Uso Restritivo", icon: Pill },
+    { id: "Normas CAvEx", path: "/normas-cavex", name: "Normas CAvEx", icon: Gavel },
+    { id: "Telefones", path: "/telefones", name: "Telefones", icon: Phone },
+    { id: "Sugestoes", path: "/sugestoes", name: "Sugestões", icon: MessageSquarePlus },
+  ];
+
+  const sectionProps = {
+    user,
+    onTabChange: handleTabChange,
+    onConsultFgr: () => {
+      navigate("/fgr");
+      setIsConsultFgrModalOpen(true);
+    },
+    abastecimentoConfig,
+    abastecimentoFiles,
+    launches,
+    setLaunches,
+    fgrs,
+    abortivas,
+    isAdminAuthenticated,
+  };
+
+  const isNavActive = (itemPath: string) => {
+    if (itemPath === "/") {
+      return location.pathname === "/";
+    }
+    return location.pathname.startsWith(itemPath);
+  };
+
+  const isAdminActive = location.pathname.startsWith("/admin");
 
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] w-full bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
@@ -3370,7 +3282,6 @@ export default function App() {
               alt="2º BAvEx Logo"
               referrerPolicy="no-referrer"
               onError={(e) => {
-                // Fallback to the original icon if the image fails to load
                 e.currentTarget.style.display = "none";
                 const parent = e.currentTarget.parentElement;
                 if (parent) {
@@ -3405,22 +3316,27 @@ export default function App() {
           <nav className="space-y-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const active = isNavActive(item.path);
               return (
-                <button
+                <NavLink
                   key={item.id}
-                  onClick={() => handleTabChange(item.id)}
-                  className={`w-full flex items-center gap-4 px-6 py-3 transition-all duration-200 group relative border-l-[3px] ${
-                    isActive
-                      ? "bg-accent-gold/10 text-accent-gold border-l-accent-gold"
-                      : "text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent"
-                  }`}
+                  to={item.path}
+                  onClick={() => {
+                    if (isMobile) setIsSidebarOpen(false);
+                  }}
+                  className={({ isActive: linkActive }) =>
+                    `w-full flex items-center gap-4 px-6 py-3 transition-all duration-200 group relative border-l-[3px] ${
+                      linkActive || active
+                        ? "bg-accent-gold/10 text-accent-gold border-l-accent-gold"
+                        : "text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent"
+                    }`
+                  }
                 >
                   <div className="flex-shrink-0 w-5 flex justify-center">
                     <Icon
                       size={16}
                       className={
-                        isActive
+                        active
                           ? "text-accent-gold"
                           : "text-text-secondary group-hover:text-white"
                       }
@@ -3429,7 +3345,7 @@ export default function App() {
                   <span className="text-[13px] font-medium text-left leading-tight block flex-1">
                     {item.name}
                   </span>
-                </button>
+                </NavLink>
               );
             })}
           </nav>
@@ -3440,7 +3356,7 @@ export default function App() {
           <button
             onClick={() => handleTabChange("Admin")}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest ${
-              activeTab === "Admin"
+              isAdminActive
                 ? "bg-accent-gold text-bg-deep shadow-lg shadow-accent-gold/10"
                 : "text-accent-gold border border-accent-gold/20 hover:bg-accent-gold/10"
             }`}
@@ -3468,7 +3384,7 @@ export default function App() {
             )}
             <button
               onClick={() => handleTabChange("Admin")}
-              className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[10px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[10px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black transition-all cursor-pointer"
             >
               <Lock size={12} />
               <span className="hidden sm:inline">Portal Administrativo</span>
@@ -3491,28 +3407,31 @@ export default function App() {
         <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeTab}
+              key={location.pathname}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full pb-20"
             >
-              {React.createElement(sectionComponents[activeTab], {
-                user,
-                onTabChange: handleTabChange,
-                onConsultFgr: () => {
-                  handleTabChange("FGR");
-                  setIsConsultFgrModalOpen(true);
-                },
-                abastecimentoConfig,
-                abastecimentoFiles,
-                launches,
-                setLaunches,
-                fgrs: fgrs,
-                abortivas,
-                isAdminAuthenticated,
-              })}
+              <Routes>
+                <Route path="/" element={<InicioSection {...sectionProps} />} />
+                <Route path="/relprev" element={<RelprevSection {...sectionProps} />} />
+                <Route path="/relprev/:id" element={<RelprevSection {...sectionProps} />} />
+                <Route path="/fgr" element={<FgrSection {...sectionProps} />} />
+                <Route path="/fgr/:id" element={<FgrSection {...sectionProps} />} />
+                <Route path="/abortiva" element={<AbortivaSection {...sectionProps} />} />
+                <Route path="/abortiva/:id" element={<AbortivaSection {...sectionProps} />} />
+                <Route path="/mapa-de-risco" element={<MapaRiscoSection {...sectionProps} />} />
+                <Route path="/abastecimento" element={<AbastecimentoSection {...sectionProps} />} />
+                <Route path="/medicamentos" element={<MedicamentosSection {...sectionProps} />} />
+                <Route path="/normas-cavex" element={<NormasSection {...sectionProps} />} />
+                <Route path="/telefones" element={<TelefonesSection {...sectionProps} />} />
+                <Route path="/sugestoes" element={<SugestoesSection {...sectionProps} />} />
+                <Route path="/admin" element={<AdminSection {...sectionProps} />} />
+                <Route path="/admin/:sub" element={<AdminSection {...sectionProps} />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -3814,6 +3733,195 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function App() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [abastecimentoConfig, setAbastecimentoConfig] = useState<any>(null);
+  const [abastecimentoFiles, setAbastecimentoFiles] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "config", "abastecimento"), (snap) => {
+      if (snap.exists()) {
+        setAbastecimentoConfig(snap.data());
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "documentos_abastecimento"),
+      orderBy("createdAt", "desc"),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const files = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setAbastecimentoFiles(files);
+    });
+    return () => unsub();
+  }, []);
+
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [totalRelprev, setTotalRelprev] = useState(0);
+  const [launches, setLaunches] = useState<any[]>([]);
+  const [fgrs, setFgrs] = useState<any[]>([]);
+  const [abortivas, setAbortivas] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "Lancamentos"),
+      orderBy("createdAt", "desc"),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setLaunches(data);
+      },
+      (err) => {
+        console.error("Erro ao buscar lançamentos:", err);
+      },
+    );
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const qFgr = query(
+      collection(db, "fgrMissions"),
+      orderBy("createdAt", "desc"),
+    );
+    const qAbortivas = query(
+      collection(db, "abortivas"),
+      orderBy("createdAt", "desc"),
+    );
+
+    const unsubFgr = onSnapshot(
+      qFgr,
+      (snap) => {
+        setFgrs(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => {
+        console.error("Erro no listener de FGR (App):", err);
+      },
+    );
+
+    const unsubAbortivas = onSnapshot(
+      qAbortivas,
+      (snap) => {
+        setAbortivas(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => {
+        console.error("Erro no listener de Abortivas (App):", err);
+      },
+    );
+
+    return () => {
+      unsubFgr();
+      unsubAbortivas();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setTotalRelprev(0);
+      return;
+    }
+    const q = query(
+      collection(db, "relprevReports"),
+      where("uid", "==", user.uid),
+    );
+    const unsubscribe = onSnapshot(q, (snap) => setTotalRelprev(snap.size));
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    console.log("Configurando listener de autenticação (Modo Automático)...");
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (currentUser) => {
+        if (currentUser) {
+          console.log(
+            "Usuário autenticado:",
+            currentUser.isAnonymous ? "Anônimo" : currentUser.email,
+          );
+          setUser(currentUser);
+          setIsAuthLoading(false);
+        } else {
+          console.log(
+            "Nenhum usuário detectado. Iniciando sessão automática...",
+          );
+          signInAnonymously(auth).catch((error) => {
+            console.warn(
+              "Login anônimo desativado no console ou erro de rede:",
+              error,
+            );
+            setIsAuthLoading(false);
+          });
+        }
+      },
+      (error) => {
+        console.error("Erro no onAuthStateChanged:", error);
+        setIsAuthLoading(false);
+      },
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const [isConsultFgrModalOpen, setIsConsultFgrModalOpen] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) setIsSidebarOpen(false);
+      else setIsSidebarOpen(true);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassword === "sipaa2bavex") {
+      setIsAdminAuthenticated(true);
+      setIsAdminModalOpen(false);
+      setAdminPassword("");
+    } else {
+      alert("Senha incorreta");
+    }
+  };
+
+  return (
+    <BrowserRouter>
+      <AppLayoutContent
+        user={user}
+        abastecimentoConfig={abastecimentoConfig}
+        abastecimentoFiles={abastecimentoFiles}
+        launches={launches}
+        setLaunches={setLaunches}
+        fgrs={fgrs}
+        abortivas={abortivas}
+        isAdminAuthenticated={isAdminAuthenticated}
+        setIsAdminAuthenticated={setIsAdminAuthenticated}
+        isAdminModalOpen={isAdminModalOpen}
+        setIsAdminModalOpen={setIsAdminModalOpen}
+        adminPassword={adminPassword}
+        setAdminPassword={setAdminPassword}
+        handleAdminLogin={handleAdminLogin}
+        isConsultFgrModalOpen={isConsultFgrModalOpen}
+        setIsConsultFgrModalOpen={setIsConsultFgrModalOpen}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+        isMobile={isMobile}
+      />
+    </BrowserRouter>
   );
 }
 
