@@ -3059,12 +3059,18 @@ export default function App() {
   const [abastecimentoFiles, setAbastecimentoFiles] = useState<any[]>([]);
   const mainScrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll to top whenever changing sections/tabs
+  // Auto scroll to top whenever changing sections/tabs with iOS WebKit safe deferral
   useEffect(() => {
-    if (mainScrollRef.current) {
-      mainScrollRef.current.scrollTop = 0;
-    }
-    window.scrollTo({ top: 0, behavior: "instant" as any });
+    const timer = setTimeout(() => {
+      requestAnimationFrame(() => {
+        if (mainScrollRef.current) {
+          mainScrollRef.current.scrollTop = 0;
+        }
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" as any });
+      });
+    }, 60);
+
+    return () => clearTimeout(timer);
   }, [activeTab]);
 
   useEffect(() => {
@@ -3253,10 +3259,14 @@ export default function App() {
     setActiveTab(tab);
     if (isMobile) setIsSidebarOpen(false);
 
-    if (mainScrollRef.current) {
-      mainScrollRef.current.scrollTop = 0;
-    }
-    window.scrollTo({ top: 0, behavior: "instant" as any });
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        if (mainScrollRef.current) {
+          mainScrollRef.current.scrollTop = 0;
+        }
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" as any });
+      });
+    }, 60);
   };
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -3480,10 +3490,10 @@ export default function App() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full pb-20"
             >
               {React.createElement(sectionComponents[activeTab], {
@@ -7351,7 +7361,7 @@ function AbastecimentoSection({
         </p>
       </div>
 
-      <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100vh-220px)] min-h-[550px] flex flex-col">
+      <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100dvh-220px)] min-h-[550px] flex flex-col">
         <div className="p-4 bg-military-dark-gray/40 border-b border-white/5 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-military-gold">
             <Droplets size={16} />
@@ -7639,7 +7649,7 @@ function MedicamentosSection({
         </p>
       </div>
 
-      <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100vh-220px)] min-h-[550px] flex flex-col">
+      <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100dvh-220px)] min-h-[550px] flex flex-col">
         <div className="p-4 bg-military-dark-gray/40 border-b border-white/5 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-military-gold">
             <Pill size={16} />
@@ -7793,7 +7803,7 @@ function NormasSection({
           </button>
         </div>
 
-        <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100vh-220px)] min-h-[550px] flex flex-col">
+        <div className="bg-military-black border border-white/5 rounded-xl overflow-hidden shadow-2xl h-[calc(100dvh-220px)] min-h-[550px] flex flex-col">
           <div className="p-4 bg-military-dark-gray/40 border-b border-white/5 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 text-military-gold">
               <FileText size={16} />
