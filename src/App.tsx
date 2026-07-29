@@ -76,6 +76,7 @@ import {
   Globe,
   Sparkles,
   RefreshCw,
+  ClipboardList,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, storage } from "./firebase";
@@ -2551,7 +2552,8 @@ type SectionKey =
   | "Normas CAvEx"
   | "Telefones"
   | "Admin"
-  | "Sugestoes";
+  | "Sugestoes"
+  | "JSV";
 
 const MONTHS_MAP: Record<string, string> = {
   JANEIRO: "01",
@@ -3076,6 +3078,7 @@ const TAB_TO_PATH: Record<string, string> = {
   Telefones: "/telefones",
   Admin: "/admin",
   Sugestoes: "/sugestoes",
+  JSV: "/pesquisa-jsv",
 };
 
 const PATH_TO_TAB: Record<string, string> = {
@@ -3090,6 +3093,7 @@ const PATH_TO_TAB: Record<string, string> = {
   "/telefones": "Telefones",
   "/admin": "Admin",
   "/sugestoes": "Sugestoes",
+  "/pesquisa-jsv": "JSV",
 };
 
 function AppLayoutContent({
@@ -3168,6 +3172,7 @@ function AppLayoutContent({
     { id: "Normas CAvEx", path: "/normas-cavex", name: "Normas CAvEx", icon: Gavel },
     { id: "Telefones", path: "/telefones", name: "Telefones", icon: Phone },
     { id: "Sugestoes", path: "/sugestoes", name: "Sugestões", icon: MessageSquarePlus },
+    { id: "JSV", path: "/pesquisa-jsv", name: "Pesquisa JSV", icon: ClipboardList },
   ];
 
   const sectionProps = {
@@ -3428,6 +3433,7 @@ function AppLayoutContent({
                 <Route path="/normas-cavex" element={<NormasSection {...sectionProps} />} />
                 <Route path="/telefones" element={<TelefonesSection {...sectionProps} />} />
                 <Route path="/sugestoes" element={<SugestoesSection {...sectionProps} />} />
+                <Route path="/pesquisa-jsv" element={<JsvSurveySection {...sectionProps} />} />
                 <Route path="/admin" element={<AdminSection {...sectionProps} />} />
                 <Route path="/admin/:sub" element={<AdminSection {...sectionProps} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -4315,127 +4321,32 @@ function InicioSection({
 
         {/* Como Chegar & Pesquisa de Opinião Buttons */}
         <div className="w-full space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-3">
             <a
               href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-2 px-3 bg-military-gold hover:bg-military-gold/90 text-military-black rounded-lg flex items-center justify-center gap-1.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer"
+              className="flex-1 py-3 px-4 bg-military-gold hover:bg-military-gold/90 text-military-black rounded-xl flex items-center justify-center gap-2 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer"
             >
-              <MapIcon size={12} className="animate-bounce" />
+              <MapIcon size={14} className="animate-bounce" />
               <span>Como Chegar</span>
-              <ExternalLink size={10} className="opacity-80" />
+              <ExternalLink size={12} className="opacity-80" />
             </a>
 
-            <button
-              type="button"
-              onClick={() => {
-                setShowOpinionForm(!showOpinionForm);
-                if (opinionSubmitted) {
-                  setOpinionSubmitted(false);
-                }
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer ${
-                showOpinionForm
-                  ? "bg-white/10 hover:bg-white/15 border border-white/10 text-white"
-                  : "bg-black/40 hover:bg-black/60 border border-military-gold/30 hover:border-military-gold text-military-gold"
-              }`}
+            <Link
+              to="/pesquisa-jsv"
+              className="flex-1 py-3 px-4 rounded-xl flex items-center justify-center gap-2.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg cursor-pointer bg-gradient-to-r from-military-gold via-amber-400 to-military-gold text-military-black border-2 border-military-gold shadow-military-gold/20"
             >
-              <MessageSquarePlus size={12} />
-              <span>Pesquisa de Opinião</span>
-            </button>
+              <div className="w-6 h-6 rounded-lg bg-military-black text-military-gold flex items-center justify-center shrink-0 shadow-inner">
+                <ClipboardList size={14} />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="leading-tight font-black">PESQUISA DE OPINIÃO</span>
+                <span className="text-[8px] opacity-90 font-bold tracking-tight">JORNADA DE SEGURANÇA DE VOO</span>
+              </div>
+              <ChevronRight size={14} className="ml-auto opacity-80" />
+            </Link>
           </div>
-
-          <AnimatePresence>
-            {showOpinionForm && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden w-full bg-military-black/60 border border-[#b5dc3e]/20 rounded-xl p-4 shadow-xl space-y-3"
-              >
-                {opinionSubmitted ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="text-center py-4 space-y-2"
-                  >
-                    <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mx-auto border border-green-500/30">
-                      <Check size={20} />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Opinião Enviada!</h4>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                        Sua opinião foi enviada com sucesso e aparecerá nas sugestões do administrador. Obrigado!
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpinionSubmitted(false)}
-                      className="text-military-gold font-bold uppercase text-[9px] tracking-widest hover:underline pt-1 cursor-pointer"
-                    >
-                      Enviar outro comentário
-                    </button>
-                  </motion.div>
-                ) : (
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      if (!opinionText.trim()) return;
-                      setIsOpinionSubmitting(true);
-                      try {
-                        await addDoc(collection(db, "suggestions"), {
-                          text: `[PESQUISA DE OPINIÃO - JORNADA 2026] ${opinionText.trim()}`,
-                          submittedBy: auth.currentUser?.email || auth.currentUser?.uid || "Anônimo",
-                          createdAt: new Date().toISOString(),
-                        });
-                        setOpinionSubmitted(true);
-                        setOpinionText("");
-                      } catch (err) {
-                        console.error("Erro ao enviar opinião:", err);
-                        alert("Erro ao enviar sua opinião. Tente novamente mais tarde.");
-                      } finally {
-                        setIsOpinionSubmitting(false);
-                      }
-                    }}
-                    className="space-y-3"
-                  >
-                    <div className="space-y-1 text-left">
-                      <label className="text-[9px] font-black text-[#b5dc3e] uppercase tracking-widest flex items-center gap-1.5">
-                        <MessageSquarePlus size={10} /> O que você achou do evento? (Texto Livre)
-                      </label>
-                      <textarea
-                        value={opinionText}
-                        onChange={(e) => setOpinionText(e.target.value)}
-                        placeholder="Escreva aqui seu feedback, sugestão, ou avaliação sobre a Jornada de Segurança de Voo 2026..."
-                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-[#b5dc3e] outline-none transition-all min-h-[90px] text-[11px] leading-relaxed placeholder:text-slate-600 italic"
-                        disabled={isOpinionSubmitting}
-                        required
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isOpinionSubmitting || !opinionText.trim()}
-                      className="w-full py-2 px-3 bg-[#b5dc3e] hover:bg-[#a4ca33] disabled:opacity-45 text-black font-black text-[10px] uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer"
-                    >
-                      {isOpinionSubmitting ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" />
-                          <span>Enviando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send size={11} />
-                          <span>Enviar Opinião</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
           
           <p className="text-[9px] text-text-secondary text-center uppercase tracking-wide select-none leading-normal">
             📍 Auditório do Museu Mazzaropi • Taubaté-SP <br />
@@ -8206,6 +8117,7 @@ function AdminSection({
 
   const [trashItems, setTrashItems] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [jsvSurveys, setJsvSurveys] = useState<any[]>([]);
   const [selectedView, setSelectedView] = useState<
     | "stats"
     | "relprevs"
@@ -8215,6 +8127,7 @@ function AdminSection({
     | "pdv"
     | "trash"
     | "suggestions"
+    | "jsv"
     | "database"
   >("pdv");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -8425,6 +8338,10 @@ function AdminSection({
       collection(db, "suggestions"),
       orderBy("createdAt", "desc"),
     );
+    const qJsv = query(
+      collection(db, "jsv_surveys"),
+      orderBy("createdAt", "desc"),
+    );
 
     const unsubRelprev = onSnapshot(
       qRelprev,
@@ -8465,10 +8382,21 @@ function AdminSection({
       },
     );
 
+    const unsubJsv = onSnapshot(
+      qJsv,
+      (snap) => {
+        setJsvSurveys(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => {
+        console.error("Erro no listener de JSV:", err);
+      },
+    );
+
     return () => {
       unsubRelprev();
       unsubTrash();
       unsubSuggestions();
+      unsubJsv();
     };
   }, [user, propFgrs.length, propAbortivas.length]);
 
@@ -9091,6 +9019,13 @@ function AdminSection({
         >
           <Lightbulb size={10} />
           Sugestões ({suggestions.length} {suggestions.length === 1 ? 'sugestão' : 'sugestões'})
+        </button>
+        <button
+          onClick={() => setSelectedView("jsv")}
+          className={`px-3 py-1.5 md:px-4 md:py-2 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${selectedView === "jsv" ? "bg-military-gold text-military-black" : "text-slate-400 hover:text-white flex items-center gap-1.5"}`}
+        >
+          <ClipboardList size={10} />
+          JSV ({jsvSurveys.length} {jsvSurveys.length === 1 ? 'pesquisa' : 'pesquisas'})
         </button>
         <button
           onClick={() => setSelectedView("stats")}
@@ -10535,6 +10470,201 @@ function AdminSection({
           </div>
         </div>
       )}
+      {selectedView === "jsv" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center bg-military-gold/10 p-4 rounded-xl border border-military-gold/20">
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <ClipboardList size={18} className="text-military-gold" />
+                Pesquisa de Opinião JSV ({jsvSurveys.length} {jsvSurveys.length === 1 ? 'resposta' : 'respostas'})
+              </h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                Jornada de Segurança de Voo — Respostas registradas dos participantes
+              </p>
+            </div>
+            {jsvSurveys.length > 0 && (
+              <button
+                onClick={async () => {
+                  if (jsvSurveys.length === 0) return;
+                  if (!window.confirm(`Deseja apagar DEFINITIVAMENTE todas as ${jsvSurveys.length} respostas da Pesquisa JSV?`)) return;
+                  try {
+                    const batch = writeBatch(db);
+                    jsvSurveys.forEach((s) => {
+                      batch.delete(doc(db, "jsv_surveys", s.id));
+                    });
+                    await batch.commit();
+                    alert("Todas as respostas da Pesquisa JSV foram excluídas com sucesso.");
+                  } catch (error: any) {
+                    alert("Erro ao excluir respostas: " + error.message);
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600 border border-red-500/30 hover:border-red-500 text-red-400 hover:text-white rounded-lg text-[10px] font-black uppercase transition-all shadow-lg cursor-pointer shrink-0"
+              >
+                <Trash2 size={12} />
+                Apagar Todas
+              </button>
+            )}
+          </div>
+
+          {/* Quick Metrics */}
+          {jsvSurveys.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-military-black/80 border border-white/5 p-4 rounded-xl">
+                <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Total de Respostas</span>
+                <span className="text-2xl font-black text-military-gold font-mono">{jsvSurveys.length}</span>
+              </div>
+              <div className="bg-military-black/80 border border-white/5 p-4 rounded-xl">
+                <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Local Adequado (Sim)</span>
+                <span className="text-2xl font-black text-green-400 font-mono">
+                  {Math.round((jsvSurveys.filter(s => s.q1_local === "Sim").length / jsvSurveys.length) * 100)}%
+                </span>
+              </div>
+              <div className="bg-military-black/80 border border-white/5 p-4 rounded-xl">
+                <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Tempo Evento (Ideal)</span>
+                <span className="text-2xl font-black text-blue-400 font-mono">
+                  {Math.round((jsvSurveys.filter(s => s.q2_tempo_evento === "Ideal").length / jsvSurveys.length) * 100)}%
+                </span>
+              </div>
+              <div className="bg-military-black/80 border border-white/5 p-4 rounded-xl">
+                <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Temas Importantes (Sim)</span>
+                <span className="text-2xl font-black text-amber-400 font-mono">
+                  {Math.round((jsvSurveys.filter(s => s.q3_temas_importantes === "Sim").length / jsvSurveys.length) * 100)}%
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {jsvSurveys.length === 0 ? (
+              <div className="card-military p-12 text-center text-slate-500 uppercase font-black text-[10px] italic">
+                Nenhuma resposta de pesquisa JSV recebida até o momento.
+              </div>
+            ) : (
+              jsvSurveys.map((s, index) => (
+                <div key={s.id} className="card-military p-6 relative group overflow-hidden space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold border border-military-gold/20 font-black text-xs font-mono">
+                        #{jsvSurveys.length - index}
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-white uppercase tracking-wider block">
+                          Resposta de {s.submittedBy || "Anônimo"}
+                        </span>
+                        <p className="text-[9px] text-slate-500 font-mono italic">
+                          {s.createdAt ? new Date(s.createdAt).toLocaleString("pt-BR") : "Data não informada"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        if (window.confirm("Excluir esta resposta da pesquisa JSV?")) {
+                          try {
+                            await deleteDoc(doc(db, "jsv_surveys", s.id));
+                          } catch (err: any) {
+                            alert("Erro ao excluir: " + err.message);
+                          }
+                        }
+                      }}
+                      className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-all rounded-lg cursor-pointer bg-military-black border border-white/5"
+                      title="Excluir Resposta"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  {/* Multiple choice responses summary */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">1. Local Adequado?</span>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                        s.q1_local === "Sim" ? "bg-green-500/20 text-green-400" : s.q1_local === "Não" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"
+                      }`}>
+                        {s.q1_local || "Não respondeu"}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">2. Tempo do Evento?</span>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                        s.q2_tempo_evento === "Ideal" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
+                      }`}>
+                        {s.q2_tempo_evento || "Não respondeu"}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">3. Temas Importantes?</span>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                        s.q3_temas_importantes === "Sim" ? "bg-green-500/20 text-green-400" : s.q3_temas_importantes === "Não" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"
+                      }`}>
+                        {s.q3_temas_importantes || "Não respondeu"}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">4. Qtd. Apresentações?</span>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                        s.q4_qtd_apresentacoes === "Ideal" ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400"
+                      }`}>
+                        {s.q4_qtd_apresentacoes || "Não respondeu"}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/2 p-3 rounded-lg border border-white/5 space-y-1 sm:col-span-2 lg:col-span-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">5. Tempo/Apresentação?</span>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                        s.q5_tempo_apresentacao === "Ideal" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
+                      }`}>
+                        {s.q5_tempo_apresentacao || "Não respondeu"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Text Answers */}
+                  {(s.q6_melhorias || s.q7_piorias || s.q8_sugestoes_temas) && (
+                    <div className="space-y-3 pt-2">
+                      {s.q6_melhorias && (
+                        <div className="bg-military-black/60 p-3.5 rounded-xl border border-white/5 space-y-1">
+                          <span className="text-[9px] font-black text-green-400 uppercase tracking-wider block">
+                            6. O que melhorou em relação a edições anteriores:
+                          </span>
+                          <p className="text-xs text-slate-200 leading-relaxed italic whitespace-pre-wrap">
+                            "{s.q6_melhorias}"
+                          </p>
+                        </div>
+                      )}
+
+                      {s.q7_piorias && (
+                        <div className="bg-military-black/60 p-3.5 rounded-xl border border-white/5 space-y-1">
+                          <span className="text-[9px] font-black text-red-400 uppercase tracking-wider block">
+                            7. O que piorou em relação a edições anteriores:
+                          </span>
+                          <p className="text-xs text-slate-200 leading-relaxed italic whitespace-pre-wrap">
+                            "{s.q7_piorias}"
+                          </p>
+                        </div>
+                      )}
+
+                      {s.q8_sugestoes_temas && (
+                        <div className="bg-military-black/60 p-3.5 rounded-xl border border-white/5 space-y-1">
+                          <span className="text-[9px] font-black text-military-gold uppercase tracking-wider block">
+                            8. Sugestões de temas ou palestrantes para a próxima edição:
+                          </span>
+                          <p className="text-xs text-slate-200 leading-relaxed italic whitespace-pre-wrap">
+                            "{s.q8_sugestoes_temas}"
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
       {selectedView === "database" && (
         <div className="space-y-6">
           <div className="pb-4 border-b border-white/5">
@@ -11781,6 +11911,353 @@ function SugestoesSection({
   );
 }
 
+function JsvSurveySection({
+  onTabChange,
+}: {
+  onTabChange?: (tab: SectionKey) => void;
+}) {
+  const [formData, setFormData] = useState({
+    q1_local: "",
+    q2_tempo_evento: "",
+    q3_temas_importantes: "",
+    q4_qtd_apresentacoes: "",
+    q5_tempo_apresentacao: "",
+    q6_melhorias: "",
+    q7_piorias: "",
+    q8_sugestoes_temas: "",
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      !formData.q1_local ||
+      !formData.q2_tempo_evento ||
+      !formData.q3_temas_importantes ||
+      !formData.q4_qtd_apresentacoes ||
+      !formData.q5_tempo_apresentacao
+    ) {
+      alert("Por favor, responda a todas as perguntas de múltipla escolha (Questões 1 a 5).");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "jsv_surveys"), {
+        ...formData,
+        q6_melhorias: formData.q6_melhorias.trim(),
+        q7_piorias: formData.q7_piorias.trim(),
+        q8_sugestoes_temas: formData.q8_sugestoes_temas.trim(),
+        submittedBy: auth.currentUser?.email || auth.currentUser?.uid || "Anônimo",
+        createdAt: new Date().toISOString(),
+      });
+      setSubmitted(true);
+    } catch (error: any) {
+      console.error("Erro ao enviar pesquisa JSV:", error);
+      alert("Erro ao enviar sua avaliação. Tente novamente: " + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReset = () => {
+    setFormData({
+      q1_local: "",
+      q2_tempo_evento: "",
+      q3_temas_importantes: "",
+      q4_qtd_apresentacoes: "",
+      q5_tempo_apresentacao: "",
+      q6_melhorias: "",
+      q7_piorias: "",
+      q8_sugestoes_temas: "",
+    });
+    setSubmitted(false);
+  };
+
+  const OptionGroup = ({
+    questionNum,
+    title,
+    options,
+    value,
+    onChange,
+  }: {
+    questionNum: number;
+    title: string;
+    options: string[];
+    value: string;
+    onChange: (val: string) => void;
+  }) => (
+    <div className="space-y-3 p-5 rounded-xl bg-white/2 border border-white/5 hover:border-military-gold/20 transition-all text-left">
+      <label className="text-xs sm:text-sm font-bold text-white flex items-start gap-2.5 leading-snug">
+        <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
+          {questionNum}
+        </span>
+        <span>{title}</span>
+      </label>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+        {options.map((opt) => {
+          const isSelected = value === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onChange(opt)}
+              className={`py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 border cursor-pointer flex items-center justify-center gap-2 ${
+                isSelected
+                  ? "bg-military-gold text-military-black border-military-gold shadow-md shadow-military-gold/10 scale-[1.02]"
+                  : "bg-military-black/60 text-slate-300 border-white/10 hover:border-military-gold/40 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <div
+                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                  isSelected
+                    ? "border-military-black bg-military-black"
+                    : "border-slate-500"
+                }`}
+              >
+                {isSelected && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-military-gold" />
+                )}
+              </div>
+              <span>{opt}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-8 pb-12">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
+        <button
+          onClick={() => onTabChange?.("Inicio")}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft size={16} />
+          <span>Voltar ao Início</span>
+        </button>
+        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest hidden sm:inline-block">
+          Página do Módulo • Pesquisa de Opinião JSV
+        </span>
+      </div>
+
+      {/* Header Banner */}
+      <div className="text-center space-y-4">
+        <div className="w-16 h-16 bg-gradient-to-br from-military-gold/20 to-amber-500/10 rounded-2xl flex items-center justify-center text-military-gold mx-auto border border-military-gold/30 shadow-2xl relative">
+          <ClipboardList size={32} />
+        </div>
+        <div>
+          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-military-gold bg-military-gold/10 px-3 py-1 rounded-full border border-military-gold/20">
+            2º BAvEx • SIPAA
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight mt-3">
+            JORNADA DE SEGURANÇA DE VOO
+          </h2>
+          <h3 className="text-lg font-bold text-military-gold uppercase tracking-widest mt-0.5">
+            PESQUISA DE OPINIÃO
+          </h3>
+        </div>
+        <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
+          Sua avaliação sincera é de extrema importância para aprimorarmos as próximas edições da Jornada de Segurança de Voo.
+        </p>
+      </div>
+
+      <div className="card-military p-6 sm:p-8">
+        {submitted ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-12 space-y-6"
+          >
+            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mx-auto border border-green-500/30 shadow-2xl">
+              <Check size={40} />
+            </div>
+            <div className="space-y-3 max-w-md mx-auto">
+              <h3 className="text-2xl font-black text-white uppercase tracking-tight">
+                Pesquisa Enviada!
+              </h3>
+              <p className="text-slate-300 text-sm leading-relaxed">
+                Obrigado pela sua contribuição! Sua pesquisa foi salva no painel administrativo da SIPAA.
+              </p>
+            </div>
+            <div className="pt-4 flex flex-col sm:flex-row justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="px-6 py-3 rounded-xl bg-military-gold text-military-black font-black uppercase text-xs tracking-wider hover:bg-military-gold/90 transition-all cursor-pointer shadow-lg"
+              >
+                Enviar nova avaliação
+              </button>
+              <button
+                type="button"
+                onClick={() => onTabChange?.("Inicio")}
+                className="px-6 py-3 rounded-xl bg-white/5 text-slate-300 font-bold uppercase text-xs tracking-wider hover:bg-white/10 hover:text-white transition-all cursor-pointer border border-white/10"
+              >
+                Voltar ao Início
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Section 1: Multiple Choice */}
+            <div className="space-y-4">
+              <div className="pb-2 border-b border-white/10 flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase text-military-gold tracking-widest flex items-center gap-2">
+                  <CheckSquare size={14} />
+                  Parte 1 — Avaliação Geral do Evento
+                </h4>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">
+                  Obrigatório (1 a 5)
+                </span>
+              </div>
+
+              <OptionGroup
+                questionNum={1}
+                title="Você considera o local do evento adequado?"
+                options={["Sim", "Parcialmente", "Não"]}
+                value={formData.q1_local}
+                onChange={(val) => setFormData((p) => ({ ...p, q1_local: val }))}
+              />
+
+              <OptionGroup
+                questionNum={2}
+                title="Como você considera o tempo destinado ao evento?"
+                options={["Extenso", "Ideal", "Curto"]}
+                value={formData.q2_tempo_evento}
+                onChange={(val) =>
+                  setFormData((p) => ({ ...p, q2_tempo_evento: val }))
+                }
+              />
+
+              <OptionGroup
+                questionNum={3}
+                title="Você considera os temas abordados importantes?"
+                options={["Sim", "Parcialmente", "Não"]}
+                value={formData.q3_temas_importantes}
+                onChange={(val) =>
+                  setFormData((p) => ({ ...p, q3_temas_importantes: val }))
+                }
+              />
+
+              <OptionGroup
+                questionNum={4}
+                title="Como você considera a quantidade de apresentações realizadas?"
+                options={["Excessiva", "Ideal", "Reduzida"]}
+                value={formData.q4_qtd_apresentacoes}
+                onChange={(val) =>
+                  setFormData((p) => ({ ...p, q4_qtd_apresentacoes: val }))
+                }
+              />
+
+              <OptionGroup
+                questionNum={5}
+                title="Como você considera o tempo destinado a cada apresentação?"
+                options={["Extenso", "Ideal", "Curto"]}
+                value={formData.q5_tempo_apresentacao}
+                onChange={(val) =>
+                  setFormData((p) => ({ ...p, q5_tempo_apresentacao: val }))
+                }
+              />
+            </div>
+
+            {/* Section 2: Text Feedback */}
+            <div className="space-y-6 pt-4 border-t border-white/10">
+              <div className="p-4 rounded-xl bg-military-gold/10 border border-military-gold/20 text-center sm:text-left">
+                <p className="text-xs font-bold text-military-gold italic">
+                  Caso já tenha participado de alguma edição da Jornada de Segurança de Voo do BAvEx:
+                </p>
+              </div>
+
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug">
+                  <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
+                    6
+                  </span>
+                  <span>O que considera ter melhorado em relação às edições anteriores?</span>
+                </label>
+                <textarea
+                  value={formData.q6_melhorias}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, q6_melhorias: e.target.value }))
+                  }
+                  placeholder="Descreva aqui os pontos positivos e melhorias percebidas..."
+                  className="w-full bg-military-black border border-white/10 rounded-xl p-4 text-white focus:border-military-gold outline-none transition-all min-h-[100px] text-xs leading-relaxed placeholder:text-slate-600 italic"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug">
+                  <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
+                    7
+                  </span>
+                  <span>O que considera ter piorado em relação às edições anteriores?</span>
+                </label>
+                <textarea
+                  value={formData.q7_piorias}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, q7_piorias: e.target.value }))
+                  }
+                  placeholder="Descreva aqui pontos que necessitam de correção ou ajustes..."
+                  className="w-full bg-military-black border border-white/10 rounded-xl p-4 text-white focus:border-military-gold outline-none transition-all min-h-[100px] text-xs leading-relaxed placeholder:text-slate-600 italic"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-white flex items-start gap-2.5 leading-snug">
+                  <span className="w-6 h-6 rounded-full bg-military-gold/10 text-military-gold text-xs font-black flex items-center justify-center shrink-0 border border-military-gold/30 mt-0.5 font-mono">
+                    8
+                  </span>
+                  <span>Quais temas ou palestrantes sugere para serem abordados ou participarem da próxima edição do evento?</span>
+                </label>
+                <textarea
+                  value={formData.q8_sugestoes_temas}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, q8_sugestoes_temas: e.target.value }))
+                  }
+                  placeholder="Escreva sugestões de novos temas, oficinas, palestrantes ou instrutores..."
+                  className="w-full bg-military-black border border-white/10 rounded-xl p-4 text-white focus:border-military-gold outline-none transition-all min-h-[120px] text-xs leading-relaxed placeholder:text-slate-600 italic"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            {/* Footer Thank You Note */}
+            <div className="text-center py-3 bg-white/2 rounded-xl border border-white/5">
+              <p className="text-xs font-bold text-military-gold uppercase tracking-wider">
+                Obrigado pela sua contribuição! Ela é muito importante para nós!
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn-military w-full py-4 text-xs flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer shadow-xl"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  ENVIANDO PESQUISA...
+                </>
+              ) : (
+                <>
+                  <Send size={16} />
+                  ENVIAR PESQUISA DE OPINIÃO
+                </>
+              )}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const sectionComponents: Record<string, FC<any>> = {
   Inicio: InicioSection,
   RELPREV: RelprevSection,
@@ -11794,4 +12271,5 @@ const sectionComponents: Record<string, FC<any>> = {
   Telefones: TelefonesSection,
   Admin: AdminSection,
   Sugestoes: SugestoesSection,
+  JSV: JsvSurveySection,
 };
