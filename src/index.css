@@ -38,7 +38,24 @@ body {
   min-height: 100dvh;
 }
 
-/* Remove -webkit-overflow-scrolling to prevent WebKit compositor locks in iOS 13+ */
+/* Enforce Zero Backdrop-Filter to prevent iOS WebKit collapse */
+*,
+*::before,
+*::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Force hardware layer isolation on scrollable containers for iOS WebKit */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto,
+.custom-scrollbar,
+.gpu-scroll {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: scroll-position;
+}
 
 /* Prevent iOS Auto-Zoom on Form Inputs / Selects / Textareas on Mobile */
 @media screen and (max-width: 767px) {

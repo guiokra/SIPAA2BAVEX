@@ -3203,81 +3203,71 @@ function AppLayoutContent({
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] w-full bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
       {/* Admin Password Modal */}
-      <AnimatePresence>
-        {isAdminModalOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/80 backdrop-blur-sm overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="card-military max-w-sm w-full p-6 sm:p-8 space-y-6 max-h-[90dvh] overflow-y-auto my-auto"
-            >
-              <div className="flex flex-col items-center gap-4 text-center mb-4">
-                <img
-                  src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
-                  alt="2º BAvEx Logo"
-                  className="w-16 h-16 object-contain"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    e.currentTarget.src =
-                      "https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png";
-                  }}
-                />
-                <div className="flex justify-between items-center w-full">
-                  <h3 className="text-military-gold font-black uppercase text-xs tracking-widest flex items-center gap-2">
-                    <Lock size={14} />
-                    Acesso Administrativo
-                  </h3>
-                  <button
-                    onClick={() => setIsAdminModalOpen(false)}
-                    className="text-text-secondary hover:text-white"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase font-bold text-text-secondary">
-                    Senha de Acesso
-                  </label>
-                  <input
-                    type="password"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    className="w-full bg-military-black border border-border-theme rounded p-3 text-white focus:border-military-gold outline-none transition-colors"
-                    placeholder="••••••••"
-                    autoFocus
-                  />
-                </div>
+      {isAdminModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
+          <div className="card-military max-w-sm w-full p-6 sm:p-8 space-y-6 max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="flex flex-col items-center gap-4 text-center mb-4">
+              <img
+                src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
+                alt="2º BAvEx Logo"
+                className="w-16 h-16 object-contain"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src =
+                    "https://upload.wikimedia.org/wikipedia/commons/e/e0/S%C3%ADmbolo_do_2%C2%BA_BAvEx.png";
+                }}
+              />
+              <div className="flex justify-between items-center w-full">
+                <h3 className="text-military-gold font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                  <Lock size={14} />
+                  Acesso Administrativo
+                </h3>
                 <button
-                  type="submit"
-                  className="btn-military w-full py-3 text-xs"
+                  onClick={() => setIsAdminModalOpen(false)}
+                  className="text-text-secondary hover:text-white"
                 >
-                  AUTENTICAR
+                  <X size={18} />
                 </button>
-              </form>
-            </motion.div>
+              </div>
+            </div>
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-text-secondary">
+                  Senha de Acesso
+                </label>
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  className="w-full bg-military-black border border-border-theme rounded p-3 text-white focus:border-military-gold outline-none"
+                  placeholder="••••••••"
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn-military w-full py-3 text-xs"
+              >
+                AUTENTICAR
+              </button>
+            </form>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       {/* Mobile Backdrop Overlay */}
       {isMobile && isSidebarOpen && (
         <div
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden transition-opacity"
+          className="fixed inset-0 z-40 bg-black/80 lg:hidden"
         />
       )}
 
       {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{
-          width: isSidebarOpen ? (isMobile ? "280px" : "240px") : "0px",
-          x: isSidebarOpen ? 0 : isMobile ? -300 : -240,
-        }}
-        className={`fixed lg:relative inset-y-0 left-0 z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-[100dvh] max-h-[100dvh] shadow-2xl transition-all duration-300 ease-in-out`}
+      <aside
+        className={`fixed lg:relative inset-y-0 left-0 z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-[100dvh] max-h-[100dvh] shadow-2xl ${
+          isSidebarOpen ? "w-[280px] lg:w-[240px]" : "w-0 overflow-hidden hidden lg:flex lg:w-[240px]"
+        }`}
       >
         <div className="p-6 flex items-center gap-3 border-b border-border-theme">
           <div className="w-10 h-10 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30">
@@ -3309,7 +3299,7 @@ function AppLayoutContent({
           {isMobile && (
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="ml-auto text-slate-400 hover:text-white transition-colors"
+              className="ml-auto text-slate-400 hover:text-white"
             >
               <X size={24} />
             </button>
@@ -3317,7 +3307,7 @@ function AppLayoutContent({
         </div>
 
         {/* Scrollable Menu Area */}
-        <div className="flex-1 overflow-y-auto py-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto py-4 custom-scrollbar gpu-scroll">
           <nav className="space-y-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -3330,7 +3320,7 @@ function AppLayoutContent({
                     if (isMobile) setIsSidebarOpen(false);
                   }}
                   className={({ isActive: linkActive }) =>
-                    `w-full flex items-center gap-4 px-6 py-3 transition-all duration-200 group relative border-l-[3px] ${
+                    `w-full flex items-center gap-4 px-6 py-3 group relative border-l-[3px] ${
                       linkActive || active
                         ? "bg-accent-gold/10 text-accent-gold border-l-accent-gold"
                         : "text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent"
@@ -3360,7 +3350,7 @@ function AppLayoutContent({
         <div className="px-4 py-4 border-t border-border-theme space-y-4">
           <button
             onClick={() => handleTabChange("Admin")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded text-[10px] font-black uppercase tracking-widest ${
               isAdminActive
                 ? "bg-accent-gold text-bg-deep shadow-lg shadow-accent-gold/10"
                 : "text-accent-gold border border-accent-gold/20 hover:bg-accent-gold/10"
@@ -3372,24 +3362,24 @@ function AppLayoutContent({
             <span className="text-left flex-1">Área Administrativa</span>
           </button>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full bg-bg-deep relative overflow-hidden">
         {/* Header */}
-        <header className="h-[50px] md:h-[60px] border-b border-border-theme bg-bg-panel/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30 shadow-sm">
+        <header className="h-[50px] md:h-[60px] border-b border-border-theme bg-bg-panel flex items-center justify-between px-4 md:px-8 z-30 shadow-sm">
           <div className="flex items-center gap-4">
             {!isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded transition-all"
+                className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded"
               >
                 <Menu size={18} />
               </button>
             )}
             <button
               onClick={() => handleTabChange("Admin")}
-              className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[10px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black transition-all cursor-pointer"
+              className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[10px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black cursor-pointer"
             >
               <Lock size={12} />
               <span className="hidden sm:inline">Portal Administrativo</span>
@@ -3409,50 +3399,35 @@ function AppLayoutContent({
         </header>
 
         {/* Content Area */}
-        <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full pb-20"
-            >
-              <Routes>
-                <Route path="/" element={<InicioSection {...sectionProps} />} />
-                <Route path="/relprev" element={<RelprevSection {...sectionProps} />} />
-                <Route path="/relprev/:id" element={<RelprevSection {...sectionProps} />} />
-                <Route path="/fgr" element={<FgrSection {...sectionProps} />} />
-                <Route path="/fgr/:id" element={<FgrSection {...sectionProps} />} />
-                <Route path="/abortiva" element={<AbortivaSection {...sectionProps} />} />
-                <Route path="/abortiva/:id" element={<AbortivaSection {...sectionProps} />} />
-                <Route path="/mapa-de-risco" element={<MapaRiscoSection {...sectionProps} />} />
-                <Route path="/abastecimento" element={<AbastecimentoSection {...sectionProps} />} />
-                <Route path="/medicamentos" element={<MedicamentosSection {...sectionProps} />} />
-                <Route path="/normas-cavex" element={<NormasSection {...sectionProps} />} />
-                <Route path="/telefones" element={<TelefonesSection {...sectionProps} />} />
-                <Route path="/sugestoes" element={<SugestoesSection {...sectionProps} />} />
-                <Route path="/pesquisa-jsv" element={<JsvSurveySection {...sectionProps} />} />
-                <Route path="/admin" element={<AdminSection {...sectionProps} />} />
-                <Route path="/admin/:sub" element={<AdminSection {...sectionProps} />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </motion.div>
-          </AnimatePresence>
+        <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar gpu-scroll">
+          <div key={location.pathname} className="max-w-7xl mx-auto w-full pb-20">
+            <Routes>
+              <Route path="/" element={<InicioSection {...sectionProps} />} />
+              <Route path="/relprev" element={<RelprevSection {...sectionProps} />} />
+              <Route path="/relprev/:id" element={<RelprevSection {...sectionProps} />} />
+              <Route path="/fgr" element={<FgrSection {...sectionProps} />} />
+              <Route path="/fgr/:id" element={<FgrSection {...sectionProps} />} />
+              <Route path="/abortiva" element={<AbortivaSection {...sectionProps} />} />
+              <Route path="/abortiva/:id" element={<AbortivaSection {...sectionProps} />} />
+              <Route path="/mapa-de-risco" element={<MapaRiscoSection {...sectionProps} />} />
+              <Route path="/abastecimento" element={<AbastecimentoSection {...sectionProps} />} />
+              <Route path="/medicamentos" element={<MedicamentosSection {...sectionProps} />} />
+              <Route path="/normas-cavex" element={<NormasSection {...sectionProps} />} />
+              <Route path="/telefones" element={<TelefonesSection {...sectionProps} />} />
+              <Route path="/sugestoes" element={<SugestoesSection {...sectionProps} />} />
+              <Route path="/pesquisa-jsv" element={<JsvSurveySection {...sectionProps} />} />
+              <Route path="/admin" element={<AdminSection {...sectionProps} />} />
+              <Route path="/admin/:sub" element={<AdminSection {...sectionProps} />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
         </div>
       </main>
 
       {/* Consult FGR Modal */}
-      <AnimatePresence>
-        {isConsultFgrModalOpen && (
-          <div className="fixed inset-0 z-[60] bg-military-black/95 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-military-black border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col shadow-2xl my-auto"
-            >
+      {isConsultFgrModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-military-black/95 flex items-center justify-center p-4 overflow-y-auto gpu-scroll">
+          <div className="bg-military-black border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col shadow-2xl my-auto">
               <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-military-gold flex items-center justify-center text-military-black">
@@ -3734,10 +3709,9 @@ function AppLayoutContent({
                   </div>
                 )}
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -3963,35 +3937,23 @@ function ImageCarousel() {
 
   return (
     <div className="relative w-full h-[400px] lg:h-[500px] overflow-hidden rounded-lg group border border-border-theme bg-[#0a0f18] select-none">
-      {/* Blurred Background */}
-      <AnimatePresence initial={false}>
-        <motion.div
-          key={`bg-${CAROUSEL_IMAGES[currentIndex]}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.3 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.8 }}
-          className="absolute inset-0 z-0 bg-center bg-cover blur-2xl scale-110"
-          style={{ backgroundImage: `url(${CAROUSEL_IMAGES[currentIndex]})` }}
-        />
-      </AnimatePresence>
+      {/* Background */}
+      <div
+        key={`bg-${CAROUSEL_IMAGES[currentIndex]}`}
+        className="absolute inset-0 z-0 bg-center bg-cover opacity-20"
+        style={{ backgroundImage: `url(${CAROUSEL_IMAGES[currentIndex]})` }}
+      />
 
       {/* Main Content */}
       <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-4">
         {/* Active Image Container */}
         <div className="relative w-full max-w-4xl h-[75%] flex items-center justify-center">
-          <AnimatePresence mode="wait">
-            <motion.img
-              key={CAROUSEL_IMAGES[currentIndex]}
-              src={CAROUSEL_IMAGES[currentIndex]}
-              initial={{ opacity: 0, scale: 0.95, x: 20 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 1.05, x: -20 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-              referrerPolicy="no-referrer"
-            />
-          </AnimatePresence>
+          <img
+            key={CAROUSEL_IMAGES[currentIndex]}
+            src={CAROUSEL_IMAGES[currentIndex]}
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            referrerPolicy="no-referrer"
+          />
 
           {/* Navigation Arrows */}
           <button
@@ -6420,15 +6382,9 @@ function FgrSection({
                           </span>
                         </button>
 
-                        <AnimatePresence>
-                          {showMitigationSuggestions && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                              className="absolute bottom-full right-0 mb-2 w-80 max-h-[400px] overflow-y-auto bg-bg-deep border border-accent-gold/20 rounded shadow-2xl z-50 p-4 custom-scrollbar"
-                            >
-                              <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                        {showMitigationSuggestions && (
+                          <div className="absolute bottom-full right-0 mb-2 w-80 max-h-[400px] overflow-y-auto bg-bg-deep border border-accent-gold/20 rounded shadow-2xl z-50 p-4 custom-scrollbar gpu-scroll">
+                            <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
                                 <span className="text-[10px] font-black text-accent-gold uppercase tracking-widest">
                                   Sugestões de Ações
                                 </span>
@@ -6472,7 +6428,7 @@ function FgrSection({
                                               if (parts.length >= 2) {
                                                 return (
                                                   <div className="flex flex-col gap-1.5">
-                                                    <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover/item:text-military-gold transition-colors">
+                                                    <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover/item:text-military-gold">
                                                       {parts[0]}
                                                     </span>
                                                     <span className="text-[10px] text-text-secondary leading-normal pl-2 border-l border-military-gold/20 italic">
@@ -6490,9 +6446,8 @@ function FgrSection({
                                   ),
                                 )}
                               </div>
-                            </motion.div>
+                            </div>
                           )}
-                        </AnimatePresence>
                       </div>
                     </div>
                     <textarea
@@ -6504,42 +6459,37 @@ function FgrSection({
                   </div>
 
                   <div id="validation-errors-anchor" className="scroll-mt-20">
-                    <AnimatePresence>
-                      {validationErrors.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="bg-red-500/10 border border-red-500/30 rounded-sm p-4 mb-4"
+                    {validationErrors.length > 0 && (
+                      <div
+                        className="bg-red-500/10 border border-red-500/30 rounded-sm p-4 mb-4"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <AlertTriangle className="text-red-500" size={16} />
+                          <span className="text-[10px] font-black uppercase text-red-500 tracking-[0.2em]">
+                            Erros de Validação
+                          </span>
+                        </div>
+                        <ul className="space-y-1 mb-4">
+                          {validationErrors.map((err, idx) => (
+                            <li
+                              key={idx}
+                              className="text-[10px] text-text-primary flex items-start gap-2"
+                            >
+                              <span className="text-red-500 font-bold">
+                                •
+                              </span>
+                              {err}
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          onClick={() => handleSave(true)}
+                          className="w-full py-2 bg-red-500/20 border border-red-500/40 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/30"
                         >
-                          <div className="flex items-center gap-2 mb-3">
-                            <AlertTriangle className="text-red-500" size={16} />
-                            <span className="text-[10px] font-black uppercase text-red-500 tracking-[0.2em]">
-                              Erros de Validação
-                            </span>
-                          </div>
-                          <ul className="space-y-1 mb-4">
-                            {validationErrors.map((err, idx) => (
-                              <li
-                                key={idx}
-                                className="text-[10px] text-text-primary flex items-start gap-2"
-                              >
-                                <span className="text-red-500 font-bold">
-                                  •
-                                </span>
-                                {err}
-                              </li>
-                            ))}
-                          </ul>
-                          <button
-                            onClick={() => handleSave(true)}
-                            className="w-full py-2 bg-red-500/20 border border-red-500/40 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/30 transition-all"
-                          >
-                            Enviar mesmo assim
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                          Enviar mesmo assim
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -10806,238 +10756,213 @@ function AdminSection({
         </div>
       )}
       {/* Batch Delete Confirmation Modal */}
-      <AnimatePresence>
-        {batchDeleteTarget && (
-          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="card-military max-w-sm w-full p-8 text-center space-y-6 border-red-500/30 max-h-[90dvh] overflow-y-auto my-auto"
-            >
-              <div className="w-20 h-20 rounded-full bg-red-500/10 text-red-500 mx-auto flex items-center justify-center border border-red-500/20">
-                <AlertTriangle size={40} className="animate-pulse" />
-              </div>
-              <div className="space-y-3">
-                <h3 className="text-xl font-black text-white uppercase tracking-tighter">
-                  Excluir Lote Inteiro?
-                </h3>
-                <div className="p-3 bg-red-500/5 rounded border border-red-500/10">
-                  <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
-                    Arquivo Selecionado:
-                  </p>
-                  <p className="text-xs text-military-gold font-black truncate">
-                    "{batchDeleteTarget.name}"
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-2">
-                    Contém {batchDeleteTarget.count} lançamentos
-                  </p>
-                </div>
-                <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest bg-red-500/10 py-2 rounded">
-                  Esta ação removerá tudo permanentemente
+      {batchDeleteTarget && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
+          <div className="card-military max-w-sm w-full p-8 text-center space-y-6 border-red-500/30 max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="w-20 h-20 rounded-full bg-red-500/10 text-red-500 mx-auto flex items-center justify-center border border-red-500/20">
+              <AlertTriangle size={40} className="animate-pulse" />
+            </div>
+            <div className="space-y-3">
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter">
+                Excluir Lote Inteiro?
+              </h3>
+              <div className="p-3 bg-red-500/5 rounded border border-red-500/10">
+                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                  Arquivo Selecionado:
+                </p>
+                <p className="text-xs text-military-gold font-black truncate">
+                  "{batchDeleteTarget.name}"
+                </p>
+                <p className="text-[10px] text-slate-500 mt-2">
+                  Contém {batchDeleteTarget.count} lançamentos
                 </p>
               </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setBatchDeleteTarget(null)}
-                  className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors border border-white/5"
-                  disabled={isUploading}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleDeleteBatch}
-                  className="flex-1 px-4 py-3 rounded bg-red-600 text-white font-bold text-[10px] uppercase hover:bg-red-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
-                  disabled={isUploading}
-                >
-                  {isUploading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                  {isUploading ? "EXCLUINDO..." : "SIM, EXCLUIR"}
-                </button>
-              </div>
-            </motion.div>
+              <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest bg-red-500/10 py-2 rounded">
+                Esta ação removerá tudo permanentemente
+              </p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setBatchDeleteTarget(null)}
+                className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors border border-white/5"
+                disabled={isUploading}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteBatch}
+                className="flex-1 px-4 py-3 rounded bg-red-600 text-white font-bold text-[10px] uppercase hover:bg-red-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+                {isUploading ? "EXCLUINDO..." : "SIM, EXCLUIR"}
+              </button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {deleteId && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-sm overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="card-military max-w-sm w-full p-6 text-center space-y-6 max-h-[90dvh] overflow-y-auto my-auto"
-            >
-              <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-500 mx-auto flex items-center justify-center">
-                <Trash2 size={32} />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-lg font-black text-white uppercase tracking-tight">
-                  Mover para Lixeira
-                </h3>
-                <p className="text-xs text-text-secondary">
-                  Deseja realmente mover este registro para a lixeira?
-                  Ele poderá ser recuperado posteriormente se necessário.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setDeleteId(null);
-                    setDeleteColl(null);
-                  }}
-                  className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="flex-1 px-4 py-3 rounded bg-red-500 text-white font-bold text-[10px] uppercase hover:bg-red-600 transition-colors"
-                >
-                  Sim, Excluir
-                </button>
-              </div>
-            </motion.div>
+      {deleteId && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-military-black/90 overflow-y-auto gpu-scroll">
+          <div className="card-military max-w-sm w-full p-6 text-center space-y-6 max-h-[90dvh] overflow-y-auto my-auto">
+            <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-500 mx-auto flex items-center justify-center">
+              <Trash2 size={32} />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                Mover para Lixeira
+              </h3>
+              <p className="text-xs text-text-secondary">
+                Deseja realmente mover este registro para a lixeira?
+                Ele poderá ser recuperado posteriormente se necessário.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setDeleteId(null);
+                  setDeleteColl(null);
+                }}
+                className="flex-1 px-4 py-3 rounded bg-slate-800 text-white font-bold text-[10px] uppercase hover:bg-slate-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 px-4 py-3 rounded bg-red-500 text-white font-bold text-[10px] uppercase hover:bg-red-600 transition-colors"
+              >
+                Sim, Excluir
+              </button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       {/* Relprev Multi-line Details Modal */}
-      <AnimatePresence>
-        {selectedRelprev && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-military-black/90 backdrop-blur-md overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card-military max-w-2xl w-full max-h-[90dvh] overflow-y-auto p-6 sm:p-8 space-y-6 my-auto"
-            >
-              <div className="flex justify-between items-start border-b border-border-theme pb-4">
-                <div>
-                  <span className="text-[10px] font-mono text-military-gold uppercase tracking-[0.2em]">
-                    RELPREV #{selectedRelprev.codigo}
-                  </span>
-                  <h3 className="text-xl font-black text-white">
-                    Anexos do Relato
-                  </h3>
+      {selectedRelprev && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-military-black/90 overflow-y-auto gpu-scroll">
+          <div className="card-military max-w-2xl w-full max-h-[90dvh] overflow-y-auto p-6 sm:p-8 space-y-6 my-auto">
+            <div className="flex justify-between items-start border-b border-border-theme pb-4">
+              <div>
+                <span className="text-[10px] font-mono text-military-gold uppercase tracking-[0.2em]">
+                  RELPREV #{selectedRelprev.codigo}
+                </span>
+                <h3 className="text-xl font-black text-white">
+                  Anexos do Relato
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedRelprev(null);
+                  setShowAnexos(false);
+                }}
+                className="text-text-secondary hover:text-white border border-white/10 rounded p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {(selectedRelprev.images &&
+                selectedRelprev.images.length > 0) ||
+              (selectedRelprev.extraFiles &&
+                selectedRelprev.extraFiles.length > 0) ? (
+                <div className="space-y-6">
+                  {selectedRelprev.images &&
+                    selectedRelprev.images.length > 0 && (
+                      <div className="space-y-3">
+                        <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">
+                          Fotos Anexadas
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {selectedRelprev.images.map(
+                            (img: string, i: number) => (
+                              <button
+                                key={i}
+                                onClick={() => openBase64InNewTab(img)}
+                                className="block group relative overflow-hidden rounded border border-white/10 hover:border-accent-gold transition-colors aspect-square"
+                              >
+                                <img
+                                  src={img}
+                                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                  alt="Anexo"
+                                />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Search size={18} className="text-white" />
+                                </div>
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                  {selectedRelprev.extraFiles &&
+                    selectedRelprev.extraFiles.length > 0 && (
+                      <div className="space-y-3">
+                        <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">
+                          Documentos Extras
+                        </span>
+                        <div className="space-y-2">
+                          {selectedRelprev.extraFiles.map(
+                            (file: string, i: number) => (
+                              <button
+                                key={i}
+                                onClick={() => openBase64InNewTab(file)}
+                                className="w-full flex items-center gap-3 p-4 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-[10px] text-white font-bold uppercase text-left"
+                              >
+                                <FileText
+                                  size={18}
+                                  className="text-military-gold"
+                                />
+                                <span>Download Arquivo Anexo {i + 1}</span>
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedRelprev(null);
-                    setShowAnexos(false);
-                  }}
-                  className="text-text-secondary hover:text-white border border-white/10 rounded p-1"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+              ) : (
+                <div className="py-20 text-center text-text-secondary italic text-sm border border-dashed border-white/10 rounded">
+                  Este relato não possui anexos.
+                </div>
+              )}
+            </div>
 
-              <div className="space-y-6">
-                {(selectedRelprev.images &&
-                  selectedRelprev.images.length > 0) ||
-                (selectedRelprev.extraFiles &&
-                  selectedRelprev.extraFiles.length > 0) ? (
-                  <div className="space-y-6">
-                    {selectedRelprev.images &&
-                      selectedRelprev.images.length > 0 && (
-                        <div className="space-y-3">
-                          <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">
-                            Fotos Anexadas
-                          </span>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {selectedRelprev.images.map(
-                              (img: string, i: number) => (
-                                <button
-                                  key={i}
-                                  onClick={() => openBase64InNewTab(img)}
-                                  className="block group relative overflow-hidden rounded border border-white/10 hover:border-accent-gold transition-colors aspect-square"
-                                >
-                                  <img
-                                    src={img}
-                                    className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                    alt="Anexo"
-                                  />
-                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Search size={18} className="text-white" />
-                                  </div>
-                                </button>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                    {selectedRelprev.extraFiles &&
-                      selectedRelprev.extraFiles.length > 0 && (
-                        <div className="space-y-3">
-                          <span className="text-[10px] uppercase font-black text-military-gold tracking-widest">
-                            Documentos Extras
-                          </span>
-                          <div className="space-y-2">
-                            {selectedRelprev.extraFiles.map(
-                              (file: string, i: number) => (
-                                <button
-                                  key={i}
-                                  onClick={() => openBase64InNewTab(file)}
-                                  className="w-full flex items-center gap-3 p-4 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-[10px] text-white font-bold uppercase text-left"
-                                >
-                                  <FileText
-                                    size={18}
-                                    className="text-military-gold"
-                                  />
-                                  <span>Download Arquivo Anexo {i + 1}</span>
-                                </button>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                ) : (
-                  <div className="py-20 text-center text-text-secondary italic text-sm border border-dashed border-white/10 rounded">
-                    Este relato não possui anexos.
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-6 border-t border-white/5">
-                <button
-                  onClick={() => {
-                    const doc = generateRelprevPDF(selectedRelprev);
-                    window.open(doc.output("bloburl"), "_blank");
-                  }}
-                  className="flex-1 btn-military py-4 flex items-center justify-center gap-2"
-                >
-                  <FileText size={16} /> VER DADOS COMPLETOS (PDF)
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedRelprev(null);
-                    setShowAnexos(false);
-                  }}
-                  className="px-8 py-4 rounded border border-border-theme text-white font-bold text-xs hover:bg-white/5 transition-all uppercase"
-                >
-                  Voltar
-                </button>
-              </div>
-            </motion.div>
+            <div className="flex gap-3 pt-6 border-t border-white/5">
+              <button
+                onClick={() => {
+                  const doc = generateRelprevPDF(selectedRelprev);
+                  window.open(doc.output("bloburl"), "_blank");
+                }}
+                className="flex-1 btn-military py-4 flex items-center justify-center gap-2"
+              >
+                <FileText size={16} /> VER DADOS COMPLETOS (PDF)
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedRelprev(null);
+                  setShowAnexos(false);
+                }}
+                className="px-8 py-4 rounded border border-border-theme text-white font-bold text-xs hover:bg-white/5 transition-all uppercase"
+              >
+                Voltar
+              </button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       {/* Manual Flight Modal */}
-      <AnimatePresence>
-        {isManualModalOpen && (
-          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto"
-            >
+      {isManualModalOpen && (
+        <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
+          <div className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto">
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-military-gold/10 flex items-center justify-center text-military-gold">
@@ -11198,21 +11123,14 @@ function AdminSection({
                   </button>
                 </div>
               </form>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
 
       {/* Link FGR Modal */}
-      <AnimatePresence>
-        {isLinkFgrModalOpen && launchToLink && (
-          <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 backdrop-blur-md overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto"
-            >
+      {isLinkFgrModalOpen && launchToLink && (
+        <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-military-black/95 overflow-y-auto gpu-scroll">
+          <div className="card-military max-w-lg w-full p-6 sm:p-8 space-y-6 overflow-y-auto max-h-[90dvh] my-auto">
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
@@ -11375,10 +11293,9 @@ function AdminSection({
                   </button>
                 )}
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -11393,17 +11310,16 @@ function QuickCard({ icon: Icon, title, desc, color, onClick }: any) {
   };
 
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
+    <div
       onClick={onClick}
-      className={`card-military p-5 cursor-pointer group transition-all text-center ${colorMap[color]}`}
+      className={`card-military p-5 cursor-pointer group text-center ${colorMap[color]}`}
     >
       <div className="flex flex-col items-center gap-3">
         {Icon && <Icon size={20} className="text-accent-gold" />}
         <h3 className="font-bold text-sm tracking-wide">{title}</h3>
         <p className="text-[11px] text-text-secondary leading-tight">{desc}</p>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -11848,11 +11764,7 @@ function SugestoesSection({
 
       <div className="card-military p-8">
         {submitted ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-12 space-y-6"
-          >
+          <div className="text-center py-12 space-y-6">
             <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-green-500 mx-auto border border-green-500/30">
               <Check size={40} />
             </div>
@@ -11868,7 +11780,7 @@ function SugestoesSection({
             >
               Enviar outra sugestão
             </button>
-          </motion.div>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -12067,11 +11979,7 @@ function JsvSurveySection({
 
       <div className="card-military p-6 sm:p-8">
         {submitted ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-12 space-y-6"
-          >
+          <div className="text-center py-12 space-y-6">
             <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mx-auto border border-green-500/30 shadow-2xl">
               <Check size={40} />
             </div>
@@ -12099,7 +12007,7 @@ function JsvSurveySection({
                 Voltar ao Início
               </button>
             </div>
-          </motion.div>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Section 1: Multiple Choice */}
