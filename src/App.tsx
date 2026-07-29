@@ -4293,27 +4293,29 @@ function InicioSection({
         <div className="w-full min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
           <iframe
             src="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/preview"
-            className="w-full h-full border-none"
+            className="w-full h-full border-none pointer-events-auto"
             allow="autoplay"
+            loading="lazy"
             title="Folder Oficial Jornada de Segurança de Voo 2026"
           />
         </div>
 
         {/* Actions / Buttons below Folder */}
         <div className="w-full space-y-3">
-          <button
+          <Link
+            to="/pesquisa-jsv"
             onClick={() => onTabChange("JSV")}
-            className="w-full py-4 px-5 bg-gradient-to-r from-accent-gold via-yellow-400 to-accent-gold hover:from-yellow-300 hover:to-accent-gold text-military-black rounded-xl flex items-center justify-between gap-3 font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-xl cursor-pointer border-2 border-yellow-300/40"
+            className="w-full py-4 px-5 bg-gradient-to-r from-accent-gold via-yellow-400 to-accent-gold hover:from-yellow-300 hover:to-accent-gold text-military-black rounded-xl flex items-center justify-between gap-3 font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-xl cursor-pointer border-2 border-yellow-300/40 select-none touch-manipulation"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <ClipboardList size={22} className="text-military-black flex-shrink-0" />
-              <div className="text-left">
-                <span className="block font-black text-xs sm:text-sm leading-tight">Pesquisa de Opinião - JSV 2026</span>
-                <span className="block text-[10px] opacity-85 font-bold uppercase tracking-wider mt-0.5">Jornada de Segurança de Voo • Formulário de Avaliação</span>
+              <div className="text-left min-w-0">
+                <span className="block font-black text-xs sm:text-sm leading-tight truncate">Pesquisa de Opinião - JSV 2026</span>
+                <span className="block text-[10px] opacity-85 font-bold uppercase tracking-wider mt-0.5 truncate">Jornada de Segurança de Voo • Formulário de Avaliação</span>
               </div>
             </div>
             <ChevronRight size={18} className="flex-shrink-0" />
-          </button>
+          </Link>
 
           <a
             href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
@@ -12093,13 +12095,14 @@ function JsvSurveySection({
     <div className="max-w-3xl mx-auto space-y-8 pb-12">
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/10">
-        <button
+        <Link
+          to="/"
           onClick={() => onTabChange?.("Inicio")}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-military-gold hover:text-white transition-all text-xs font-bold uppercase tracking-wider border border-military-gold/20 cursor-pointer shadow-sm select-none touch-manipulation"
         >
           <ArrowLeft size={16} />
           <span>Voltar ao Início</span>
-        </button>
+        </Link>
         <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest hidden sm:inline-block">
           Página do Módulo • Pesquisa de Opinião JSV
         </span>
