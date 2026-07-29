@@ -4287,8 +4287,17 @@ function InicioSection({
           />
         </div>
 
-        {/* Como Chegar Button */}
+        {/* Actions / Buttons below Folder */}
         <div className="w-full space-y-3">
+          <button
+            onClick={() => onTabChange("JSV")}
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-accent-gold to-yellow-500 hover:from-yellow-400 hover:to-accent-gold text-military-black rounded-xl flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-lg cursor-pointer"
+          >
+            <ClipboardList size={18} />
+            <span>Pesquisa de Opinião - JSV 2026</span>
+            <ChevronRight size={14} className="opacity-80" />
+          </button>
+
           <a
             href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
             target="_blank"
@@ -4304,32 +4313,6 @@ function InicioSection({
             📍 Auditório do Museu Mazzaropi • Taubaté-SP <br />
             Estr. Amácio Mazzaropi, 249 - Itaim, Taubaté-SP
           </p>
-        </div>
-      </div>
-
-      {/* Cartazes 2026 */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest">
-            Cartazes 2026
-          </h3>
-          <a
-            href="https://drive.google.com/file/d/12QrZ2iEQuHA0u6oEcpcryk8OnoxDzL9m/view?usp=sharing"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[9px] font-bold text-military-gold hover:underline uppercase tracking-wider"
-          >
-            Abrir PDF <ExternalLink size={10} />
-          </a>
-        </div>
-        
-        <div className="w-full max-w-[480px] mx-auto min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
-          <iframe
-            src="https://drive.google.com/file/d/12QrZ2iEQuHA0u6oEcpcryk8OnoxDzL9m/preview"
-            className="w-full h-full border-none"
-            allow="autoplay"
-            title="Cartazes 2026 - Prevenção de Acidentes"
-          />
         </div>
       </div>
 
