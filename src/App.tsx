@@ -1,15 +1,5 @@
 import React, { FC, useState, useEffect, useRef } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  NavLink,
-  Link,
-  useNavigate,
-  useLocation,
-  useParams,
-  Navigate,
-} from "react-router-dom";
+// react-router-dom removed per user request for single-page state navigation
 import * as pdfjs from "pdfjs-dist";
 import {
   ArrowLeft,
@@ -3064,34 +3054,6 @@ async function processPDVFile(file: File) {
   return results;
 }
 
-const TAB_TO_PATH: Record<string, string> = {
-  Inicio: "/",
-  RELPREV: "/relprev",
-  FGR: "/fgr",
-  Abortiva: "/abortiva",
-  "Mapa de Risco": "/mapa-de-risco",
-  Abastecimento: "/abastecimento",
-  Medicamentos: "/medicamentos",
-  "Normas CAvEx": "/normas-cavex",
-  Telefones: "/telefones",
-  Admin: "/admin",
-  Sugestoes: "/sugestoes",
-};
-
-const PATH_TO_TAB: Record<string, string> = {
-  "/": "Inicio",
-  "/relprev": "RELPREV",
-  "/fgr": "FGR",
-  "/abortiva": "Abortiva",
-  "/mapa-de-risco": "Mapa de Risco",
-  "/abastecimento": "Abastecimento",
-  "/medicamentos": "Medicamentos",
-  "/normas-cavex": "Normas CAvEx",
-  "/telefones": "Telefones",
-  "/admin": "Admin",
-  "/sugestoes": "Sugestoes",
-};
-
 function AppLayoutContent({
   user,
   abastecimentoConfig,
@@ -3113,8 +3075,7 @@ function AppLayoutContent({
   setIsSidebarOpen,
   isMobile,
 }: any) {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<string>("Inicio");
   const mainScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -3128,7 +3089,7 @@ function AppLayoutContent({
     }, 60);
 
     return () => clearTimeout(timer);
-  }, [location.pathname]);
+  }, [activeTab]);
 
   const handleTabChange = (tab: any) => {
     if (tab === "Portal Único de Notificação") {
@@ -3138,43 +3099,44 @@ function AppLayoutContent({
       );
       return;
     }
-    if (tab === "Admin" && !isAdminAuthenticated) {
-      setIsAdminModalOpen(true);
+
+    if (tab === "Admin") {
+      if (!isAdminAuthenticated) {
+        setIsAdminModalOpen(true);
+        return;
+      }
+      setActiveTab("Admin");
+      if (isMobile) setIsSidebarOpen(false);
       return;
     }
 
     if (tab === "Inicio" || tab === "BACK") {
-      if (window.history.length > 1 && location.pathname !== "/") {
-        navigate(-1);
-      } else {
-        navigate("/");
-      }
+      setActiveTab("Inicio");
+      if (isMobile) setIsSidebarOpen(false);
       return;
     }
 
-    const path = TAB_TO_PATH[tab] || "/";
-    navigate(path);
-    if (isMobile) setIsSidebarOpen(false);
+    alert("Esta seção está desativada neste endereço. Acesse o novo portal do 2º BAvEx: https://sipaa-2-bavex.guiokra.chatgpt.site/");
   };
 
   const navItems = [
-    { id: "Inicio", path: "/", name: "Início", icon: Home },
-    { id: "RELPREV", path: "/relprev", name: "PREENCHIMENTO DE RELPREV", icon: FileSearch },
-    { id: "FGR", path: "/fgr", name: "FGR", icon: ShieldCheck },
-    { id: "Abortiva", path: "/abortiva", name: "Abortiva", icon: Zap },
-    { id: "Mapa de Risco", path: "/mapa-de-risco", name: "Mapa de Risco", icon: MapIcon },
-    { id: "Abastecimento", path: "/abastecimento", name: "Abastecimento", icon: Droplets },
-    { id: "Medicamentos", path: "/medicamentos", name: "Medicamentos de Uso Restritivo", icon: Pill },
-    { id: "Normas CAvEx", path: "/normas-cavex", name: "Normas CAvEx", icon: Gavel },
-    { id: "Telefones", path: "/telefones", name: "Telefones", icon: Phone },
-    { id: "Sugestoes", path: "/sugestoes", name: "Sugestões", icon: MessageSquarePlus },
+    { id: "Inicio", name: "Início", icon: Home, disabled: false },
+    { id: "RELPREV", name: "PREENCHIMENTO DE RELPREV", icon: FileSearch, disabled: true },
+    { id: "FGR", name: "FGR", icon: ShieldCheck, disabled: true },
+    { id: "Abortiva", name: "Abortiva", icon: Zap, disabled: true },
+    { id: "Mapa de Risco", name: "Mapa de Risco", icon: MapIcon, disabled: true },
+    { id: "Abastecimento", name: "Abastecimento", icon: Droplets, disabled: true },
+    { id: "Medicamentos", name: "Medicamentos de Uso Restritivo", icon: Pill, disabled: true },
+    { id: "Normas CAvEx", name: "Normas CAvEx", icon: Gavel, disabled: true },
+    { id: "Telefones", name: "Telefones", icon: Phone, disabled: true },
+    { id: "Sugestoes", name: "Sugestões", icon: MessageSquarePlus, disabled: true },
   ];
 
   const sectionProps = {
     user,
     onTabChange: handleTabChange,
     onConsultFgr: () => {
-      navigate("/fgr");
+      setActiveTab("FGR");
       setIsConsultFgrModalOpen(true);
     },
     abastecimentoConfig,
@@ -3186,21 +3148,14 @@ function AppLayoutContent({
     isAdminAuthenticated,
   };
 
-  const isNavActive = (itemPath: string) => {
-    if (itemPath === "/") {
-      return location.pathname === "/";
-    }
-    return location.pathname.startsWith(itemPath);
-  };
-
-  const isAdminActive = location.pathname.startsWith("/admin");
+  const isAdminActive = activeTab === "Admin";
 
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] w-full bg-military-black overflow-hidden relative selection:bg-military-gold selection:text-military-black">
       {/* Admin Password Modal */}
       <AnimatePresence>
         {isAdminModalOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-military-black/80 backdrop-blur-sm overflow-y-auto grayscale">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -3247,7 +3202,7 @@ function AppLayoutContent({
                 </div>
                 <button
                   type="submit"
-                  className="btn-military w-full py-3 text-xs"
+                  className="btn-military w-full py-3 text-xs cursor-pointer"
                 >
                   AUTENTICAR
                 </button>
@@ -3265,14 +3220,14 @@ function AppLayoutContent({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Grayscale */}
       <motion.aside
         initial={false}
         animate={{
           width: isSidebarOpen ? (isMobile ? "280px" : "240px") : "0px",
           x: isSidebarOpen ? 0 : isMobile ? -300 : -240,
         }}
-        className={`fixed lg:relative inset-y-0 left-0 z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-[100dvh] max-h-[100dvh] shadow-2xl transition-all duration-300 ease-in-out`}
+        className={`fixed lg:relative inset-y-0 left-0 z-50 bg-bg-sidebar border-r border-border-theme flex flex-col h-[100dvh] max-h-[100dvh] shadow-2xl transition-all duration-300 ease-in-out grayscale`}
       >
         <div className="p-6 flex items-center gap-3 border-b border-border-theme">
           <div className="w-10 h-10 bg-accent-gold/20 flex items-center justify-center rounded-lg border border-accent-gold/30">
@@ -3316,27 +3271,30 @@ function AppLayoutContent({
           <nav className="space-y-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = isNavActive(item.path);
+              const active = activeTab === item.id;
+              const isDisabled = item.disabled;
+
               return (
-                <NavLink
+                <button
                   key={item.id}
-                  to={item.path}
-                  onClick={() => {
-                    if (isMobile) setIsSidebarOpen(false);
-                  }}
-                  className={({ isActive: linkActive }) =>
-                    `w-full flex items-center gap-4 px-6 py-3 transition-all duration-200 group relative border-l-[3px] ${
-                      linkActive || active
-                        ? "bg-accent-gold/10 text-accent-gold border-l-accent-gold"
-                        : "text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent"
-                    }`
-                  }
+                  type="button"
+                  onClick={() => handleTabChange(item.id)}
+                  disabled={isDisabled}
+                  className={`w-full flex items-center gap-4 px-6 py-3 transition-all duration-200 group relative border-l-[3px] ${
+                    isDisabled
+                      ? "opacity-35 cursor-not-allowed border-l-transparent bg-black/30 text-gray-400"
+                      : active
+                      ? "bg-accent-gold/10 text-accent-gold border-l-accent-gold cursor-pointer"
+                      : "text-text-secondary hover:bg-accent-gold/5 hover:text-white border-l-transparent cursor-pointer"
+                  }`}
                 >
                   <div className="flex-shrink-0 w-5 flex justify-center">
                     <Icon
                       size={16}
                       className={
-                        active
+                        isDisabled
+                          ? "text-gray-500"
+                          : active
                           ? "text-accent-gold"
                           : "text-text-secondary group-hover:text-white"
                       }
@@ -3345,17 +3303,22 @@ function AppLayoutContent({
                   <span className="text-[13px] font-medium text-left leading-tight block flex-1">
                     {item.name}
                   </span>
-                </NavLink>
+                  {isDisabled && (
+                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter bg-gray-800/80 px-1.5 py-0.5 rounded border border-gray-700/50">
+                      Inativo
+                    </span>
+                  )}
+                </button>
               );
             })}
           </nav>
         </div>
 
-        {/* User profile & Admin Section at Bottom */}
+        {/* User profile & Admin Section at Bottom - ACTIVE */}
         <div className="px-4 py-4 border-t border-border-theme space-y-4">
           <button
             onClick={() => handleTabChange("Admin")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-all duration-200 text-[10px] font-black uppercase tracking-widest cursor-pointer ${
               isAdminActive
                 ? "bg-accent-gold text-bg-deep shadow-lg shadow-accent-gold/10"
                 : "text-accent-gold border border-accent-gold/20 hover:bg-accent-gold/10"
@@ -3364,15 +3327,15 @@ function AppLayoutContent({
             <div className="flex-shrink-0 w-4 flex justify-center">
               {isAdminAuthenticated ? <Unlock size={12} /> : <Lock size={12} />}
             </div>
-            <span className="text-left flex-1">Área Administrativa</span>
+            <span className="text-left flex-1">Portal Administrativo</span>
           </button>
         </div>
       </motion.aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full bg-bg-deep relative overflow-hidden">
-        {/* Header */}
-        <header className="h-[50px] md:h-[60px] border-b border-border-theme bg-bg-panel/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30 shadow-sm">
+        {/* Header - Grayscale */}
+        <header className="h-[50px] md:h-[60px] border-b border-border-theme bg-bg-panel/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30 shadow-sm grayscale">
           <div className="flex items-center gap-4">
             {!isSidebarOpen && (
               <button
@@ -3384,10 +3347,10 @@ function AppLayoutContent({
             )}
             <button
               onClick={() => handleTabChange("Admin")}
-              className="flex items-center gap-2 px-3 py-1.5 rounded bg-military-gold/10 text-military-gold border border-military-gold/20 text-[10px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black transition-all cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded bg-military-gold/20 text-white border border-military-gold/40 text-[11px] font-black uppercase tracking-widest hover:bg-military-gold hover:text-military-black transition-all cursor-pointer shadow-md"
             >
-              <Lock size={12} />
-              <span className="hidden sm:inline">Portal Administrativo</span>
+              <Lock size={13} />
+              <span>Portal Administrativo</span>
             </button>
           </div>
 
@@ -3407,31 +3370,17 @@ function AppLayoutContent({
         <div ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 relative custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
-              key={location.pathname}
+              key={activeTab}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full pb-20"
             >
-              <Routes>
-                <Route path="/" element={<InicioSection {...sectionProps} />} />
-                <Route path="/relprev" element={<RelprevSection {...sectionProps} />} />
-                <Route path="/relprev/:id" element={<RelprevSection {...sectionProps} />} />
-                <Route path="/fgr" element={<FgrSection {...sectionProps} />} />
-                <Route path="/fgr/:id" element={<FgrSection {...sectionProps} />} />
-                <Route path="/abortiva" element={<AbortivaSection {...sectionProps} />} />
-                <Route path="/abortiva/:id" element={<AbortivaSection {...sectionProps} />} />
-                <Route path="/mapa-de-risco" element={<MapaRiscoSection {...sectionProps} />} />
-                <Route path="/abastecimento" element={<AbastecimentoSection {...sectionProps} />} />
-                <Route path="/medicamentos" element={<MedicamentosSection {...sectionProps} />} />
-                <Route path="/normas-cavex" element={<NormasSection {...sectionProps} />} />
-                <Route path="/telefones" element={<TelefonesSection {...sectionProps} />} />
-                <Route path="/sugestoes" element={<SugestoesSection {...sectionProps} />} />
-                <Route path="/admin" element={<AdminSection {...sectionProps} />} />
-                <Route path="/admin/:sub" element={<AdminSection {...sectionProps} />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              {(() => {
+                const ActiveComponent = sectionComponents[activeTab] || InicioSection;
+                return <ActiveComponent {...sectionProps} />;
+              })()}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -3899,29 +3848,27 @@ export default function App() {
   };
 
   return (
-    <BrowserRouter>
-      <AppLayoutContent
-        user={user}
-        abastecimentoConfig={abastecimentoConfig}
-        abastecimentoFiles={abastecimentoFiles}
-        launches={launches}
-        setLaunches={setLaunches}
-        fgrs={fgrs}
-        abortivas={abortivas}
-        isAdminAuthenticated={isAdminAuthenticated}
-        setIsAdminAuthenticated={setIsAdminAuthenticated}
-        isAdminModalOpen={isAdminModalOpen}
-        setIsAdminModalOpen={setIsAdminModalOpen}
-        adminPassword={adminPassword}
-        setAdminPassword={setAdminPassword}
-        handleAdminLogin={handleAdminLogin}
-        isConsultFgrModalOpen={isConsultFgrModalOpen}
-        setIsConsultFgrModalOpen={setIsConsultFgrModalOpen}
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-        isMobile={isMobile}
-      />
-    </BrowserRouter>
+    <AppLayoutContent
+      user={user}
+      abastecimentoConfig={abastecimentoConfig}
+      abastecimentoFiles={abastecimentoFiles}
+      launches={launches}
+      setLaunches={setLaunches}
+      fgrs={fgrs}
+      abortivas={abortivas}
+      isAdminAuthenticated={isAdminAuthenticated}
+      setIsAdminAuthenticated={setIsAdminAuthenticated}
+      isAdminModalOpen={isAdminModalOpen}
+      setIsAdminModalOpen={setIsAdminModalOpen}
+      adminPassword={adminPassword}
+      setAdminPassword={setAdminPassword}
+      handleAdminLogin={handleAdminLogin}
+      isConsultFgrModalOpen={isConsultFgrModalOpen}
+      setIsConsultFgrModalOpen={setIsConsultFgrModalOpen}
+      isSidebarOpen={isSidebarOpen}
+      setIsSidebarOpen={setIsSidebarOpen}
+      isMobile={isMobile}
+    />
   );
 }
 
@@ -4241,8 +4188,8 @@ function InicioSection({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* Sleek, Compact Welcome Banner */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0d121d] to-[#080b12] border border-border-theme p-4 sm:p-5 shadow-xl">
+      {/* Sleek, Compact Welcome Banner - Grayscale */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0d121d] to-[#080b12] border border-border-theme p-4 sm:p-5 shadow-xl grayscale">
         <div className="absolute top-1/2 -translate-y-1/2 right-6 opacity-5 pointer-events-none hidden sm:block">
           <img
             src="https://i.ibb.co/0pjMXVKB/2-bavex.png"
@@ -4283,169 +4230,58 @@ function InicioSection({
         </div>
       </div>
 
-      {/* Official Event PDF Flyer (Google Drive Embed) & Map Button */}
-      <div className="flex flex-col items-center justify-center w-full max-w-[500px] mx-auto py-2 space-y-4">
-        {/* Header indicator */}
-        <div className="flex items-center justify-between w-full select-none px-1">
-          <div className="flex items-center gap-2">
-            <span className="animate-pulse w-2 h-2 rounded-full bg-accent-gold" />
-            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-accent-gold">
-              Folder Oficial do Evento
-            </span>
+      {/* BIG PROMINENT NOTICE BOX FOR NEW SITE ADDRESS - FULL HIGHLIGHT COLOR (NO GRAYSCALE) */}
+      <div className="w-full max-w-3xl mx-auto my-6 filter-none grayscale-0 isolate z-20" style={{ filter: "none" }}>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#1e2310] via-[#13190a] to-[#090e04] border-2 border-[#b5dc3e] p-6 sm:p-10 shadow-[0_0_50px_rgba(181,220,62,0.35)] text-center space-y-6">
+          
+          {/* Animated Highlight Icon & Alert Badge */}
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="w-20 h-20 rounded-full bg-[#b5dc3e]/20 border-2 border-[#b5dc3e] flex items-center justify-center text-[#b5dc3e] animate-bounce shadow-xl">
+              <ExternalLink size={38} />
+            </div>
+            <div className="inline-flex items-center gap-2 bg-[#b5dc3e] text-black px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg">
+              <AlertTriangle size={16} className="fill-black text-[#b5dc3e]" />
+              <span>ATENÇÃO: MUDANÇA DE ENDEREÇO</span>
+            </div>
           </div>
-          <a
-            href="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/view?usp=drivesdk"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[9px] font-bold text-military-gold hover:underline uppercase tracking-wider"
-          >
-            Abrir PDF <ExternalLink size={10} />
-          </a>
-        </div>
 
-        {/* Official Event PDF Flyer (Google Drive Embed) */}
-        <div className="w-full min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
-          <iframe
-            src="https://drive.google.com/file/d/1MzNOCQqSxSA8d3BZDXHNAfRv9x-Oc61h/preview"
-            className="w-full h-full border-none"
-            allow="autoplay"
-            title="Folder Oficial Jornada de Segurança de Voo 2026"
-          />
-        </div>
+          {/* Title & Explanatory Text */}
+          <div className="space-y-3">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white uppercase tracking-wider leading-tight drop-shadow-md">
+              SISTEMA MIGRADO PARA NOVO SITE
+            </h2>
+            <p className="text-xs sm:text-sm md:text-base text-slate-200 max-w-xl mx-auto leading-relaxed">
+              Este site foi desativado. O portal oficial de Segurança de Voo do 2º BAvEx agora atende no novo link abaixo. Clique no botão para ser redirecionado para o novo portal:
+            </p>
+          </div>
 
-        {/* Como Chegar & Pesquisa de Opinião Buttons */}
-        <div className="w-full space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
+          {/* New URL Display Box */}
+          <div className="bg-black/90 border-2 border-[#b5dc3e]/60 rounded-2xl p-4 max-w-lg mx-auto flex items-center justify-center gap-3 text-[#b5dc3e] font-mono text-xs sm:text-sm md:text-base font-bold break-all shadow-inner">
+            <ShieldCheck size={20} className="flex-shrink-0 text-[#b5dc3e]" />
+            <span>https://sipaa-2-bavex.guiokra.chatgpt.site/</span>
+          </div>
+
+          {/* Main Action Button */}
+          <div className="pt-2">
             <a
-              href="https://maps.google.com/?q=Estr.+Amacio+Mazzaropi,+249+-+Itaim,+Taubate+-+SP"
+              href="https://sipaa-2-bavex.guiokra.chatgpt.site/"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-2 px-3 bg-military-gold hover:bg-military-gold/90 text-military-black rounded-lg flex items-center justify-center gap-1.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer"
+              className="inline-flex items-center justify-center gap-3 px-8 py-4 sm:px-10 sm:py-5 rounded-2xl bg-gradient-to-r from-[#b5dc3e] via-[#c2e847] to-[#99c223] hover:from-[#c8f04d] hover:to-[#a9d82a] text-black font-black text-sm sm:text-lg uppercase tracking-wider transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-[0_0_35px_rgba(181,220,62,0.6)] cursor-pointer border-2 border-white/40"
             >
-              <MapIcon size={12} className="animate-bounce" />
-              <span>Como Chegar</span>
-              <ExternalLink size={10} className="opacity-80" />
+              <span>CLIQUE AQUI PARA ACESSAR O NOVO SITE</span>
+              <ExternalLink size={22} className="animate-pulse" />
             </a>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowOpinionForm(!showOpinionForm);
-                if (opinionSubmitted) {
-                  setOpinionSubmitted(false);
-                }
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 font-black text-[11px] uppercase tracking-wider transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] shadow-md cursor-pointer ${
-                showOpinionForm
-                  ? "bg-white/10 hover:bg-white/15 border border-white/10 text-white"
-                  : "bg-black/40 hover:bg-black/60 border border-military-gold/30 hover:border-military-gold text-military-gold"
-              }`}
-            >
-              <MessageSquarePlus size={12} />
-              <span>Pesquisa de Opinião</span>
-            </button>
           </div>
 
-          <AnimatePresence>
-            {showOpinionForm && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden w-full bg-military-black/60 border border-[#b5dc3e]/20 rounded-xl p-4 shadow-xl space-y-3"
-              >
-                {opinionSubmitted ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="text-center py-4 space-y-2"
-                  >
-                    <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mx-auto border border-green-500/30">
-                      <Check size={20} />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Opinião Enviada!</h4>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                        Sua opinião foi enviada com sucesso e aparecerá nas sugestões do administrador. Obrigado!
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpinionSubmitted(false)}
-                      className="text-military-gold font-bold uppercase text-[9px] tracking-widest hover:underline pt-1 cursor-pointer"
-                    >
-                      Enviar outro comentário
-                    </button>
-                  </motion.div>
-                ) : (
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      if (!opinionText.trim()) return;
-                      setIsOpinionSubmitting(true);
-                      try {
-                        await addDoc(collection(db, "suggestions"), {
-                          text: `[PESQUISA DE OPINIÃO - JORNADA 2026] ${opinionText.trim()}`,
-                          submittedBy: auth.currentUser?.email || auth.currentUser?.uid || "Anônimo",
-                          createdAt: new Date().toISOString(),
-                        });
-                        setOpinionSubmitted(true);
-                        setOpinionText("");
-                      } catch (err) {
-                        console.error("Erro ao enviar opinião:", err);
-                        alert("Erro ao enviar sua opinião. Tente novamente mais tarde.");
-                      } finally {
-                        setIsOpinionSubmitting(false);
-                      }
-                    }}
-                    className="space-y-3"
-                  >
-                    <div className="space-y-1 text-left">
-                      <label className="text-[9px] font-black text-[#b5dc3e] uppercase tracking-widest flex items-center gap-1.5">
-                        <MessageSquarePlus size={10} /> O que você achou do evento? (Texto Livre)
-                      </label>
-                      <textarea
-                        value={opinionText}
-                        onChange={(e) => setOpinionText(e.target.value)}
-                        placeholder="Escreva aqui seu feedback, sugestão, ou avaliação sobre a Jornada de Segurança de Voo 2026..."
-                        className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-[#b5dc3e] outline-none transition-all min-h-[90px] text-[11px] leading-relaxed placeholder:text-slate-600 italic"
-                        disabled={isOpinionSubmitting}
-                        required
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isOpinionSubmitting || !opinionText.trim()}
-                      className="w-full py-2 px-3 bg-[#b5dc3e] hover:bg-[#a4ca33] disabled:opacity-45 text-black font-black text-[10px] uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer"
-                    >
-                      {isOpinionSubmitting ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" />
-                          <span>Enviando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send size={11} />
-                          <span>Enviar Opinião</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-          
-          <p className="text-[9px] text-text-secondary text-center uppercase tracking-wide select-none leading-normal">
-            📍 Auditório do Museu Mazzaropi • Taubaté-SP <br />
-            Estr. Amácio Mazzaropi, 249 - Itaim, Taubaté-SP
+          <p className="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase tracking-wider pt-2">
+            2º Batalhão de Aviação do Exército — Batalhão Casimiro Montenegro Filho
           </p>
         </div>
       </div>
 
-      {/* Cartazes 2026 */}
-      <div className="space-y-3">
+      {/* Cartazes 2026 - Grayscale */}
+      <div className="space-y-3 grayscale opacity-80">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest">
             Cartazes 2026
@@ -4460,7 +4296,7 @@ function InicioSection({
           </a>
         </div>
         
-        <div className="w-full max-w-[480px] mx-auto min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-[#b5dc3e]/30 overflow-hidden bg-black/40 shadow-2xl relative">
+        <div className="w-full max-w-[480px] mx-auto min-h-[420px] aspect-[1/1.4] sm:h-[620px] sm:aspect-auto rounded-2xl border-2 border-white/20 overflow-hidden bg-black/40 shadow-2xl relative">
           <iframe
             src="https://drive.google.com/file/d/12QrZ2iEQuHA0u6oEcpcryk8OnoxDzL9m/preview"
             className="w-full h-full border-none"
@@ -4470,8 +4306,8 @@ function InicioSection({
         </div>
       </div>
 
-      {/* Operative Statistics */}
-      <div className="space-y-3">
+      {/* Operative Statistics - Grayscale */}
+      <div className="space-y-3 grayscale opacity-80">
         <h3 className="text-military-gold font-black uppercase text-[10px] sm:text-xs tracking-widest px-1">
           Estatísticas Operacionais
         </h3>
